@@ -1,0 +1,160 @@
+import json
+import os
+from telethon import TelegramClient, events
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from agent_classifier import agent_classify_telegram_message
+from order_manager import OrderManager
+from risk_manager import RiskManager
+from mt5_executor import MT5Executor
+
+manager = OrderManager()
+risk_agent = RiskManager()
+mt5_agent = MT5Executor()
+
+# ==========================================
+# CONFIGURAZIONI TELEGRAM 
+# ==========================================
+# Puoi usare le variabili d'ambiente o inserire i dati direttamente qui sotto
+TELEGRAM_API_ID = int(os.getenv("TELEGRAM_API_ID", "0"))
+TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
+
+# Può essere il link (es: 'https://t.me/tuocanale'), l'username (es: '@tuocanale') o l'ID numerico del canale/gruppo
+TARGET_CHANNEL = os.getenv("TARGET_CHANNEL", "")
+
+# Inizializzazione del client Telethon (creerà una sessione locale chiamata 'session_test')
+tg_client = TelegramClient('session_test', TELEGRAM_API_ID, TELEGRAM_API_HASH)
+
+OWNER_ID = 462122085
+
+async def process_and_print(event, is_edit: bool):
+
+    sender_id = event.sender_id
+    print(event.sender_id)
+    # Se il messaggio non arriva dall'owner, scartalo subito (nessuna chiamata AI)
+    if sender_id != OWNER_ID:
+        return
+
+    text = event.raw_text
+    if not text or not text.strip():
+        return
+    
+    msg_id = event.id
+    reply_to = event.reply_to_msg_id if hasattr(event, 'reply_to_msg_id') else None
+    has_media = bool(event.media) if hasattr(event, 'media') else False
+    is_forwarded = bool(event.forward) if hasattr(event, 'forward') else False
+    timestamp = event.date.timestamp() if getattr(event, 'date', None) else None
+
+    # Ignoriamo i messaggi vuoti (es. solo foto senza didascalia o sticker)
+    if not text.strip():
+        return
+
+    print(f"\n" + "="*50)
+    print(f"[{'✏️ EDIT MESSAGGIO' if is_edit else '🆕 NUOVO MESSAGGIO'}] ID: {msg_id} | Reply-To: {reply_to}")
+    print(f"TESTO RICEVUTO:\n{text}")
+    print("="*50)
+
+    try:
+        # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
+        ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
+        
+        print("🧠 OUTPUT AGENTE 1 (JSON):")
+        print(json.dumps(ai_output, indent=2, ensure_ascii=False))
+
+        # 2. Passaggio all'Order Manager (il tuo file separato)
+        manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output)
+
+        if manager_result:
+            action = manager_result.get("action")
+            trade_data = manager_result.get("trade", {})
+
+            # CASO 1: Apertura nuovo ordine (Fase Rapida)
+            if action == "OPEN":
+                validated_orders = risk_agent.validate_and_build_order(trade_data)
+                if validated_orders.get("approved"):
+                    orders_dict = validated_orders.get("orders", {})
+        
+                    all_success = True
+                    for target_key, order_config in orders_dict.items():
+                        # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
+                        order_ticket = mt5_agent.execute_open(order_config)
+            
+                        # Aggiorniamo direttamente i campi del ticket pre-strutturato in memoria
+                        if target_key in trade_data["tickets"]:
+                            trade_data["tickets"][target_key]["volume"] = order_config.get("volume")
+                            trade_data["tickets"][target_key]["mt5_ticket"] = order_ticket
+                            trade_data["tickets"][target_key]["success"] = order_ticket is not None
+            
+                        if order_ticket is None:
+                            all_success = False
+
+                    # Aggiorniamo lo status in base all'esito complessivo
+                    trade_data["status"] = "ACTIVE" if all_success else "PENDING_FAILED"
+                    print(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
+
+                else:
+                    print(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
+                    trade_data["status"] = "REJECTED"
+
+            # CASO 2: Aggiornamento ordine esistente (SL/TP reali o BE+)
+            elif action == "UPDATE":
+                # Se è richiesta la modifica a Breakeven
+                if trade_data.get("be_active"):
+                    mt5_agent.set_sl_to_be(
+                        ticket=trade_data.get("ticket_id"),
+                        symbol=trade_data.get("symbol"),
+                        entry_price=trade_data.get("entry_min")
+                    )
+                    # Se si tratta dell'aggiornamento con SL/TP reali
+                else:
+                    for tp_key, tp_config in trade_data["tickets"].items():
+                        real_mt5_ticket = tp_config.get("mt5_ticket")
+        
+                        # Prendi il nuovo stop_loss dal trade_data aggiornato dall'Order Manager
+                        new_sl = trade_data.get("stop_loss")
+                        new_tp = trade_data.get("take_profit")
+        
+                        mt5_agent.modify_order_levels(
+                            ticket=real_mt5_ticket,
+                            stop_loss=new_sl,
+                            take_profit=new_tp
+                        )
+
+            # CASO 3: Chiusura posizione
+            elif action == "CLOSE":
+                trade_data = manager_result.get("trade", {})
+                tickets = trade_data.get("tickets", {})
+    
+                for tp_key, tp_config in tickets.items():
+                    real_mt5_ticket = tp_config.get("mt5_ticket")
+                    if real_mt5_ticket:
+                        # Chiamata al metodo di chiusura per il singolo ticket
+                        mt5_agent.close_all(ticket=real_mt5_ticket) # Oppure il nome del metodo corretto nel tuo MT5Executor
+                        print(f"🔒 Chiusura eseguita su MT5 per il ticket: {real_mt5_ticket}")
+        
+        print("\n📦 STATO MEMORIA (ORDER MANAGER):")
+        print(json.dumps(manager_result, indent=2, ensure_ascii=False))
+        print(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
+        
+    except Exception as e:
+        print(f"❌ Errore durante l'elaborazione dell'Agente 1: {e}")
+
+# Listener per i NUOVI messaggi nel canale
+@tg_client.on(events.NewMessage(chats=TARGET_CHANNEL))
+async def handle_new_message(event):
+    await process_and_print(event, is_edit=False)
+
+# Listener per i MESSAGGI MODIFICATI (gli Edit) nel canale
+@tg_client.on(events.MessageEdited(chats=TARGET_CHANNEL))
+async def handle_edited_message(event):
+    await process_and_print(event, is_edit=True)
+
+
+# Avvio del client
+if __name__ == "__main__":
+    print(f"🤖 Ascolto attivo sul canale: {TARGET_CHANNEL}")
+    print("In attesa di messaggi... (Premi Ctrl+C per fermare)")
+    tg_client.start()
+    tg_client.run_until_disconnected()

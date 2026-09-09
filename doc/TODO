@@ -1,0 +1,113 @@
+Ottimizzazione Sistema Bot
+
+    CLASSIFICAZIONE SEGNALI:
+        - NEW_SIGNAL
+            - Messaggi in modalià rapida, buy o sell senza TP e SL
+
+        - UPDATE_SIGNAL
+            - Messaggio STANDARD fase COMPLETA --> aggiunta di TP e SL
+            - Messaggio STANDARD "Trade Active" --> attivare BE se presente nel messaggio
+            - Messaggio STANDARD "Zero Float" --> attivare BE se presente nel messaggio
+            - Messaggio STANDARD "HIT TP" --> attivare BE se presente nel messaggio
+            - Messaggio NON STANDARD
+
+        - CLOSE_SIGNAL
+            - Messaggio STANDARD "HIT TP MAX" --> mai BE chiudere sempre operazioni attive, il motivo è che il trader del canale ha toccato il TP MAX,
+                                                  se non abbiamo toccato anche noi il tp max, bisogna chiudere perchè non staremmo ascoltando le direttive del trader
+            - Messaggio NON STANDARD
+
+        - IGNORE
+            - Messaggio STANDARD celebrativi
+            - Messaggio STANDARD reason nuy
+            - Messaggio STANDARD READY
+            - Messaggio NON STANDARD
+
+    Bisogna gesitre meglio i messaggi che fanno riferimento ad una operazione attiva, quindi di aggiornamento che sia CLOSE_SIGNAL o UPDATE_SIGNAL.
+    I messaggi da classficare potrebbero essere questi:
+        - "Trade Active"
+        - "HIT TP MAX"
+        - "Zero Float"
+        - "HIT TP"
+
+Messaggio di Sell o buy again, il messaggio non passerà mai alla fase completa perchè non vine editato o fa riferimento ad un messaggio.
+    Mancanza del simbolo
+        Quando un messaggio rapido (es. "Lets sell again") non menziona l'asset (es. XAUUSD) e non è un reply diretto al segnale originale, l'LLM restituisce symbol: null.
+
+    Assenza perenne di Stop Loss e Take Profit
+        Se il trader lancia un segnale a mercato ma non edita mai il messaggio per aggiungere i livelli (lasciando la "Fase Completa" vuota), l'ordine viene aperto a mercato, 
+        ma rischia di rimanere scoperto e privo di protezione.
+
+Gestione dei CLOSE_SIGNAL
+
+    Capire quali sono i close_signal da zanna e rinna.
+    Mettere aposto logica in order_manager
+    Aggiungere più esempi nel propmt dell'agente classificatore.
+
+Gestione del Breakeven (BE+)
+
+    Gestione parziale del Breakeven (BE+) con TP1 già colpito
+        Motivo: Quando il canale invia "BE+", il ticket_1 potrebbe essere già stato chiuso da MT5 perché ha colpito il TP1. 
+        La funzione deve gestire il caso in cui uno dei due ticket non esista più a mercato e applicare il Breakeven solo al ticket_2 ancora aperto.
+
+    Gestione dei 2 Take Profit e della Size
+        Motivo: Quando entriamo a mercato con 2 posizioni (per gestire TP1 e TP2), dividiamo il rischio a metà (50% e 50%) o dare più peso al primo obiettivo (es. 70% su TP1 e 30% su TP2)?
+
+
+Verificare se le regole di classificazione sono impostate bene, con dei test su chat telegram
+    === REGOLE TASSATIVE DI ESCLUSIONE (INTENT = IGNORE) ===
+
+Filtrare gli utenti in telegram_listener.py, escluederte tutti tranne "Maestro Fx"
+
+Gestione Ibrida Multi-Posizione su TP MAX (Chiusura Parziale + BE)
+    Estendere la logica dell'Order Manager per supportare i comandi ibridi di incasso (es. "Collect half & BE+"). 
+    Consentirà al bot di chiudere solo una frazione dei ticket attivi (es. chiudere 1 posizione e mantenere la seconda) applicando 
+    contestualmente il Breakeven sulle posizioni residue, anziché forzare sempre la chiusura totale. Da implementare quando il sistema passerà a 
+    una gestione avanzata con più di 2 posizioni simultanee per segnale.
+
+Gestire meglio la logica degli output che arrivano da manager_result in telegram_listener.py
+    OPEN
+    UPDATE
+    CLOSE
+
+Capire a quanto impostare DEFAULT_SL_DIST_GOLD, il valore che sottrae al buy o sell, per impostare Stop Loss temporaneo
+Timeout sull'edit: Se il canale invia la Fase Rapida ma poi si dimentica o ci mette più di 5 minuti a modificare il messaggio con lo SL reale, cosa deve fare il bot? 
+Chiude la posizione in pari o la lascia correre con lo SL temporaneo?
+    DEFAULT_SL_DIST_GOLD = 5.0
+
+Migliorare la classe RiskManager, con controlli di rischio più efficenti, con utilizzo di agenti AI
+    class RiskManager()
+
+Capire funzionamento della classe MT5Executor
+    MT5Executor()
+
+Check di Allineamento e Resilienza allo Startup/Crash
+    Se il script Telegram o la connessione a MT5 si interrompe e viene riavviata, come recupera self.active_trades? 
+    Serve prevedere una persistenza su file JSON (o piccolo SQLite) per non perdere la traccia dei ticket aperti tra una sessione e l'altra. 
+
+Filtri di Sicurezza e Prezzo Scappato (Slippage)
+    Motivo: Tolleranza sull'ingresso (Slippage): "L'Oro è velocissimo. Se il segnale dice BUY 2640 e quando il bot legge il messaggio il prezzo è già a 2642 (+20 pips), 
+    entriamo lo stesso a mercato o scartiamo il segnale perché il rischio/rendimento si è rovinato?"
+    Motivo: Apertura durante le news "Il bot deve operare anche durante la pubblicazione dei dati macroeconomici ad alta impatto (es. NFP, CPI), o vuoi un blocco automatico per evitare spike e spread allargati?"
+
+Gestione delle Chiusure Manuali / Anticipate
+    Motivo: "Chiusure parziali e Breakeven Quando il canale scrive 'Secure profits' o 'Close half', preferisci che il bot chiuda del tutto la prima posizione e metta a BE la seconda, 
+    o che chiuda solo una percentuale fissa?"
+    Chiusure totali: "Quanto spesso il trader del canale invia messaggi di chiusura anticipata tipo 'Close ALL now' o 'Exit at market'? Li usa spesso o lascia sempre arrivare a SL/TP?"
+
+Regole di Gestione del Rischio (Risk Management)
+    Max Drawdown giornaliero: "C'è un limite di perdita giornaliera (es. -3% del conto) superato il quale il bot deve staccarsi fino al giorno dopo per evitare giornate no del canale?"
+    Gestione tramite Calendario Economico
+
+Titolo: Gestione Invalidation Level: Hard SL vs Soft SL (Conditional Break)
+    Al momento, i messaggi del tipo "Cut lose if solid break 4426" vengono mappati direttamente come stop_loss: 4426 rigido su MT5 per garantire la massima sicurezza del capitale (Safety-First).
+    
+    Futuro sviluppo (Soft SL): Valutare l'implementazione di un motore di monitoraggio in Python che memorizza il livello di invalidazione (invalidation_level: 4426) 
+    ed esegue la chiusura a mercato solo dopo la conferma della rottura della candela su MT5, evitando lo stop-out da spike temporanei.
+
+    
+Aggiungere sitema di blocco per quando i mercati sono chiusi
+    Essendo i mercati chiusi se venisse digitato un messaggio durante il weekend bverrebbero usati token dell'agente, per penso richieste sempre Ignorate.
+
+
+Utilizzare variabile di Stop Loss temporanea in risk_manager.py
+    is_temp_sl

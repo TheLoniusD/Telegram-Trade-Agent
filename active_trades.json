@@ -1,0 +1,101 @@
+{
+  "latest_msg_id": 1204,
+  "active_trades": {
+    "1202": {
+      "ticket_id": "83FAE3A8",
+      "msg_id": 1202,
+      "entry_min": 4476.0,
+      "entry_max": 4480.0,
+      "status": "ACTIVE",
+      "be_active": false,
+      "is_latest": false,
+      "created_at": 1788877395.3843262,
+      "tickets": {
+        "tp1": {
+          "symbol": "XAUUSD",
+          "direction": "BUY",
+          "entry_price": 4476.0,
+          "stop_loss": 4470.0,
+          "take_profit": 4487.0,
+          "volume": 1.55,
+          "mt5_ticket": 99988877,
+          "success": true
+        },
+        "tp2": {
+          "symbol": "XAUUSD",
+          "direction": "BUY",
+          "entry_price": 4476.0,
+          "stop_loss": 4470.0,
+          "take_profit": 4490.0,
+          "volume": 1.55,
+          "mt5_ticket": 99988877,
+          "success": true
+        }
+      }
+    },
+    "1203": {
+      "ticket_id": "C536467D",
+      "msg_id": 1203,
+      "entry_min": null,
+      "entry_max": null,
+      "status": "ACTIVE",
+      "be_active": false,
+      "is_latest": false,
+      "created_at": 1788877468.9227202,
+      "tickets": {
+        "tp1": {
+          "symbol": null,
+          "direction": "BUY",
+          "entry_price": null,
+          "stop_loss": null,
+          "take_profit": null,
+          "volume": 1.55,
+          "mt5_ticket": 99988877,
+          "success": true
+        },
+        "tp2": {
+          "symbol": null,
+          "direction": "BUY",
+          "entry_price": null,
+          "stop_loss": null,
+          "take_profit": null,
+          "volume": 1.55,
+          "mt5_ticket": 99988877,
+          "success": true
+        }
+      }
+    },
+    "1204": {
+      "ticket_id": "1B3C7884",
+      "msg_id": 1204,
+      "entry_min": null,
+      "entry_max": null,
+      "status": "ACTIVE",
+      "be_active": false,
+      "is_latest": true,
+      "created_at": 1788877508.5879056,
+      "tickets": {
+        "tp1": {
+          "symbol": null,
+          "direction": "BUY",
+          "entry_price": null,
+          "stop_loss": null,
+          "take_profit": null,
+          "volume": null,
+          "mt5_ticket": null,
+          "success": false
+        },
+        "tp2": {
+          "symbol": null,
+          "direction": "BUY",
+          "entry_price": null,
+          "stop_loss": null,
+          "take_profit": null,
+          "volume": null,
+          "mt5_ticket": null,
+          "success": false
+        }
+      }
+    }
+  }
+}

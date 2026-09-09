@@ -1,0 +1,374 @@
+Messaggio: {READY US NEWS SESSION🔔
+
+⚡️⚡️⚡️⚡️⚡️⚡️
+
+🔻Average Hourly Earnings m/m
+🔻Non-Farm Employment Change
+🔻Unemployment Rate
+
+Claim 50% Deposit Bonus
+
+Get Ready For Any Volatile Movement & Don’t Miss Out to Join our Inner 
+Signals☝🏻Only in Private Circle !
+
+🏆All the Best Traders}
+
+
+Messaggio scritto dal trader del canale.
+Lo classifichiamo come avvertimento, potrebbe essere un nuovo segnale da implementare per abbasare il rischio?
+
+-------------------------------------------------------------------------------------------------
+
+messaggio: {"Thks boss"}
+
+
+Messagio utente di celebrazione
+
+-------------------------------------------------------------------------------------------------
+
+messaggio: {"Still hold✅"}
+
+
+Messagio utente di celebrazione.
+potrebbe essere scambiato per possibile segnale? 
+se un utente fa riferimento (reply_to=True) ad un messaggio di un operazione in corso, potrebbe scambiare per operazione attiva?
+Forse basterebbe dire all'agente di ingorare tutti gli altri messaggi scritti da altri utenti
+
+-------------------------------------------------------------------------------------------------
+
+messaggio:{"Trade Active ✅}
+
+Gold Sell Running 100+ Pips 
+
+Scalpers secure ur Profits & BE+ ur entries}
+
+
+Messaggio scritto dal trader del canale, segnale di update operazione. 
+Il messaggio in qeustione fa riferimento (reply_to=True) ad un messaggio di un'operazione in corso.
+Gold Sell Running 100+ Pips , cosa indica esattamente questa frase?
+Scalpers secure ur Profits & BE+ ur entries, indica l'azione di attivazione di BE, l'agente classificherà prossimo json con be_activate=true
+
+-------------------------------------------------------------------------------------------------
+
+messaggio:{"HIT TP MAX⚡️⚡️ 
+
+Gold Buy 300+ Pips ✔️
+
+Collect all or half & BE+ ur entries
+
+Beautiful reaction from the zone🫵
+
+Flex me ur profit⬇️"}
+
+
+Messaggio scritto dal trader del canale.
+Il messaggio in qeustione fa riferimento (reply_to=True) ad un messaggio di un'operazione in corso.
+Non capisco se questo messaggio sia celebrativo oppure un segnale di update operazione. Come dovrebbe classificarlo?
+HIT TP MAX⚡️⚡️, questa sembra la parte celebrativa.
+Gold Buy 300+ Pips ✔️, questo non so cosa indichi.
+Collect all or half & BE+ ur entries, questo sembra quasi un segnale di chiusura, ma non lo so.
+Beautiful reaction from the zone🫵 Flex me ur profit⬇️, messaggio celebrativo
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"Let’s gooo"}
+
+
+Messaggio utente di celebrazione
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"GOLD BUY NOW
+
+BUY @ 4382 - 4377
+
+SL🔴4372
+TP✅4392
+TP✅4402
+
+Care Money Management 💠"}
+
+
+Messaggio scritto dal trader del canale, segnale di update operazione.
+Questo messagio è modificato, prima non possedeva TP e SL 
+Questo segnale va ad innescare la modifica dell'operazione in corso che era in fase "RAPIDA", impostando TP e SL comunicati.
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"News Trading is Very Risky & High Votality Market
+
+Be Sure to Follow Guidelines Below :
+
+❌Do Not Trade your Whole Capital
+✔️SeperateYour Profits
+✔️ Only Use Willing to Lose Capital
+❌Do Not Use Oversize Lots
+✔️ Only Use War Account
+
+Better yet if you have 2-3 Account on Standby💯
+
+Don’t be a Fool because of Greed. Be a Smart Trader. Good Luck Everyone !
+
+See you in Private Circle🫡}
+
+
+Non riesco a classificare da chi sia stato mandato il messaggio, è un messaggio inoltrato. (forwarded from Maestro Live Circles)
+Nome utente "Maestro Live Circles", sembra essere legato al canale telegram.
+Lo classifichiamo come avvertimento, anche se non è scritto dal trader del canale potremmo prenderlo in considerazione.
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"Hit risk !
+
+Ready setup recovery!"}
+
+
+Messaggio scritto dal trader del canale.
+Il messaggio in qeustione non fa riferimento (reply_to=False) ad un messaggio di un'operazione in corso.
+Però presumo che faccia riferimento alle operazioni aperte fino ad ora, oppure a quella aperta subito prima del messaggio in questione.
+Come dovrebbe essere classificata?
+Hit risk ! Ready setup recovery!, cosa intende scrivendo questo?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"Anyone Riding this Wave ⁉️
+
+Flex me ur Profit first"}
+
+
+Messaggio scritto dal trader del canale.
+Classificato come messaggio celebrativo?
+Anyone Riding this Wave?, cosa indica?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"Did u caught the move ⁉️
+
+Flex me ur Profit"}
+
+
+Messaggio scritto dal trader del canale.
+Classificato come messaggio celebrativo.
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"Team Maestro MileStone🏆Part 2
+
+Success with #TeamMaestro isn’t just a Goal, it’s the Standard !
+
+✅ Proven Strategies
+✅ Consistent Wins
+✅ Unmatched Expertise
+✅ Legendary Traders
+
+💠REGISTER TRADING ACC HERE
+
+Quit Hesitating, Start Winning. Your Moment is NOW !
+
+🌐 BullMaestro
+
+#MaestroPayout #tradelikeMaestro"}
+
+
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio:{"Zero Float ✅
+
+Gold Sell Running 90+ Pips 
+
+Scalpers secure ur Profits & BE+ ur entries"}
+
+
+Messaggio scritto dal trader del canale.
+Lo stile di messaggio è molto simile agli altri Be, però non so cosa indichi Zero Float
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"Running 90pips, lets close half now and BE your entry"}
+
+
+Messaggio scritto dal trader del canale.
+Stile del messaggio diverso da gli altri ma è un segnale di update
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"M15 resistance"}
+
+
+Messaggio scritto dal trader del canale.
+è stato scritto dopo minuti dall'azione di buy in modalità COMPLETA.
+La distanza di tempo tra i 2 messaggi è di 6 min: 09:05 (messagio editato), 09:11 ("Lets sell again")
+Cosa vuole dire conq uesta frase?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"Lets sell again"}
+
+
+Messaggio scritto dal trader del canale.
+Questo messaggio è stato inviato subito dopo un messaggio rapido di sell, che poi è stato editato impostando TP e SL.
+La distanza di tempo tra i 2 messaggi è di 1 min: 8:44 (messagio editato), 8:45 ("Lets sell again")
+Cosa voleva indicare, di comprare di nuovo?
+Se si come ci dovremmo comportare inq eusto caso, con i TP e SL?
+Impostiamo quelli messi dall'operazione prima?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"H4 support"}
+
+
+Messaggio scritto dal trader del canale.
+è stato scritto subito dopo l'azione di buy in modalità COMPLETA
+Cosa vuole dire con questa frase?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"I'm try hold a few layer until to TP, manage your risk"}
+
+
+Messaggio scritto dal trader del canale.
+Scritto subito dopo un messaggio di Trade Active ✅
+Cosa vuole dire con questo?
+Come ci dovremmo comportare a riguardo, dovremmo prenderla come segnalazione?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"M30 Bullish engulfing zone, lets do it guys 🫵"}
+
+
+Messaggio scritto dal trader del canale.
+Scritto subito dopo un messaggio di GOLD BUY NOW.
+La distanza di tempo tra i 2 messaggi è di 3: 14:01 (messagio editato), 14:04 ("M30 Bullish engulfing zone, lets do it guys 🫵") 
+Cosa vuole dire con questa frase?
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"Try buy again, M15,M30,H1 got bullish engulfing"}
+
+
+Messaggio scritto dal trader del canale.
+Scritto subito dopo un messaggio di GOLD BUY NOW.
+La distanza di tempo tra i 2 messaggi è di 3: 13:18 (messagio editato), 13:21 ("Try buy again, M15,M30,H1 got bullish engulfing") 
+
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"Reason buy
+
+M15 RBS
+M5 bullish engulfing"}
+
+
+Messaggio scritto dal trader del canale.
+Essendo la spiegazione per cui ha già comprato creco che possiamo ignorare il messaggio.
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"H1 GOLD MARKET UPDATE
+
+The H1 support is being tested right now. 👀
+
+🔴 If the H1 candle closes with a solid break below the support → I will focus on SELL.
+
+🟢 If the H1 support holds and there is no solid break → I will focus on BUY.
+
+For now, I’m not rushing into a position.
+⏳ We need to wait for one more H1 candle to close for confirmation."}
+
+
+Messaggio scritto dal trader del canale.
+Non capisco cosa intenda
+Sembra spiegare quello che farà, con il messaggio è allegata una foto, dove mostra il grafico e 2 linee rosse per indicare una zona. Dentro quella zona c'è un cerchio che indica la caduta di una candela.
+Anche l'ultima parte del messaggio non la capisco molto bene, parla di chiudere le poszioni.
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"Wait a moment"}
+
+
+Messaggio scritto dal trader del canale.
+Dopo pochi minuti è stata fatta un operazione RAPIDA che poi è passata a COMPLETA.
+Direi che possa essere ignorato come messaggio.
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"I'm still try hold this setup
+
+M5 support 
+
+Cut lose if solid break 4426"}
+
+
+Messaggio scritto dal trader del canale.
+Penso che si rifirescia ad alcune oprazioni scritte in precedenza (quelle attive), quella più vicinia risale a 30 minuti prima. GOLD BUY NOW
+Cosa vuole indicare con Cut lose if solid break 4426
+
+
+-------------------------------------------------------------------------------------------------
+
+
+Messaggio: {"Running 75pips from lowest layer in zone, manage your risk"}
+
+
+Messaggio scritto dal trader del canale.
+Scritto 15 min dopo quello "I'm still try hold this setup M5 support Cut lose if solid break 4426".
+Cosa vuole indicare con questo messaggio?
+
+-------------------------------------------------------------------------------------------------
+
+
+Messaggio: {"Try hold a few layer with BE"}
+
+
+Messaggio scritto dal trader del canale.
+Cosa vuole indicare con questo messaggio, bisonga mettere in be alcune operazioni?
+
+
+-------------------------------------------------------------------------------------------------
+
+Messaggio: {"XAUUSD M15 Market Bias
+
+I’m still focused on SELL as long as price remains below the M15 DBD zone.
+
+📉 SELL Bias: Price stays below the M15 DBD zone
+📈 BUY Bias: Only if price breaks and confirms above the M15 DBD zone"}
+
+
+Messaggio scritto dal trader del canale.
+Cosa vuole indicare con questo messaggio?
+Sono possibili segnali?
+
+-------------------------------------------------------------------------------------------------
+
+
+Messaggio: {"Sell again 
+
+M15 DBD zone
+M5 double top"}
+
+
+Messaggio scritto dal trader del canale.
+Scritto subito dopo un messaggio di GOLD SELL NOW.
+La distanza di tempo tra i 2 messaggi è di 2min: 09:46 (messagio editato), 09:48 ("Try buy again, M15,M30,H1 got bullish engulfing") 
+
+-------------------------------------------------------------------------------------------------
+
+M15 Bearish engulfing 
+M5 Bearish engulfing
+
+
+-------------------------------------------------------------------------------------------------
+
+Gold still in bearish momentum, let’s monitor for sell setup 🫵
+
+-------------------------------------------------------------------------------------------------
+
+HIT TP⚡️⚡️ 
+
+Gold Buy 210+ Pips ✔️
+Gold Buy 170+ Pips ✔️
+
+Collect all or half & BE+ ur entries
+
+Lets your profit talk 🫵

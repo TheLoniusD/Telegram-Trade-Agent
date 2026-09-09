@@ -1,0 +1,18 @@
+# File di ambiente e credenziali sensibili
+.env
+.env.*
+
+# File di sessione Telegram (prevengono il leak dell'accesso all'account)
+session_test.session
+*.session
+*.session-journal
+
+# Cache e file temporanei di Python
+__pycache__/
+*.pyc
+
+# Cartelle IDE e ambiente virtuale
+.vscode/
+.idea/
+venv/
+.venv/
