@@ -78,6 +78,19 @@ class OrderManager:
         
         return matching_trades
 
+    # Helper per cercare il valore prima su root, poi dentro tickets['tp1']
+    def _get_param(self, latest_trade, key, ticket_field=None):
+        if not latest_trade:
+            return None
+        # 1. Cerca a livello root nel vecchio trade
+        if latest_trade.get(key) is not None:
+            return latest_trade[key]
+        # 2. Fallback su tickets -> tp1
+        field = ticket_field or key
+        if "tickets" in latest_trade and "tp1" in latest_trade["tickets"]:
+            return latest_trade["tickets"]["tp1"].get(field)
+        return None
+
 
     def handle_agent_output(self, msg_id: int, reply_to: Optional[int], ai_output: dict) -> Optional[dict]:
         intent = ai_output.get("intent")
@@ -89,31 +102,48 @@ class OrderManager:
 
             # Recuperiamo il riferimento all'ultima operazione attiva (se presente)
             latest_trade = self._get_latest_trade()
+            has_active_trade = latest_trade is not None and latest_trade.get("status") == "ACTIVE"
 
-            # Determina se è un Re-entry legato a una catena esistente o una nuova catena
-            is_reentry = (data.get("symbol") is None) and (latest_trade is not None)
+            # CONDIZIONI RE-ENTRY:
+            # È re-entry se c'è un trade attivo E (manca il simbolo O (stesso simbolo E manca lo stop loss))
+            missing_symbol = data.get("symbol") is None
+            missing_sl = data.get("stop_loss") is None
+            missing_entry = data.get("entry_min") is None
 
-            # Se è re-entry eredita il root_msg_id, altrimenti questo messaggio diventa il root
-            root_msg_id = latest_trade["root_msg_id"] if is_reentry else msg_id
+            same_symbol = has_active_trade and (data.get("symbol") == latest_trade.get("symbol"))
 
-            # Ereditarietà dinamica dei dati mancanti
-            symbol = data.get("symbol") or (latest_trade.get("symbol") if latest_trade else "XAUUSD")
-            direction = data.get("direction") or (latest_trade.get("direction") if latest_trade else None)
+            is_reentry = has_active_trade and (missing_symbol or (same_symbol and (missing_sl or missing_entry)))
 
-            stop_loss = data.get("stop_loss")
-            if stop_loss is None and latest_trade:
-                stop_loss = latest_trade.get("stop_loss")
+            # Se è re-entry ereditiamo da latest_trade, altrimenti disattiviamo l'ereditarietà (source_trade = None)
+            source_trade = latest_trade if is_reentry else None
+            root_msg_id = latest_trade.get("root_msg_id", latest_trade["msg_id"]) if is_reentry else msg_id
 
+            # Ereditarietà dinamica dei dati (solo se source_trade non è None)
+            symbol = data.get("symbol") or self._get_param(source_trade, "symbol") or "XAUUSD"
+            direction = data.get("direction") or self._get_param(source_trade, "direction")
+
+            entry_min = data.get("entry_min") if data.get("entry_min") is not None else self._get_param(source_trade, "entry_min", "entry_price")
+            entry_max = data.get("entry_max") if data.get("entry_max") is not None else self._get_param(source_trade, "entry_max")
+
+            stop_loss = data.get("stop_loss") if data.get("stop_loss") is not None else self._get_param(source_trade, "stop_loss")
+
+            # Gestione Take Profit (da lista se fornita, altrimenti ereditati)
             tp_list = data.get("take_profit", [])
-            tp1 = tp_list[0] if len(tp_list) > 0 else (latest_trade.get("tp1") if latest_trade else None)
-            tp2 = tp_list[1] if len(tp_list) > 1 else (latest_trade.get("tp2") if latest_trade else None)
+            if isinstance(tp_list, list) and len(tp_list) > 0:
+                tp1 = tp_list[0]
+                tp2 = tp_list[1] if len(tp_list) > 1 else None
+            else:
+                tp1 = self._get_param(source_trade, "tp1", "take_profit")
+                tp2 = self._get_param(source_trade, "tp2")
+                if tp2 is None and source_trade and "tickets" in source_trade and "tp2" in source_trade["tickets"]:
+                    tp2 = source_trade["tickets"]["tp2"].get("take_profit")
 
             trade_record = {
                 "ticket_id": ticket_id,
                 "msg_id": msg_id,
                 "root_msg_id": root_msg_id,
-                "entry_min": data.get("entry_min"),
-                "entry_max": data.get("entry_max"),
+                "entry_min": entry_min,
+                "entry_max": entry_max,
                 "status": "ACTIVE",
                 "be_active": False,
                 "created_at": time.time(),
@@ -121,7 +151,7 @@ class OrderManager:
                     "tp1": {
                         "symbol": symbol,
                         "direction": direction,
-                        "entry_price": data.get("entry_min"),
+                        "entry_price": entry_min,
                         "stop_loss": stop_loss,
                         "take_profit": tp1,
                         "volume": None,  # Sarà calcolato dal Risk Manager
@@ -131,7 +161,7 @@ class OrderManager:
                     "tp2": {
                         "symbol": symbol,
                         "direction": direction,
-                        "entry_price": data.get("entry_min"),
+                        "entry_price": entry_min,
                         "stop_loss": stop_loss,
                         "take_profit": tp2,
                         "volume": None,  # Sarà calcolato dal Risk Manager
@@ -159,79 +189,140 @@ class OrderManager:
             new_entry_max = data.get("entry_max")
             new_sl = data.get("stop_loss")
             new_tp_list = data.get("take_profit")  # Es: [4487.0, 4490.0]
+
             update_details = data.get("update_details", {})
             move_to_be = update_details.get("move_sl_to_be", False)
+            layer_target = update_details.get("layer_target")
+
+            # 2. Identificazione del Trade Bersaglio
+            target_msg_id = reply_to if (reply_to and reply_to in self.active_trades) else None
+            
+            if not target_msg_id:
+                latest_trade = self._get_latest_trade()
+                if latest_trade and latest_trade.get("status") == "ACTIVE":
+                    target_msg_id = latest_trade["msg_id"]
+
+            if not target_msg_id or target_msg_id not in self.active_trades:
+                return {"action": "IGNORE", "reason": "Nessun trade attivo trovato per l'aggiornamento."}
+
+            # 3. Recuperiamo l'intera catena legata al trade trovato
+            target_trade = self.active_trades[target_msg_id]
+            root_id = target_trade.get("root_msg_id", target_trade["msg_id"])
 
             updated_trades = []
 
             for trade in trades_to_update:
+                modified = False
                 # 1. Aggiornamento Range di Ingresso
                 if new_entry_min is not None:
                     trade["entry_min"] = new_entry_min
+                    modified = True
                 if new_entry_max is not None:
                     trade["entry_max"] = new_entry_max
+                    modified = True
 
                 # 2. Aggiornamento Stop Loss a livello radice
                 if new_sl is not None:
                     trade["stop_loss"] = new_sl
+                    modified = True
+                    if "tickets" in trade:
+                        for tp_config in trade["tickets"].values():
+                            tp_config["stop_loss"] = new_sl
 
                 # 3. Aggiornamento Take Profit a livello radice (per ereditarietà re-entry)
                 if new_tp_list and isinstance(new_tp_list, list):
                     if len(new_tp_list) > 0:
                         trade["tp1"] = new_tp_list[0]
+                        modified = True
                     if len(new_tp_list) > 1:
                         trade["tp2"] = new_tp_list[1]
-
-                # 4. Mappatura sui singoli ticket MT5 (tp1, tp2, ecc.)
-                if "tickets" in trade:
-                    ticket_keys = list(trade["tickets"].keys())  # ['tp1', 'tp2']
-
-                    for i, tp_key in enumerate(ticket_keys):
-                        tp_config = trade["tickets"][tp_key]
-
-                        if new_sl is not None:
-                            tp_config["stop_loss"] = new_sl
-
-                        if new_tp_list and isinstance(new_tp_list, list):
-                            if i < len(new_tp_list):
-                                tp_config["take_profit"] = new_tp_list[i]
-                        elif new_tp_list is not None:
-                            tp_config["take_profit"] = new_tp_list
-
-                # 5. Messa a Breakeven (BE+)
-                if move_to_be:
-                    trade["be_active"] = True
+                        modified = True
+                        
                     if "tickets" in trade:
-                        for tp_config in trade["tickets"].values():
-                            entry_price = tp_config.get("entry_price") or trade.get("entry_min")
-                            if entry_price is not None:
-                                tp_config["stop_loss"] = entry_price
-                        trade["stop_loss"] = entry_price  # Sincronizza anche la radice
+                        ticket_keys = list(trade["tickets"].keys())  # ['tp1', 'tp2']
+                        for i, tp_key in enumerate(ticket_keys):
+                            if i < len(new_tp_list):
+                                trade["tickets"][tp_key]["take_profit"] = new_tp_list[i]
 
-                updated_trades.append(trade)
+                # --- D. Messa a Breakeven (BE+) ---
+                    if move_to_be and not trade.get("be_active"):
+                        trade["be_active"] = True
+                        modified = True
+                        
+                        # Calcoliamo il prezzo da usare come BE (diamo priorità all'entry radice)
+                        entry_price = trade.get("entry_min") 
+                        
+                        if entry_price is not None:
+                            trade["stop_loss"] = entry_price
+                            if "tickets" in trade:
+                                for tp_config in trade["tickets"].values():
+                                    # Se nel ticket c'è un entry_price più preciso, usalo
+                                    ticket_entry = tp_config.get("entry_price") or entry_price
+                                    tp_config["stop_loss"] = ticket_entry
 
-            # Persistenza dello stato aggiornato su file
-            self.save_state_to_file()
-            return {"action": "UPDATE", "trade": trade}
+                    # --- E. Gestione HIT TP (Segna il ticket interno come completato) ---
+                    if layer_target:
+                        target_key = str(layer_target).lower()  # "tp1" o "tp2"
+                        if "tickets" in trade and target_key in trade["tickets"]:
+                            ticket_info = trade["tickets"][target_key]
+                            if not ticket_info.get("success"):
+                                ticket_info["success"] = True
+                                modified = True
+
+                    # Se c'è stata almeno una modifica, aggiungiamolo alla lista dei processati
+                    if modified:
+                        updated_trades.append(trade)
+
+                    # 5. Salvataggio ed Export
+            if updated_trades:
+                self.save_state_to_file()
+                print(f"🔄 [UPDATE_SIGNAL] Root ID {root_id}: Applicati aggiornamenti a {len(updated_trades)} posizioni (Originale + Re-entry).")
+                return {"action": "UPDATE", "trade": trade}
 
         # 3. CHIUSURA SEGNALE
         elif intent == "CLOSE_SIGNAL":
             target_msg_id = reply_to if (reply_to and reply_to in self.active_trades) else msg_id
 
             # Se ancora non lo troviamo, cerchiamo se tra i messaggi attivi ce n'è uno valido (fallback utile se il reply_to è vuoto ma c'è un solo trade attivo)
-            if not target_msg_id and len(self.active_trades) == 1:
-                target_msg_id = list(self.active_trades.keys())[0]
+            if not target_msg_id:
+                latest_trade = self._get_latest_trade()
+                if latest_trade and latest_trade.get("status") == "ACTIVE":
+                    target_msg_id = latest_trade["msg_id"]
 
-            if target_msg_id in self.active_trades:
-                closed_trade = self.active_trades.pop(target_msg_id)
-                closed_trade["status"] = "CLOSED"
+            # 2. Se abbiamo trovato un trade bersaglio, chiudiamo TUTTA la catena collegata
+            if target_msg_id and target_msg_id in self.active_trades:
+                target_trade = self.active_trades[target_msg_id]
+
+                # Recuperiamo il root ID: ci serve per trovare tutte le operazioni collegate (re-entry inclusi)
+                root_id = target_trade.get("root_msg_id", target_trade["msg_id"])
+                closed_chain = []
+
+                # Scansioniamo tutte le operazioni in memoria
+                for m_id, trade in self.active_trades.items():
+                    # Se fa parte della stessa "famiglia" (stesso root_msg_id) ed è ancora attiva
+                    if trade.get("root_msg_id", trade["msg_id"]) == root_id and trade.get("status") == "ACTIVE":
+                        
+                        # Modifichiamo lo stato
+                        trade["status"] = "CLOSED"
+                        
+                        # Impostiamo i ticket interni come inattivi (ma NON svuotiamo l'mt5_ticket
+                        # altrimenti l'MT5Executor non saprà cosa chiudere sul broker)
+                        if "tickets" in trade:
+                            for tp_config in trade["tickets"].values():
+                                tp_config["success"] = False 
+
+                        closed_chain.append(trade)
+
+                self.save_state_to_file()
+
+                print(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: Chiuse e mantenute in memoria {len(closed_chain)} operazioni (Originale + Re-entry).")
                 
-                # Aggiorniamo lo stato dei singoli ticket interni per coerenza con la memoria
-                if "tickets" in closed_trade:
-                    for tp_config in closed_trade["tickets"].values():
-                        tp_config["success"] = False
-
-                print(f"🔒 [CLOSE_SIGNAL] Operazione {target_msg_id} rimossa dalla memoria attiva.")
-                return {"action": "CLOSE", "trade": closed_trade}
+                # Passiamo l'intera lista di trade chiusi così che l'MT5Executor 
+                # possa iterare e chiudere tutto sul broker
+                return {
+                    "action": "CLOSE", 
+                    "trade": target_trade, 
+                    "closed_chain": closed_chain 
+                }
 
         return None

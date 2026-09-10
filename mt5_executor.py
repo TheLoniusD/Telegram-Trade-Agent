@@ -76,7 +76,7 @@ class MT5Executor:
     def close_all(self, symbol: str):
         """Chiude tutte le posizioni aperte per un dato simbolo."""
         print(f"🛠️ [TEST MODE] Simulazione apertura per {symbol['symbol']}")
-        return 99988877
+        return
         positions = mt5.positions_get(symbol=symbol)
         if not positions:
             return
@@ -103,7 +103,7 @@ class MT5Executor:
         Invia una richiesta TRADE_ACTION_SLTP a MT5 per aggiornare Stop Loss e Take Profit.
         """
         print(f"🛠️ [TEST MODE] Simulazione apertura per {ticket} | stop_loss: {stop_loss}, take_profit: {take_profit}")
-        return 99988878
+        return
         # Se la lista TP contiene valori, prendiamo il primo (TP1)
         tp_price = take_profit[0] if take_profit else 0.0
 

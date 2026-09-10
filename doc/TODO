@@ -6,20 +6,19 @@ Ottimizzazione Sistema Bot
 
         - UPDATE_SIGNAL
             - Messaggio STANDARD fase COMPLETA --> aggiunta di TP e SL
-            - Messaggio STANDARD "Trade Active" --> attivare BE se presente nel messaggio
-            - Messaggio STANDARD "Zero Float" --> attivare BE se presente nel messaggio
             - Messaggio STANDARD "HIT TP" --> attivare BE se presente nel messaggio
             - Messaggio NON STANDARD
 
         - CLOSE_SIGNAL
-            - Messaggio STANDARD "HIT TP MAX" --> mai BE chiudere sempre operazioni attive, il motivo è che il trader del canale ha toccato il TP MAX,
-                                                  se non abbiamo toccato anche noi il tp max, bisogna chiudere perchè non staremmo ascoltando le direttive del trader
+            - Messaggio STANDARD "HIT TP MAX"
             - Messaggio NON STANDARD
 
         - IGNORE
             - Messaggio STANDARD celebrativi
-            - Messaggio STANDARD reason nuy
+            - Messaggio STANDARD reason buy
             - Messaggio STANDARD READY
+            - Messaggio STANDARD "Trade Active" --> attivare BE se presente nel messaggio
+            - Messaggio STANDARD "Zero Float" --> attivare BE se presente nel messaggio
             - Messaggio NON STANDARD
 
     Bisogna gesitre meglio i messaggi che fanno riferimento ad una operazione attiva, quindi di aggiornamento che sia CLOSE_SIGNAL o UPDATE_SIGNAL.
@@ -29,19 +28,9 @@ Ottimizzazione Sistema Bot
         - "Zero Float"
         - "HIT TP"
 
-Messaggio di Sell o buy again, il messaggio non passerà mai alla fase completa perchè non vine editato o fa riferimento ad un messaggio.
-    Mancanza del simbolo
-        Quando un messaggio rapido (es. "Lets sell again") non menziona l'asset (es. XAUUSD) e non è un reply diretto al segnale originale, l'LLM restituisce symbol: null.
 
-    Assenza perenne di Stop Loss e Take Profit
-        Se il trader lancia un segnale a mercato ma non edita mai il messaggio per aggiungere i livelli (lasciando la "Fase Completa" vuota), l'ordine viene aperto a mercato, 
-        ma rischia di rimanere scoperto e privo di protezione.
+Migliorare classificazione messaggi, l'agente sbaglia ancora con TRADE ACTIVE e ZERO FLOAT
 
-Gestione dei CLOSE_SIGNAL
-
-    Capire quali sono i close_signal da zanna e rinna.
-    Mettere aposto logica in order_manager
-    Aggiungere più esempi nel propmt dell'agente classificatore.
 
 Gestione del Breakeven (BE+)
 
@@ -51,6 +40,13 @@ Gestione del Breakeven (BE+)
 
     Gestione dei 2 Take Profit e della Size
         Motivo: Quando entriamo a mercato con 2 posizioni (per gestire TP1 e TP2), dividiamo il rischio a metà (50% e 50%) o dare più peso al primo obiettivo (es. 70% su TP1 e 30% su TP2)?
+
+
+Gestione dei CLOSE_SIGNAL
+
+    Capire quali sono i close_signal da zanna e rinna.
+    Mettere aposto logica in order_manager
+    Aggiungere più esempi nel propmt dell'agente classificatore.
 
 
 Verificare se le regole di classificazione sono impostate bene, con dei test su chat telegram

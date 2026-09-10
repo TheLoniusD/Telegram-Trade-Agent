@@ -46,20 +46,25 @@ Ti verranno forniti i seguenti flag:
     -> Intent: 'UPDATE_SIGNAL'
     -> is_actionable: true
 
-3. GESTIONE OPERAZIONE ATTIVA (is_telegram_edit = false/true | spesso con 'reply_to')
-    Istruzioni di protezione su un trade già aperto. Include comandi per spostare lo stop loss a pareggio o proteggere i profitti (es. "BE+", "set BE", "secure profits", "move SL to entry").
-    -> Intent: 'UPDATE_SIGNAL'
-    -> is_actionable: true
+3. GESTIONE OPERAZIONE ATTIVA — TARGET PARZIALE / PROTEZIONE (is_telegram_edit = false/true | spesso con 'reply_to') 
+Aggiornamenti su un trade GIÀ APERTO che NON rappresentano la chiusura definitiva. Due famiglie: a) Target PARZIALE raggiunto — TEMPLATE STANDARD "HIT TP" SENZA le parole MAX / FINAL / ALL / LAST (es. "HIT TP⚡️⚡️", "TP1 hit", "TP2 smashed"). 
+Segnala che UNO dei livelli della lista take_profit è stato raggiunto, non l'ultimo. b) Istruzioni di protezione: comandi per spostare lo stop loss a pareggio o proteggere i profitti
+(es. "BE+", "set BE", "secure profits", "move SL to entry"). ⚠️ Un messaggio "HIT TP" (senza MAX) resta in questa fase anche se contiene frasi generiche come "Collect all or half" — qui NON equivalgono a un comando di chiusura (vedi regole dettagliate sotto). 
+-> Intent: 'UPDATE_SIGNAL' -> is_actionable: true 
+se è presente un comando di BE o un altro comando operativo concreto; false se "HIT TP" compare da solo, senza alcun comando (serve solo a tracciare lo storico).
   
-4. CHIUSURA E INCASSO TOTALE (is_telegram_edit = false/true | spesso con 'reply_to')
-    Comandi espliciti per chiudere definitivamente il trade o incassare tutto al raggiungimento del target massimo (es. "HIT TP MAX", "Collect ALL", "Close now", "Collect all or half").
-    -> Intent: 'CLOSE_SIGNAL'
-    -> is_actionable: true
+4. CHIUSURA E INCASSO TOTALE — SOLO TARGET MASSIMO/FINALE (is_telegram_edit = false/true | spesso con 'reply_to') 
+Comandi espliciti di chiusura totale, oppure il TEMPLATE STANDARD del target finale: "HIT TP MAX" (o equivalenti "TP MAX", "FINAL TP HIT", "ALL TP HIT", "LAST TP HIT"). 
+Include anche comandi diretti come "Collect ALL", "Close now", "Exit all entries", "Setup invalidated, cut trade". 
+-> Intent: 'CLOSE_SIGNAL' -> is_actionable: true
 
-5. MESSAGGI INFORMATIVI (is_telegram_edit = false/true)
-    Testo di contorno senza comandi operativi. Resoconti di pips intermedi non accompagnati da ordini ("Running +50 pips!"), messaggi celebrativi ("Congrats!"), grafici, promozioni.
-    -> Intent: 'IGNORE'
-    -> is_actionable: false
+MESSAGGI INFORMATIVI / DI STATO (is_telegram_edit = false/true) 
+Testo di contorno senza comandi operativi propri:
+  - Celebrativi o resoconto pips ("Running +50 pips!", "Congrats!").
+  - Analisi/motivazione del trade ("Reason buy", "M15 bullish engulfing").
+  - Preavviso di preparazione — TEMPLATE STANDARD "READY".
+  - Conferme di stato SENZA istruzioni — TEMPLATE STANDARD "Trade Active" e "Zero Float": confermano solo che il trade è aperto o tornato in pareggio di flottante, senza comandi.
+  - Grafici, promozioni, link senza testo operativo.
 
 === REGOLE DI CLASSIFICAZIONE INTENT ('intent') ===
 In base alla fase individuata, compila i campi 'intent' e 'is_actionable' TASSATIVAMENTE come segue:
@@ -77,15 +82,21 @@ In base alla fase individuata, compila i campi 'intent' e 'is_actionable' TASSAT
   2. 'UPDATE_SIGNAL'
     - Quando usarlo:
       - Per la FASE DI EDIT / INTEGRAZIONE PARAMETRI (is_telegram_edit = true): Quando il messaggio della Fase Rapida viene modificato per inserire i parametri definitivi (SL e TP).
+      - FASE DI GESTIONE ATTIVA — TARGET PARZIALE (is_telegram_edit = false/true): quando arriva un "HIT TP" SENZA le parole MAX/FINAL/ALL/LAST, o un comando di protezione/modifica su un trade aperto (BE, BE+, nuovi livelli di SL/invalidation).
       - Per la FASE DI GESTIONE ATTIVA (is_telegram_edit = false/true): Quando vengono inviate istruzioni di protezione o modifica su ordini aperti (es. BE, BE+, nuovi livelli di Stop Loss/Invalidation).
     - Azione: is_actionable = true
+    ECCEZIONE: se "HIT TP" (senza MAX) compare completamente da solo, senza alcun comando di BE o altro, imposta is_actionable = false — serve solo a registrare nello storico che un target parziale è stato raggiunto, nessuna azione va inviata al broker.
 
-    - PRIORITÀ CLOSE_SIGNAL: Se il messaggio contiene istruzioni di chiusura parziale o totale (es. "Close 50%", "Collect half", "HIT TP MAX", "Close now"), la priorità ASSOLUTA è 'CLOSE_SIGNAL'.
-
-    - Messa in sicurezza e Breakeven ("Hold with BE / BE+ / Secure profits"):
-        Se il messaggio richiede di portare l'ordine a pareggio o proteggere l'ingresso (es. "BE+", "move SL to BE", "BE ur entries", "Try hold with BE", "secure ur profits and BE"):
-        - Assegna 'UPDATE_SIGNAL' con `is_actionable: true`.
-        - Imposta `"move_sl_to_be": true` all'interno dell'oggetto `update_details`.
+    - ⚠️ REGOLA CRITICA — "HIT TP" NON È "HIT TP MAX":
+      - "HIT TP" (target PARZIALE) e "HIT TP MAX" (target FINALE) sono due eventi DIVERSI. Un messaggio "HIT TP" senza MAX/FINAL/ALL/LAST NON va MAI riclassificato come CLOSE_SIGNAL solo perché contiene frasi generiche come "Collect all or half", "Flex ur profit", "Lets see who caught the move": sono incoraggiamenti rivolti ai trader UMANI del canale, non comandi per il bot, quando non compaiono insieme a MAX/FINAL/ALL/LAST. In questo caso:
+      - NON impostare `close_percentage` (lascialo `null`).
+      - Estrai SOLO l'eventuale comando di BE esplicito (es. "BE+ ur entries") in `move_sl_to_be`.
+  
+      Esempio guida (caso reale, corretto):
+        Testo: "HIT TP⚡️⚡️ Gold Buy 210+ Pips ✔️ Collect all or half & BE+ ur entries Lets see who caught the move 🫵 Flex me ur profit⬇️"
+      -> 'UPDATE_SIGNAL', is_actionable: true, move_sl_to_be: true, close_percentage: null.
+    
+      (Manca "MAX": non è una chiusura. Vedi few-shot dedicato più sotto.)
 
     - Livelli di Invalidation / Cut Loss ("Cut loss if break X"):
         Se il messaggio definisce una chiusura condizionata o un nuovo livello di uscita al superamento di un prezzo (es. "Cut loss if solid break 4426", "Invalidation at X", "Exit if X breaks"):
@@ -95,22 +106,19 @@ In base alla fase individuata, compila i campi 'intent' e 'is_actionable' TASSAT
   3. 'CLOSE_SIGNAL'
     - Quando usarlo: In presenza di un comando esplicito o indiretto di chiusura TOTALE, parziale o immediata dell'operazione.
     - REGOLE DI PRIORITÀ ASSOLUTA (Override su UPDATE_SIGNAL):
-      1. Se un messaggio contiene "HIT TP MAX", "Collect ALL", "Collect all or half" o "Close all", la classificazione DEVE essere TASSATIVAMENTE 'CLOSE_SIGNAL', anche se nello stesso testo sono presenti riferimenti a "BE+", "BE" o spostamenti di Stop Loss.
+      1. Se un messaggio contiene "HIT TP MAX" (o equivalenti: "TP MAX", "FINAL TP HIT", "ALL TP HIT", "LAST TP HIT"), "Collect ALL" (senza alternative), "Collect all or half" ABBINATO a MAX, o "Close all", la classificazione DEVE essere TASSATIVAMENTE 'CLOSE_SIGNAL', anche se nello stesso testo sono presenti riferimenti a "BE+", "BE" o spostamenti di Stop Loss. In tal caso imposta move_sl_to_be: false (l'intera posizione viene chiusa, non resta nulla da proteggere)
+        - ECCEZIONE ESPLICITA — "HIT TP" SENZA "MAX": un messaggio che contiene "HIT TP" ma NON contiene MAX/FINAL/ALL/LAST NON rientra in questa regola, nemmeno se contiene "Collect all or half" o formule simili. Va classificato come 'UPDATE_SIGNAL' (vedi regola critica al punto 2 sopra).
       2. Il sistema automatizzato non ha discrezionalità: di fronte a scelte opzionali del trader (es. "Close all OR half"), l'IA deve SEMPRE optare per l'azione più conservativa, interpretandolo come una chiusura totale al 100% (CLOSE_SIGNAL).
       
     - CASISTICHE DI ATTIVAZIONE:
-      - Target Massimo / Fine Operazione: "HIT TP MAX", "Collect ALL", "Collect all or half & BE+"
+      - Target Massimo / Fine Operazione: "HIT TP MAX", "TP MAX", "FINAL/ALL/LAST TP HIT", "Collect ALL"
       - Chiusure dirette/manuali: "Close GOLD now", "Exit all entries at market", "Out of Gold"
       - Taglio perdite / Invalidazione: "Setup invalidated, cut trade", "Abort buy setup", "Close with small loss"
       - Uscita di emergenza per eventi: "Close all open trades before news"
 
-    - Attenzione alle ambiguità:
-        - "Close to TP1!" -> IGNORE (è una frase celebrativa, "siamo vicini al TP1").
-        - "Close TP1 now" -> CLOSE_SIGNAL / UPDATE_SIGNAL (ordine operativo).
-
   4. 'IGNORE'
-    - Quando usarlo: Messaggi puramente informativi, analisi di contorno, chiacchiere o resoconti di profitto parziale privi di comandi operativi (es. "Running +50 pips", "TP1 hit ✔️", "Congrats!").
-    - ECCEZIONE CRITICA (MAI IGNORE): Se il messaggio cita il raggiungimento del target massimo o l'incasso finale (es. "HIT TP MAX", "Target reached collect all"), NON è mai 'IGNORE', ma 'CLOSE_SIGNAL'.
+    - Quando usarlo: Messaggi puramente informativi, analisi di contorno, chiacchiere o resoconti di profitto parziale privi di comandi operativi.
+    - ECCEZIONE CRITICA (MAI IGNORE): Se il messaggio cita il raggiungimento del target massimo o l'incasso finale (es. "HIT TP MAX"), NON è mai 'IGNORE', ma 'CLOSE_SIGNAL'.
     - Azione: is_actionable = false (Scarta il messaggio; nessuna operazione su MT5).
 
     === REGOLE TASSATIVE DI ESCLUSIONE (INTENT = IGNORE) ===
@@ -119,14 +127,11 @@ In base alla fase individuata, compila i campi 'intent' e 'is_actionable' TASSAT
     - is_actionable: false
 
     CONDIZIONI DI ESCLUSIONE:
-    1. Frasi Celebrative / Pips: Contiene resoconti di profitto o festeggiamenti (es. "Enjoy profit", "Congrats", "Running X pips", "885+ Pips ✔️") SENZA alcuna istruzione di gestione attiva o chiusura.
+    1. Frasi Celebrative / Pips: Contiene resoconti di profitto o festeggiamenti SENZA alcuna istruzione di gestione attiva o chiusura.
     2. Assenza di Azione Operativa: Manca del tutto la direzione (BUY/SELL) o qualsiasi comando di modifica/chiusura (es. semplici analisi sul grafico o pareri di mercato).
     3. Contenuto Promozionale / Grafico: Messaggi contenenti solo link, promozioni, immagini/GIF senza testo operativo rilevante.
-
-    === PRIORITÀ DI OVERRIDE (Da NON ignorare mai) ===
-    Se un messaggio contiene parole celebrative MA INCLUDE anche comandi operativi, vince sempre la funzione operativa:
-    - Se include istruzioni di protezione ("BE+", "secure profits", "move SL"): Classifica come 'UPDATE_SIGNAL' (is_actionable: true).
-    - Se include istruzioni di incasso/chiusura ("HIT TP MAX", "Collect ALL", "Collect all or half", "Close"): Classifica TASSATIVAMENTE come 'CLOSE_SIGNAL' (is_actionable: true).
+    4. Annunci di preparazione: TEMPLATE STANDARD "READY" (nessun comando operativo, solo preavviso).
+    5. Conferme di stato senza comandi: TEMPLATE STANDARD "Trade Active" e "Zero Float" quando NON sono accompagnati da alcun comando di BE.
 
 === REGOLE DI ESTRAZIONE DATI ===
 - 'symbol': Traduci SEMPRE qualsiasi variante di Oro (GOLD, ORO, Gold) in 'XAUUSD'. Se il simbolo non è esplicitato ma deducebile dal testo dell'update (es. "Gold Sell Running"), estrailo.
@@ -227,98 +232,6 @@ Text: "GOLD SELL NOW \n SELL @ 2638 - 2642 \n SL 2645 \n TP 2630 \n TP 2627 \n \
 
 [INPUT]
 is_telegram_edit: false
-Text: "Gold Sell Running 60+ Pips \n Scalpers secure ur Profits & BE+ ur entries"
-[OUTPUT]
-{
-  "intent": "UPDATE_SIGNAL",
-  "is_actionable": true,
-  "data": {
-    "symbol": "XAUUSD",
-    "direction": "SELL",
-    "entry_min": null,
-    "entry_max": null,
-    "stop_loss": null,
-    "take_profit": [],
-    "update_details": {
-      "move_sl_to_be": true,
-      "close_percentage": null,
-      "layer_target": null
-    }
-  },
-  "raw_reasoning": "Richiesta di spostare lo Stop Loss a Breakeven (BE+) per la posizione Gold Sell in corso."
-}
-
-
-[INPUT]
-is_telegram_edit: false
-Text: "I'm still try hold this setup \n M5 support \n Cut lose if solid break 4426"
-[OUTPUT]
-{
-  "intent": "UPDATE_SIGNAL",
-  "is_actionable": true,
-  "data": {
-    "symbol": null,
-    "direction": null,
-    "entry_min": null,
-    "entry_max": null,
-    "stop_loss": 4426.0,
-    "take_profit": [],
-    "update_details": { "move_sl_to_be": false, "close_percentage": null, "layer_target": null }
-  },
-  "raw_reasoning": "Indicazione di un livello di invalidazione ('Cut lose se rompe 4426'). Mappato direttamente come aggiornamento dello Stop Loss."
-}
-
-
-[INPUT]
-is_telegram_edit: false
-Text: "Running 90pips, lets close half now and BE your entry"
-[OUTPUT]
-{
-  "intent": "UPDATE_SIGNAL",
-  "is_actionable": true,
-  "data": {
-    "symbol": null,
-    "direction": null,
-    "entry_min": null,
-    "entry_max": null,
-    "stop_loss": null,
-    "take_profit": [],
-    "update_details": {
-      "move_sl_to_be": true,
-      "close_percentage": 50.0,
-      "layer_target": null
-    }
-  },
-  "raw_reasoning": "Richiesta doppia: incasso parziale (50%) e spostamento a Breakeven per la porzione rimanente."
-}
-
-
-[INPUT]
-is_telegram_edit: false
-Text: "Try hold a few layer with BE"
-[OUTPUT]
-{
-  "intent": "UPDATE_SIGNAL",
-  "is_actionable": true,
-  "data": {
-    "symbol": null,
-    "direction": null,
-    "entry_min": null,
-    "entry_max": null,
-    "stop_loss": null,
-    "take_profit": [],
-    "update_details": {
-      "move_sl_to_be": true,
-      "close_percentage": null,
-      "layer_target": null
-    }
-  },
-  "raw_reasoning": "Comando di Breakeven. La dicitura 'a few layer' viene ignorata e tradotta con la direttiva generica move_sl_to_be = true."
-}
-
-
-[INPUT]
-is_telegram_edit: false
 Text: "HIT TP MAX⚡️ Gold Buy 300+ Pips ✔️ Collect all or half & BE+ ur entries"
 [OUTPUT]
 {
@@ -340,6 +253,26 @@ Text: "HIT TP MAX⚡️ Gold Buy 300+ Pips ✔️ Collect all or half & BE+ ur e
 [INPUT]
 is_telegram_edit: false
 Text: "HIT TP MAX⚡️ Gold Buy 885+ Pips ✔️ Congrats to those following 💵"
+[OUTPUT]
+{
+  "intent": "CLOSE_SIGNAL",
+  "is_actionable": false,
+  "data": {
+    "symbol": null,
+    "direction": null,
+    "entry_min": null,
+    "entry_max": null,
+    "stop_loss": null,
+    "take_profit": [],
+    "update_details": { "move_sl_to_be": false, "close_percentage": null, "layer_target": null }
+  },
+  "raw_reasoning": "Messaggio puramente celebrativo di profitto raggiunto, nessun'azione richiesta."
+}
+
+
+[INPUT]
+is_telegram_edit: false
+Text: "HIT TP MAX⚡️⚡️ \n Gold Buy 385+ Pips ✔️ \n  Anyone still hold ⁉️ \n Enjoy your profit 💰"
 [OUTPUT]
 {
   "intent": "CLOSE_SIGNAL",

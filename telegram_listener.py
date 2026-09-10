@@ -107,10 +107,14 @@ async def process_and_print(event, is_edit: bool):
                         symbol=trade_data.get("symbol"),
                         entry_price=trade_data.get("entry_min")
                     )
-                    # Se si tratta dell'aggiornamento con SL/TP reali
+                # Se si tratta dell'aggiornamento con SL/TP reali
                 else:
                     for tp_key, tp_config in trade_data["tickets"].items():
                         real_mt5_ticket = tp_config.get("mt5_ticket")
+
+                        # Se il ticket non è aperto su MT5, saltalo
+                        if not real_mt5_ticket:
+                            continue
         
                         # Prendi il nuovo stop_loss dal trade_data aggiornato dall'Order Manager
                         new_sl = trade_data.get("stop_loss")
