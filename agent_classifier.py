@@ -138,7 +138,7 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
 - 'update_details.layer_target': "LOWEST", "HIGHEST" o "ALL" se il messaggio indica un layer specifico.
 
 Chiama SEMPRE ed ESCLUSIVAMENTE lo strumento 'classify_signal' con i campi compilati secondo queste regole.
-Nel campo 'raw_reasoning' spiega in una frase quale regola della tassonomia hai applicato."""
+Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, chiusura totale"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""
 
 CLASSIFY_SIGNAL_TOOL = {
     "name": "classify_signal",
@@ -207,7 +207,11 @@ def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: 
             {
                 "type": "text",
                 "text": MAESTRO_FX_SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},  # Il prompt è statico: cache per ridurre costo/latenza
+                # TTL 1h invece del default 5 min: i segnali del trader arrivano a intervalli irregolari,
+                # spesso >5 min l'uno dall'altro. Con TTL corto la cache scade tra un segnale e l'altro e
+                # il messaggio più critico in termini di latenza (il NEW_SIGNAL rapido) ripaga ogni volta
+                # il costo pieno di elaborazione del prompt.
+                "cache_control": {"type": "ephemeral", "ttl": "1h"},
             }
         ],
         tools=[CLASSIFY_SIGNAL_TOOL],
