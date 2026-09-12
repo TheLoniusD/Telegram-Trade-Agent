@@ -107,7 +107,9 @@ async def process_and_print(event, is_edit: bool):
                 # 2a. Breakeven, ticket per ticket. MT5 stesso verifica se la posizione
                 # esiste ancora: se il TP è già scattato, il broker l'ha già chiusa e
                 # set_sl_to_be non applica nulla (ritorna False).
-                for tp_config in be_candidates:
+                for candidate in be_candidates:
+                    parent_trade = candidate["trade"]
+                    tp_config = candidate["ticket"]
                     real_mt5_ticket = tp_config.get("mt5_ticket")
                     entry_price = tp_config.get("entry_price")
 
@@ -115,6 +117,9 @@ async def process_and_print(event, is_edit: bool):
                     if be_applied:
                         tp_config["be_active"] = True
                         tp_config["stop_loss"] = entry_price
+                        # Risincronizziamo anche lo stop_loss a livello radice del trade,
+                        # altrimenti resta al valore pre-BE (usato per ereditarietà re-entry).
+                        parent_trade["stop_loss"] = entry_price
                         print(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
                     else:
                         # Non più aperto su MT5: il TP era già scattato prima del BE.

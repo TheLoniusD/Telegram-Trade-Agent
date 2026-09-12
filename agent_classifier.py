@@ -135,7 +135,13 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
 - 'update_details.move_sl_to_be': true se il testo contiene "BE+", "BE", "B/E", "break even", "breakeven",
   "set BE", "secure profits & BE", "move SL to entry", "move to entry", "protect", "zero risk".
 - 'update_details.close_percentage': percentuale di chiusura parziale indicata (es. "close 50%", "close half" = 50.0).
-- 'update_details.layer_target': "LOWEST", "HIGHEST" o "ALL" se il messaggio indica un layer specifico.
+- 'update_details.layer_target': Estrai "LOWEST", "HIGHEST" o "ALL" SOLO SE il messaggio conferma esplicitamente
+  che quel target è stato RAGGIUNTO/CHIUSO (es. "hit lowest layer", "close all layers", "highest layer done").
+  ⚠️ NON impostarlo per un semplice riferimento generico a "layer" senza conferma di chiusura: messaggi come
+  "Try hold a few layer with BE" o "I'm try hold a few layer until to TP" NON indicano che un target sia stato
+  colpito (anzi, dicono di continuare a tenerli aperti) -> layer_target resta null, anche se move_sl_to_be è true.
+  Se in dubbio, lascia null: un valore sbagliato qui rischia di far segnare come chiusa una posizione ancora
+  aperta, bloccando il BE su di essa.
 
 Chiama SEMPRE ed ESCLUSIVAMENTE lo strumento 'classify_signal' con i campi compilati secondo queste regole.
 Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, chiusura totale"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""

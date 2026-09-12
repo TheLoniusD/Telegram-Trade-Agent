@@ -293,7 +293,9 @@ class OrderManager:
                 if move_to_be:
                     for tp_key, tp_config in trade.get("tickets", {}).items():
                         if tp_config.get("mt5_ticket") and not tp_config.get("be_active") and not tp_config.get("closed"):
-                            be_candidates.append(tp_config)
+                            # Includiamo il riferimento al trade padre per poter risincronizzare
+                            # lo stop_loss a livello radice dopo un BE riuscito.
+                            be_candidates.append({"trade": trade, "ticket": tp_config})
 
                 if modified:
                     updated_trades.append(trade)

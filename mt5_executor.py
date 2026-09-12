@@ -11,11 +11,17 @@ class MT5Executor:
         else:
             print("🚀 Connessione a MetaTrader 5 riuscita!")
 
+        # Solo per TEST MODE: contatore per generare ticket fittizi distinti
+        # (in produzione ogni execute_open ritorna il vero ticket assegnato dal broker).
+        self._test_ticket_counter = 90000000
+
     def execute_open(self, order_plan: dict) -> dict:
 
-        print(f"🛠️ [TEST MODE] Simulazione apertura per {order_plan['symbol']} | Volume: {order_plan['volume']}")
-        return 99988877
-        
+        self._test_ticket_counter += 1
+        fake_ticket = self._test_ticket_counter
+        print(f"🛠️ [TEST MODE] Simulazione apertura per {order_plan['symbol']} | Volume: {order_plan['volume']} | Ticket fittizio: {fake_ticket}")
+        return fake_ticket
+
         symbol = order_plan["symbol"]
         direction = order_plan["direction"]
         volume = order_plan["volume"]
