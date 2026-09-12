@@ -1,8 +1,9 @@
 Ottimizzazione Sistema Bot
 
-    CLASSIFICAZIONE SEGNALI:
+    CLASSIFICAZIONE SEGNALI (v2 - implementata in agent_classifier.py):
         - NEW_SIGNAL
             - Messaggi in modalià rapida, buy o sell senza TP e SL
+            - Messaggi di re-entry, try buy again
 
         - UPDATE_SIGNAL
             - Messaggio STANDARD fase COMPLETA --> aggiunta di TP e SL
@@ -17,19 +18,18 @@ Ottimizzazione Sistema Bot
             - Messaggio STANDARD celebrativi
             - Messaggio STANDARD reason buy
             - Messaggio STANDARD READY
-            - Messaggio STANDARD "Trade Active" --> attivare BE se presente nel messaggio
-            - Messaggio STANDARD "Zero Float" --> attivare BE se presente nel messaggio
+            - Messaggio STANDARD "Trade Active" (SENZA comando di BE)
+            - Messaggio STANDARD "Zero Float" (SENZA comando di BE)
             - Messaggio NON STANDARD
 
-    Bisogna gesitre meglio i messaggi che fanno riferimento ad una operazione attiva, quindi di aggiornamento che sia CLOSE_SIGNAL o UPDATE_SIGNAL.
-    I messaggi da classficare potrebbero essere questi:
-        - "Trade Active"
-        - "HIT TP MAX"
-        - "Zero Float"
-        - "HIT TP"
+    NOTA SULLA CORREZIONE (risolve il bug sotto): "Trade Active" e "Zero Float" erano elencati come IGNORE
+    con la clausola "attivare BE se presente" - ma IGNORE nell'Order Manager non produce mai un'azione,
+    quindi un comando di BE dentro un messaggio classificato IGNORE veniva silenziosamente perso. Ora, come
+    per "HIT TP", se questi template contengono un comando di BE esplicito vengono classificati UPDATE_SIGNAL
+    (is_actionable=true, move_sl_to_be=true); restano IGNORE solo quando sono pura conferma di stato senza BE.
 
-
-Migliorare classificazione messaggi, l'agente sbaglia ancora con TRADE ACTIVE e ZERO FLOAT
+[RISOLTO] Migliorare classificazione messaggi, l'agente sbaglia ancora con TRADE ACTIVE e ZERO FLOAT
+    -> Vedi nota sopra: il fix è nel prompt riscritto in agent_classifier.py.
 
 
 Gestione del Breakeven (BE+)
