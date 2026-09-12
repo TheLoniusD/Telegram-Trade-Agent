@@ -98,33 +98,48 @@ async def process_and_print(event, is_edit: bool):
                     print(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
                     trade_data["status"] = "REJECTED"
 
-            # CASO 2: Aggiornamento ordine esistente (SL/TP reali o BE+)
+            # CASO 2: Aggiornamento ordine esistente (SL/TP reali e/o BE+)
             elif action == "UPDATE":
-                # Se è richiesta la modifica a Breakeven
-                if trade_data.get("be_active"):
-                    mt5_agent.set_sl_to_be(
-                        ticket=trade_data.get("ticket_id"),
-                        symbol=trade_data.get("symbol"),
-                        entry_price=trade_data.get("entry_min")
-                    )
-                # Se si tratta dell'aggiornamento con SL/TP reali
-                else:
-                    for tp_key, tp_config in trade_data["tickets"].items():
-                        real_mt5_ticket = tp_config.get("mt5_ticket")
+                trades = manager_result.get("trades", [])
+                be_candidates = manager_result.get("be_candidates", [])
+                sl_tp_changed = manager_result.get("sl_tp_changed", False)
 
-                        # Se il ticket non è aperto su MT5, saltalo
-                        if not real_mt5_ticket:
-                            continue
-        
-                        # Prendi il nuovo stop_loss dal trade_data aggiornato dall'Order Manager
-                        new_sl = trade_data.get("stop_loss")
-                        new_tp = trade_data.get("take_profit")
-        
-                        mt5_agent.modify_order_levels(
-                            ticket=real_mt5_ticket,
-                            stop_loss=new_sl,
-                            take_profit=new_tp
-                        )
+                # 2a. Breakeven, ticket per ticket. MT5 stesso verifica se la posizione
+                # esiste ancora: se il TP è già scattato, il broker l'ha già chiusa e
+                # set_sl_to_be non applica nulla (ritorna False).
+                for tp_config in be_candidates:
+                    real_mt5_ticket = tp_config.get("mt5_ticket")
+                    entry_price = tp_config.get("entry_price")
+
+                    be_applied = mt5_agent.set_sl_to_be(ticket=real_mt5_ticket, entry_price=entry_price)
+                    if be_applied:
+                        tp_config["be_active"] = True
+                        tp_config["stop_loss"] = entry_price
+                        print(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
+                    else:
+                        # Non più aperto su MT5: il TP era già scattato prima del BE.
+                        tp_config["closed"] = True
+                        print(f"ℹ️ Ticket MT5 {real_mt5_ticket} non più aperto (TP già raggiunto), BE non applicabile.")
+
+                # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
+                # solo se il messaggio conteneva davvero nuovi valori.
+                if sl_tp_changed:
+                    for trade in trades:
+                        for tp_key, tp_config in trade.get("tickets", {}).items():
+                            real_mt5_ticket = tp_config.get("mt5_ticket")
+                            if not real_mt5_ticket or tp_config.get("closed"):
+                                continue
+
+                            new_sl = trade.get("stop_loss")
+                            new_tp = tp_config.get("take_profit")
+
+                            mt5_agent.modify_order_levels(
+                                ticket=real_mt5_ticket,
+                                stop_loss=new_sl,
+                                take_profit=[new_tp] if new_tp is not None else []
+                            )
+
+                manager.save_state_to_file()
 
             # CASO 3: Chiusura posizione
             elif action == "CLOSE":

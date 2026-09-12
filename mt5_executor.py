@@ -51,27 +51,35 @@ class MT5Executor:
         print(f"✅ Ordine Eseguito su MT5 | Ticket: {result.order} | Volume: {volume}")
         return {"success": True, "mt5_ticket": result.order}
 
-    def set_sl_to_be(self, symbol: str, direction: str, entry_price: float):
-        """Sposta lo Stop Loss a Breakeven per tutte le posizioni aperte sul simbolo."""
-        return
-        positions = mt5.positions_get(symbol=symbol)
-        if not positions:
-            print("Nessuna posizione aperta trovata per BE+.")
-            return
+    def set_sl_to_be(self, ticket: int, entry_price: float) -> bool:
+        """
+        Sposta lo Stop Loss al prezzo di ingresso (Breakeven) per UN SINGOLO ticket.
+        Se la posizione non esiste più su MT5 (es. il broker l'ha già chiusa perché
+        ha colpito il proprio Take Profit), non fa nulla e ritorna False: MT5 è la
+        fonte di verità su quali ticket sono ancora aperti, non il testo del messaggio.
+        """
+        print(f"🛠️ [TEST MODE] Simulazione BE per ticket {ticket} | nuovo SL: {entry_price}")
+        return True
 
-        for pos in positions:
-            # Spostiamo lo SL al prezzo d'ingresso
-            request = {
-                "action": mt5.TRADE_ACTION_SLTP,
-                "position": pos.ticket,
-                "sl": float(entry_price),
-                "tp": pos.tp
-            }
-            res = mt5.order_send(request)
-            if res.retcode == mt5.TRADE_RETCODE_DONE:
-                print(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
-            else:
-                print(f"❌ Errore spostamento BE posizione #{pos.ticket}: {res.comment}")
+        position = mt5.positions_get(ticket=ticket)
+        if not position:
+            print(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
+            return False
+
+        pos = position[0]
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "position": pos.ticket,
+            "sl": float(entry_price),
+            "tp": pos.tp
+        }
+        result = mt5.order_send(request)
+        if result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
+            return True
+
+        print(f"❌ Errore spostamento BE posizione #{pos.ticket}: {result.comment}")
+        return False
 
     def close_all(self, symbol: str):
         """Chiude tutte le posizioni aperte per un dato simbolo."""
