@@ -43,8 +43,6 @@ Gestione del Breakeven (BE+)
 
 
 Gestione dei CLOSE_SIGNAL
-
-    Capire quali sono i close_signal da zanna e rinna.
     Mettere aposto logica in order_manager
     Aggiungere più esempi nel propmt dell'agente classificatore.
 
@@ -52,18 +50,11 @@ Gestione dei CLOSE_SIGNAL
 Verificare se le regole di classificazione sono impostate bene, con dei test su chat telegram
     === REGOLE TASSATIVE DI ESCLUSIONE (INTENT = IGNORE) ===
 
-Filtrare gli utenti in telegram_listener.py, escluederte tutti tranne "Maestro Fx"
-
 Gestione Ibrida Multi-Posizione su TP MAX (Chiusura Parziale + BE)
     Estendere la logica dell'Order Manager per supportare i comandi ibridi di incasso (es. "Collect half & BE+"). 
     Consentirà al bot di chiudere solo una frazione dei ticket attivi (es. chiudere 1 posizione e mantenere la seconda) applicando 
     contestualmente il Breakeven sulle posizioni residue, anziché forzare sempre la chiusura totale. Da implementare quando il sistema passerà a 
     una gestione avanzata con più di 2 posizioni simultanee per segnale.
-
-Gestire meglio la logica degli output che arrivano da manager_result in telegram_listener.py
-    OPEN
-    UPDATE
-    CLOSE
 
 Capire a quanto impostare DEFAULT_SL_DIST_GOLD, il valore che sottrae al buy o sell, per impostare Stop Loss temporaneo
 Timeout sull'edit: Se il canale invia la Fase Rapida ma poi si dimentica o ci mette più di 5 minuti a modificare il messaggio con lo SL reale, cosa deve fare il bot? 
