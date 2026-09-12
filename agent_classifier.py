@@ -155,7 +155,7 @@ CLASSIFY_SIGNAL_TOOL = {
                 "type": "object",
                 "properties": {
                     "symbol": {"type": ["string", "null"]},
-                    "direction": {"type": ["string", "null"], "enum": ["BUY", "SELL", None]},
+                    "direction": {"anyOf": [{"type": "string", "enum": ["BUY", "SELL"]}, {"type": "null"}]},
                     "entry_min": {"type": ["number", "null"]},
                     "entry_max": {"type": ["number", "null"]},
                     "stop_loss": {"type": ["number", "null"]},
@@ -165,7 +165,7 @@ CLASSIFY_SIGNAL_TOOL = {
                         "properties": {
                             "move_sl_to_be": {"type": "boolean"},
                             "close_percentage": {"type": ["number", "null"]},
-                            "layer_target": {"type": ["string", "null"], "enum": ["LOWEST", "HIGHEST", "ALL", None]}
+                            "layer_target": {"anyOf": [{"type": "string", "enum": ["LOWEST", "HIGHEST", "ALL"]}, {"type": "null"}]}
                         },
                         "required": ["move_sl_to_be", "close_percentage", "layer_target"],
                         "additionalProperties": False
@@ -203,7 +203,6 @@ def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: 
     response = client.messages.create(
         model=MODEL_ID,
         max_tokens=1024,
-        temperature=0.0,  # Deterministico per ridurre errori
         system=[
             {
                 "type": "text",
