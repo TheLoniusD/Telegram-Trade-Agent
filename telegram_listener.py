@@ -94,16 +94,25 @@ async def process_and_print(event, is_edit: bool):
                     all_success = True
                     for target_key, order_config in orders_dict.items():
                         # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
-                        order_ticket = mt5_agent.execute_open(order_config)
-            
-                        # Aggiorniamo direttamente i campi del ticket pre-strutturato in memoria
+                        exec_result = mt5_agent.execute_open(order_config)
+
+                        # Scriviamo in memoria i valori REALI restituiti dal broker:
+                        # prezzo di riempimento e volume effettivo possono differire da
+                        # quelli pianificati (slippage, riempimento parziale), e sono loro
+                        # a dover guidare il Breakeven e i controlli successivi.
                         if target_key in trade_data["tickets"]:
-                            trade_data["tickets"][target_key]["volume"] = order_config.get("volume")
-                            trade_data["tickets"][target_key]["mt5_ticket"] = order_ticket
-                            trade_data["tickets"][target_key]["success"] = order_ticket is not None
-            
-                        if order_ticket is None:
+                            ticket_data = trade_data["tickets"][target_key]
+                            ticket_data["mt5_ticket"] = exec_result.get("mt5_ticket")
+                            ticket_data["success"] = exec_result.get("success", False)
+                            ticket_data["volume"] = exec_result.get("volume") or order_config.get("volume")
+
+                            fill_price = exec_result.get("fill_price")
+                            if fill_price:
+                                ticket_data["entry_price"] = fill_price
+
+                        if not exec_result.get("success"):
                             all_success = False
+                            print(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
 
                     # Aggiorniamo lo status in base all'esito complessivo
                     trade_data["status"] = "ACTIVE" if all_success else "PENDING_FAILED"
@@ -215,6 +224,15 @@ async def handle_edited_message(event):
 
 # Avvio del client
 if __name__ == "__main__":
+    # Riconciliazione con MT5: mentre il bot era spento un TP/SL può essere
+    # scattato, o un'operazione può essere stata chiusa a mano dal terminale.
+    # In TEST MODE non esistono posizioni reali, quindi si salta.
+    if not mt5_agent.test_mode:
+        corrette = manager.reconcile_with_broker(mt5_agent.get_open_position)
+        print(f"🔄 Riconciliazione con MT5 completata ({corrette} valori allineati).")
+    else:
+        print("🧪 TEST MODE: riconciliazione con MT5 saltata.")
+
     print(f"🤖 Ascolto attivo sul canale: {TARGET_CHANNEL}")
     print("In attesa di messaggi... (Premi Ctrl+C per fermare)")
     tg_client.start()

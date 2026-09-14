@@ -60,6 +60,56 @@ class OrderManager:
             return False
 
 
+    def reconcile_with_broker(self, position_lookup) -> int:
+        """
+        Allinea la memoria con la realtà del broker.
+
+        'position_lookup(ticket)' deve ritornare lo stato reale della posizione
+        (dict) oppure None se non è più aperta - vedi MT5Executor.get_open_position.
+        Da chiamare all'avvio: mentre il bot era spento un TP/SL può essere
+        scattato, o l'operazione può essere stata chiusa a mano dal terminale.
+
+        Ritorna il numero di ticket il cui stato è stato corretto.
+        """
+        corrections = 0
+
+        for trade in self.active_trades.values():
+            if trade.get("status") not in CLOSABLE_STATUSES:
+                continue
+
+            tickets = trade.get("tickets", {})
+            for tp_key, tp_config in tickets.items():
+                mt5_ticket = tp_config.get("mt5_ticket")
+                if not mt5_ticket or tp_config.get("closed"):
+                    continue
+
+                state = position_lookup(mt5_ticket)
+
+                if state is None:
+                    tp_config["closed"] = True
+                    corrections += 1
+                    print(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
+                    continue
+
+                # La posizione esiste ancora: i valori del broker vincono sempre
+                # su quelli in memoria (potrebbero essere stati modificati a mano).
+                for campo_memoria, campo_broker in (("stop_loss", "stop_loss"), ("take_profit", "take_profit"), ("volume", "volume"), ("entry_price", "price_open")):
+                    valore_broker = state.get(campo_broker)
+                    if valore_broker and tp_config.get(campo_memoria) != valore_broker:
+                        tp_config[campo_memoria] = valore_broker
+                        corrections += 1
+
+            # Se tutti i ticket sono chiusi, lo è anche l'operazione
+            if tickets and all(t.get("closed") for t in tickets.values()):
+                trade["status"] = "CLOSED"
+                print(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
+
+        if corrections:
+            self.save_state_to_file()
+
+        return corrections
+
+
     def _get_latest_trade(self) -> Optional[dict]:
         """Recupera l'operazione più recente contrassegnata come attiva."""
         if self.latest_msg_id and self.latest_msg_id in self.active_trades:
