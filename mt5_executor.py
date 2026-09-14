@@ -3,6 +3,10 @@ from typing import Optional
 
 import MetaTrader5 as mt5
 
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
+
 # ⚠️ INTERRUTTORE UNICO TEST / REALE
 # True  = nessun ordine viene realmente inviato a MT5, tutto viene solo simulato.
 # False = il bot opera davvero sul conto collegato al terminale MT5.
@@ -25,12 +29,12 @@ class MT5Executor:
         self.test_mode = TEST_MODE
 
         if not mt5.initialize():
-            print(f"❌ Impossibile connettersi a MT5: {mt5.last_error()}")
+            logger.error(f"❌ Impossibile connettersi a MT5: {mt5.last_error()}")
         else:
-            print("🚀 Connessione a MetaTrader 5 riuscita!")
+            logger.info("🚀 Connessione a MetaTrader 5 riuscita!")
 
         if self.test_mode:
-            print("🧪 TEST MODE attivo: nessun ordine verrà realmente inviato a MT5.")
+            logger.info("🧪 TEST MODE attivo: nessun ordine verrà realmente inviato a MT5.")
 
         # Solo per TEST MODE: contatore per generare ticket fittizi distinti
         self._test_ticket_counter = 90000000
@@ -54,7 +58,7 @@ class MT5Executor:
         if self.test_mode:
             self._test_ticket_counter += 1
             fake_ticket = self._test_ticket_counter
-            print(f"🛠️ [TEST MODE] Simulazione apertura {symbol} {direction} | Volume: {volume} | Ticket fittizio: {fake_ticket}")
+            logger.info(f"🛠️ [TEST MODE] Simulazione apertura {symbol} {direction} | Volume: {volume} | Ticket fittizio: {fake_ticket}")
             return {
                 "success": True,
                 "mt5_ticket": fake_ticket,
@@ -65,7 +69,7 @@ class MT5Executor:
 
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
-            print(f"❌ Nessun prezzo disponibile per {symbol}: ordine non inviato.")
+            logger.error(f"❌ Nessun prezzo disponibile per {symbol}: ordine non inviato.")
             return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": "nessun prezzo disponibile"}
 
         order_type = mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL
@@ -91,10 +95,10 @@ class MT5Executor:
 
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"❌ Errore apertura ordine MT5: {result.comment}")
+            logger.error(f"❌ Errore apertura ordine MT5: {result.comment}")
             return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": result.comment}
 
-        print(f"✅ Ordine eseguito su MT5 | Ticket: {result.order} | Volume: {result.volume} | Prezzo: {result.price}")
+        logger.info(f"✅ Ordine eseguito su MT5 | Ticket: {result.order} | Volume: {result.volume} | Prezzo: {result.price}")
         return {
             "success": True,
             "mt5_ticket": result.order,
@@ -111,16 +115,16 @@ class MT5Executor:
         fonte di verità su quali ticket sono ancora aperti, non il testo del messaggio.
         """
         if entry_price is None:
-            print(f"⚠️ BE non applicabile al ticket {ticket}: prezzo di ingresso sconosciuto.")
+            logger.warning(f"⚠️ BE non applicabile al ticket {ticket}: prezzo di ingresso sconosciuto.")
             return False
 
         if self.test_mode:
-            print(f"🛠️ [TEST MODE] Simulazione BE per ticket {ticket} | nuovo SL: {entry_price}")
+            logger.info(f"🛠️ [TEST MODE] Simulazione BE per ticket {ticket} | nuovo SL: {entry_price}")
             return True
 
         position = mt5.positions_get(ticket=ticket)
         if not position:
-            print(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
+            logger.info(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
             return False
 
         pos = position[0]
@@ -132,10 +136,10 @@ class MT5Executor:
         }
         result = mt5.order_send(request)
         if result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
+            logger.info(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
             return True
 
-        print(f"❌ Errore spostamento BE posizione #{pos.ticket}: {result.comment}")
+        logger.error(f"❌ Errore spostamento BE posizione #{pos.ticket}: {result.comment}")
         return False
 
     def close_position(self, ticket: int, symbol: str = None) -> bool:
@@ -147,12 +151,12 @@ class MT5Executor:
         fallita, per non segnare come chiusa una posizione ancora aperta.
         """
         if self.test_mode:
-            print(f"🛠️ [TEST MODE] Simulazione chiusura posizione {ticket} ({symbol})")
+            logger.info(f"🛠️ [TEST MODE] Simulazione chiusura posizione {ticket} ({symbol})")
             return True
 
         position = mt5.positions_get(ticket=ticket)
         if not position:
-            print(f"ℹ️ Ticket {ticket} non presente su MT5: nessuna chiusura necessaria.")
+            logger.info(f"ℹ️ Ticket {ticket} non presente su MT5: nessuna chiusura necessaria.")
             return True
 
         pos = position[0]
@@ -160,7 +164,7 @@ class MT5Executor:
 
         tick = mt5.symbol_info_tick(pos.symbol)
         if tick is None:
-            print(f"❌ Nessun prezzo disponibile per {pos.symbol}: chiusura di {pos.ticket} non inviata.")
+            logger.error(f"❌ Nessun prezzo disponibile per {pos.symbol}: chiusura di {pos.ticket} non inviata.")
             return False
 
         price = tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask
@@ -181,10 +185,10 @@ class MT5Executor:
 
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"❌ Errore chiusura posizione {pos.ticket}: {result.comment}")
+            logger.error(f"❌ Errore chiusura posizione {pos.ticket}: {result.comment}")
             return False
 
-        print(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
+        logger.info(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
         return True
 
     def modify_order_levels(self, ticket: int, stop_loss: float, take_profit: list) -> bool:
@@ -192,7 +196,7 @@ class MT5Executor:
         Invia una richiesta TRADE_ACTION_SLTP a MT5 per aggiornare Stop Loss e Take Profit.
         """
         if self.test_mode:
-            print(f"🛠️ [TEST MODE] Simulazione modifica ticket {ticket} | stop_loss: {stop_loss}, take_profit: {take_profit}")
+            logger.info(f"🛠️ [TEST MODE] Simulazione modifica ticket {ticket} | stop_loss: {stop_loss}, take_profit: {take_profit}")
             return True
 
         # Se la lista TP contiene valori, prendiamo il primo (TP1)
@@ -208,10 +212,10 @@ class MT5Executor:
         result = mt5.order_send(request)
 
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"❌ Errore modifica ordine {ticket}: {result.comment}")
+            logger.error(f"❌ Errore modifica ordine {ticket}: {result.comment}")
             return False
 
-        print(f"✅ Ordine {ticket} aggiornato con successo | SL: {stop_loss} | TP: {tp_price}")
+        logger.info(f"✅ Ordine {ticket} aggiornato con successo | SL: {stop_loss} | TP: {tp_price}")
         return True
 
     def get_open_position(self, ticket: int) -> Optional[dict]:

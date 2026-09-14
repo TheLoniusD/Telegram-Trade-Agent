@@ -7,6 +7,11 @@ session_test.session
 *.session
 *.session-journal
 
+# Stato operativo e log: sono dati di esecuzione, non codice
+active_trades.json
+logs/
+storico/
+
 # Cache e file temporanei di Python
 __pycache__/
 *.pyc

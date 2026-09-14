@@ -4,6 +4,10 @@ import time
 import uuid
 from typing import Dict, Optional
 
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
+
 # Stati in cui un'operazione è (o potrebbe essere) ancora a mercato e quindi
 # va considerata chiudibile. "CLOSING" rientra per permettere di ritentare una
 # chiusura interrotta a metà (es. crash del bot durante l'invio a MT5).
@@ -35,7 +39,7 @@ class OrderManager:
 
         with open(target_path, "w", encoding="utf-8") as f:
             json.dump(state_payload, f, indent=2, default=str, ensure_ascii=False)
-        print(f"💾 Stato memoria salvato in: {target_path}")
+        logger.info(f"💾 Stato memoria salvato in: {target_path}")
 
 
     def load_state_from_file(self, filepath: Optional[str] = None) -> bool:
@@ -53,10 +57,10 @@ class OrderManager:
                 self.active_trades = {int(k): v for k, v in data.get("active_trades", {}).items()}
                 self.latest_msg_id = data.get("latest_msg_id")
                 
-            print(f"📂 Stato memoria caricato da: {target_path} ({len(self.active_trades)} trade attivi)")
+            logger.info(f"📂 Stato memoria caricato da: {target_path} ({len(self.active_trades)} trade attivi)")
             return True
         except Exception as e:
-            print(f"⚠️ Errore nel caricamento del file di stato: {e}")
+            logger.exception(f"⚠️ Errore nel caricamento del file di stato: {e}")
             return False
 
 
@@ -88,7 +92,7 @@ class OrderManager:
                 if state is None:
                     tp_config["closed"] = True
                     corrections += 1
-                    print(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
+                    logger.warning(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
                     continue
 
                 # La posizione esiste ancora: i valori del broker vincono sempre
@@ -102,7 +106,7 @@ class OrderManager:
             # Se tutti i ticket sono chiusi, lo è anche l'operazione
             if tickets and all(t.get("closed") for t in tickets.values()):
                 trade["status"] = "CLOSED"
-                print(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
+                logger.warning(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
 
         if corrections:
             self.save_state_to_file()
@@ -195,7 +199,7 @@ class OrderManager:
             # orfani sul broker senza che il bot sappia più chiuderli.
             existing_trade = self.active_trades.get(msg_id)
             if existing_trade and existing_trade.get("status") in CLOSABLE_STATUSES:
-                print(f"⚠️ [NEW_SIGNAL] msg_id {msg_id} ha già un'operazione a mercato: segnale ignorato per non perdere i ticket esistenti.")
+                logger.warning(f"⚠️ [NEW_SIGNAL] msg_id {msg_id} ha già un'operazione a mercato: segnale ignorato per non perdere i ticket esistenti.")
                 return {"action": "IGNORE", "reason": "Operazione già esistente per questo messaggio."}
 
             ticket_id = str(uuid.uuid4())[:8].upper()
@@ -367,7 +371,7 @@ class OrderManager:
 
             if updated_trades or be_candidates:
                 self.save_state_to_file()
-                print(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
+                logger.info(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
                 return {
                     "action": "UPDATE",
                     "trades": trades_to_update,
@@ -409,7 +413,7 @@ class OrderManager:
                 return {"action": "IGNORE", "reason": "Nessuna operazione a mercato da chiudere."}
 
             self.save_state_to_file()
-            print(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: {len(closing_chain)} operazioni da chiudere (Originale + Re-entry).")
+            logger.info(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: {len(closing_chain)} operazioni da chiudere (Originale + Re-entry).")
 
             return {
                 "action": "CLOSE",

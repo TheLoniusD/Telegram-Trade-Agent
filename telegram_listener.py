@@ -10,6 +10,9 @@ from order_manager import OrderManager
 from risk_manager import RiskManager
 from mt5_executor import MT5Executor
 from market_hours import is_market_time_open
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 manager = OrderManager()
 risk_agent = RiskManager()
@@ -33,10 +36,9 @@ OWNER_ID = 462122085
 # Simbolo su cui verifichiamo l'apertura del mercato prima di classificare
 TRADED_SYMBOL = "XAUUSD"
 
-async def process_and_print(event, is_edit: bool):
+async def process_message(event, is_edit: bool):
 
     sender_id = event.sender_id
-    print(event.sender_id)
     # Se il messaggio non arriva dall'owner, scartalo subito (nessuna chiamata AI)
     if sender_id != OWNER_ID:
         return
@@ -55,10 +57,7 @@ async def process_and_print(event, is_edit: bool):
     if not text.strip():
         return
 
-    print(f"\n" + "="*50)
-    print(f"[{'✏️ EDIT MESSAGGIO' if is_edit else '🆕 NUOVO MESSAGGIO'}] ID: {msg_id} | Reply-To: {reply_to}")
-    print(f"TESTO RICEVUTO:\n{text}")
-    print("="*50)
+    logger.info(f"{'✏️ EDIT' if is_edit else '🆕 NUOVO'} MESSAGGIO | ID: {msg_id} | Reply-To: {reply_to} | Testo: {text!r}")
 
     # A mercato chiuso nessuna azione sarebbe eseguibile su MT5: scartiamo il
     # messaggio PRIMA di chiamare l'agente, così non consumiamo token inutilmente.
@@ -68,15 +67,14 @@ async def process_and_print(event, is_edit: bool):
         market_open, market_reason = mt5_agent.is_symbol_tradable(TRADED_SYMBOL)
 
     if not market_open:
-        print(f"⏸️ Messaggio scartato senza classificarlo: {market_reason}")
+        logger.info(f"⏸️ Messaggio scartato senza classificarlo: {market_reason}")
         return
 
     try:
         # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
         ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
         
-        print("🧠 OUTPUT AGENTE 1 (JSON):")
-        print(json.dumps(ai_output, indent=2, ensure_ascii=False))
+        logger.info(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
 
         # 2. Passaggio all'Order Manager (il tuo file separato)
         manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output)
@@ -112,7 +110,7 @@ async def process_and_print(event, is_edit: bool):
 
                         if not exec_result.get("success"):
                             all_success = False
-                            print(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
+                            logger.warning(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
 
                     # Aggiorniamo lo status in base all'esito complessivo
                     trade_data["status"] = "ACTIVE" if all_success else "PENDING_FAILED"
@@ -121,10 +119,10 @@ async def process_and_print(event, is_edit: bool):
                     # contiene ancora mt5_ticket a null. Se il bot si riavviasse
                     # ora, perderebbe il riferimento a posizioni già a mercato.
                     manager.save_state_to_file()
-                    print(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
+                    logger.info(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
 
                 else:
-                    print(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
+                    logger.warning(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
                     trade_data["status"] = "REJECTED"
                     manager.save_state_to_file()
 
@@ -150,11 +148,11 @@ async def process_and_print(event, is_edit: bool):
                         # Risincronizziamo anche lo stop_loss a livello radice del trade,
                         # altrimenti resta al valore pre-BE (usato per ereditarietà re-entry).
                         parent_trade["stop_loss"] = entry_price
-                        print(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
+                        logger.info(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
                     else:
                         # Non più aperto su MT5: il TP era già scattato prima del BE.
                         tp_config["closed"] = True
-                        print(f"ℹ️ Ticket MT5 {real_mt5_ticket} non più aperto (TP già raggiunto), BE non applicabile.")
+                        logger.info(f"ℹ️ Ticket MT5 {real_mt5_ticket} non più aperto (TP già raggiunto), BE non applicabile.")
 
                 # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
                 # solo se il messaggio conteneva davvero nuovi valori.
@@ -200,26 +198,25 @@ async def process_and_print(event, is_edit: bool):
                     # invece di risultare chiusa mentre è ancora a mercato.
                     trade["status"] = "CLOSED" if all_closed else "CLOSE_FAILED"
                     if not all_closed:
-                        print(f"⚠️ Chiusura INCOMPLETA per il trade {trade.get('ticket_id')}: verificare manualmente su MT5.")
+                        logger.warning(f"⚠️ Chiusura INCOMPLETA per il trade {trade.get('ticket_id')}: verificare manualmente su MT5.")
 
                 manager.save_state_to_file()
         
-        print("\n📦 STATO MEMORIA (ORDER MANAGER):")
-        print(json.dumps(manager_result, indent=2, ensure_ascii=False))
-        print(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
+        logger.info(f"📦 ESITO ORDER MANAGER: {json.dumps(manager_result, default=str, ensure_ascii=False)}")
+        logger.info(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
         
     except Exception as e:
-        print(f"❌ Errore durante l'elaborazione dell'Agente 1: {e}")
+        logger.exception("❌ Errore durante l'elaborazione del messaggio")
 
 # Listener per i NUOVI messaggi nel canale
 @tg_client.on(events.NewMessage(chats=TARGET_CHANNEL))
 async def handle_new_message(event):
-    await process_and_print(event, is_edit=False)
+    await process_message(event, is_edit=False)
 
 # Listener per i MESSAGGI MODIFICATI (gli Edit) nel canale
 @tg_client.on(events.MessageEdited(chats=TARGET_CHANNEL))
 async def handle_edited_message(event):
-    await process_and_print(event, is_edit=True)
+    await process_message(event, is_edit=True)
 
 
 # Avvio del client
@@ -229,11 +226,11 @@ if __name__ == "__main__":
     # In TEST MODE non esistono posizioni reali, quindi si salta.
     if not mt5_agent.test_mode:
         corrette = manager.reconcile_with_broker(mt5_agent.get_open_position)
-        print(f"🔄 Riconciliazione con MT5 completata ({corrette} valori allineati).")
+        logger.info(f"🔄 Riconciliazione con MT5 completata ({corrette} valori allineati).")
     else:
-        print("🧪 TEST MODE: riconciliazione con MT5 saltata.")
+        logger.info("🧪 TEST MODE: riconciliazione con MT5 saltata.")
 
-    print(f"🤖 Ascolto attivo sul canale: {TARGET_CHANNEL}")
-    print("In attesa di messaggi... (Premi Ctrl+C per fermare)")
+    logger.info(f"🤖 Ascolto attivo sul canale: {TARGET_CHANNEL}")
+    logger.info("In attesa di messaggi... (Premi Ctrl+C per fermare)")
     tg_client.start()
     tg_client.run_until_disconnected()
