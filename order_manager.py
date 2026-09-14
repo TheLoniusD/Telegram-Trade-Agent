@@ -2,6 +2,7 @@ import json
 import os
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from logger_config import setup_logger
@@ -13,24 +14,70 @@ logger = setup_logger(__name__)
 # chiusura interrotta a metà (es. crash del bot durante l'invio a MT5).
 CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 
+# Stati definitivi: l'operazione non tornerà più a mercato, quindi esce dallo
+# stato vivo e finisce nell'archivio giornaliero.
+TERMINAL_STATUSES = ("CLOSED", "REJECTED")
+
 
 class OrderManager:
     """
     Gestisce lo stato attivo delle operazioni in memoria.
     Mappa i messaggi di Telegram (message_id) ai ticket di trading attivi.
     """
-    def __init__(self, storage_path: str = "active_trades.json"):
+    def __init__(self, storage_path: str = "active_trades.json", archive_dir: str = "storico"):
         # Dizionario chiave-valore: { telegram_msg_id: dict_operazione }
         self.active_trades: Dict[int, dict] = {}
         # Puntatore diretto all'ultimo msg_id registrato
         self.latest_msg_id: Optional[int] = None
 
         self.storage_path = storage_path
+        self.archive_dir = archive_dir
         # Carica automaticamente lo stato esistente all'avvio
         self.load_state_from_file()
 
+    def _archive_terminal_trades(self) -> int:
+        """
+        Sposta le operazioni concluse (CLOSED/REJECTED) dallo stato vivo a un
+        archivio giornaliero in formato JSONL (un'operazione per riga, in append).
+
+        Perché non basta cancellare il file a fine giornata: l'oro resta aperto da
+        domenica sera a venerdì sera, quindi un'operazione aperta lunedì può essere
+        ancora a mercato mercoledì. Azzerare il file a fine giornata farebbe perdere
+        al bot le posizioni realmente aperte. Qui invece esce dallo stato vivo solo
+        ciò che è definitivamente concluso, e nulla va perso perché finisce nello
+        storico.
+        """
+        terminali = [(msg_id, trade) for msg_id, trade in self.active_trades.items()
+                     if trade.get("status") in TERMINAL_STATUSES]
+
+        if not terminali:
+            return 0
+
+        os.makedirs(self.archive_dir, exist_ok=True)
+        nome_file = f"trades_{datetime.now().strftime('%Y-%m-%d')}.jsonl"
+        percorso = os.path.join(self.archive_dir, nome_file)
+
+        with open(percorso, "a", encoding="utf-8") as f:
+            for msg_id, trade in terminali:
+                record = dict(trade)
+                record["archived_at"] = datetime.now(timezone.utc).isoformat()
+                f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
+
+        for msg_id, _ in terminali:
+            del self.active_trades[msg_id]
+
+        logger.info(f"🗄️ Archiviate {len(terminali)} operazioni concluse in {percorso}")
+        return len(terminali)
+
     def save_state_to_file(self, filepath: Optional[str] = None) -> None:
-        """Salva fisicamente lo stato corrente di active_trades e latest_msg_id su file JSON."""
+        """
+        Salva lo stato corrente su file JSON.
+
+        Prima archivia le operazioni concluse, così active_trades.json contiene
+        sempre e solo ciò che è ancora a mercato e non cresce nel tempo.
+        """
+        self._archive_terminal_trades()
+
         target_path = filepath or self.storage_path
         state_payload = {
             "latest_msg_id": self.latest_msg_id,
@@ -39,7 +86,7 @@ class OrderManager:
 
         with open(target_path, "w", encoding="utf-8") as f:
             json.dump(state_payload, f, indent=2, default=str, ensure_ascii=False)
-        logger.info(f"💾 Stato memoria salvato in: {target_path}")
+        logger.info(f"💾 Stato memoria salvato in: {target_path} ({len(self.active_trades)} operazioni vive)")
 
 
     def load_state_from_file(self, filepath: Optional[str] = None) -> bool:

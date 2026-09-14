@@ -39,11 +39,19 @@ PRIMA DEL RILASCIO (bloccanti, emersi durante lo sviluppo)
         messaggi reali del canale. Va sostituito con l'ID Telegram del trader "Maestro Fx" prima di andare in
         autonomia, altrimenti non verrà classificato nessun segnale vero.
 
-    entry_price reale restituito da MT5
+    [RISOLTO] entry_price reale restituito da MT5
         Nei ticket, 'entry_price' è ancora il prezzo teorico del segnale (o ereditato da un re-entry): MT5Executor
         non restituisce il prezzo di riempimento effettivo dell'ordine. Finché non viene cablato, il BE sposta lo
         stop loss su un prezzo che potrebbe non essere quello di ingresso reale.
         Collegato al controllo di slippage (entry_min/entry_max servono a verificare che il fill sia nel range).
+        -> execute_open() ritorna ora sempre {success, mt5_ticket, fill_price, volume, error} e telegram_listener.py
+           scrive in memoria prezzo di riempimento e volume REALI del broker.
+        -> Sanato anche un bug latente: execute_open ritornava un intero in TEST MODE e un dizionario nel codice
+           reale, mentre il chiamante lo trattava sempre come ticket. Togliendo il TEST MODE sarebbe finito un dict
+           dentro 'mt5_ticket' e 'success' sarebbe stato True anche per ordini rifiutati.
+        -> TEST_MODE è ora un interruttore unico in cima a mt5_executor.py.
+        -> RESTA DA FARE il controllo di slippage vero e proprio: confrontare fill_price con entry_min/entry_max e
+           decidere cosa fare se il prezzo è scappato.
 
 
 Gestione del Breakeven (BE+)
@@ -110,14 +118,21 @@ Check di Allineamento e Resilienza allo Startup/Crash
         -> Aggiunta guardia: un NEW_SIGNAL su un msg_id che ha già un'operazione a mercato non sovrascrive più il
            record esistente (avrebbe lasciato i ticket MT5 orfani, non più chiudibili dal bot).
 
-    [DA FARE] Riconciliazione con MT5 allo startup
-        Al riavvio il bot si fida del JSON senza verificare che le posizioni elencate esistano ancora davvero su MT5
-        (potrebbero essere state chiuse dal broker o a mano mentre il bot era spento). Serve un controllo all'avvio
-        che confronti active_trades con mt5.positions_get() e allinei gli stati.
+    [RISOLTO] Riconciliazione con MT5 allo startup
+        -> OrderManager.reconcile_with_broker(), chiamata all'avvio in telegram_listener.py: per ogni ticket vivo
+           chiede a MT5 se la posizione esiste ancora. Se non c'è più viene segnata chiusa (TP/SL scattati o
+           chiusura manuale mentre il bot era spento); se c'è, i valori del broker (SL, TP, volume, prezzo di
+           apertura) sovrascrivono quelli in memoria.
+        -> Resta senza dipendenze da MT5: riceve dall'esterno la funzione di lookup
+           (MT5Executor.get_open_position). In TEST MODE viene saltata, non esistendo posizioni reali.
 
-    [DA FARE] Pulizia delle operazioni concluse
-        active_trades cresce all'infinito: i trade CLOSED restano in memoria e nel JSON per sempre.
-        Valutare un'archiviazione su file separato o una scadenza temporale.
+    [RISOLTO] Pulizia delle operazioni concluse
+        -> Le operazioni in stato terminale (CLOSED, REJECTED) escono dallo stato vivo e finiscono in un archivio
+           giornaliero storico/trades_AAAA-MM-GG.jsonl (una per riga, in append).
+        -> active_trades.json contiene ora solo ciò che è ancora a mercato, quindi non cresce nel tempo.
+        -> Scartata l'ipotesi di cancellare il file a fine giornata: l'oro resta aperto da domenica sera a venerdì
+           sera, quindi un'operazione aperta lunedì può essere ancora a mercato mercoledì. Azzerare il file
+           farebbe perdere al bot posizioni realmente aperte.
 
 Filtri di Sicurezza e Prezzo Scappato (Slippage)
     Motivo: Tolleranza sull'ingresso (Slippage): "L'Oro è velocissimo. Se il segnale dice BUY 2640 e quando il bot legge il messaggio il prezzo è già a 2642 (+20 pips), 
