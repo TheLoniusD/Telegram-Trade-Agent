@@ -4,6 +4,12 @@ import time
 import uuid
 from typing import Dict, Optional
 
+# Stati in cui un'operazione è (o potrebbe essere) ancora a mercato e quindi
+# va considerata chiudibile. "CLOSING" rientra per permettere di ritentare una
+# chiusura interrotta a metà (es. crash del bot durante l'invio a MT5).
+CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
+
+
 class OrderManager:
     """
     Gestisce lo stato attivo delle operazioni in memoria.
@@ -68,12 +74,12 @@ class OrderManager:
         if not target_trade:
             return []
 
-        root_id = target_trade["root_msg_id"]
-        
+        root_id = target_trade.get("root_msg_id", target_trade.get("msg_id"))
+
         # Filtra tutti i trade attivi che condividono lo stesso root_msg_id
         matching_trades = [
             trade for trade in self.active_trades.values()
-            if trade["status"] == "ACTIVE" and trade["root_msg_id"] == root_id
+            if trade.get("status") == "ACTIVE" and trade.get("root_msg_id", trade.get("msg_id")) == root_id
         ]
         
         return matching_trades
@@ -133,6 +139,15 @@ class OrderManager:
     
         # 1. NUOVO SEGNALE (Lo salviamo SEMPRE per tracciare futuri edit o reply)
         if intent == "NEW_SIGNAL":
+            # Guardia: se per questo msg_id esiste già un'operazione a mercato
+            # (es. un edit classificato per errore come NEW_SIGNAL), sovrascriverla
+            # ci farebbe perdere i riferimenti ai ticket MT5 già aperti, lasciandoli
+            # orfani sul broker senza che il bot sappia più chiuderli.
+            existing_trade = self.active_trades.get(msg_id)
+            if existing_trade and existing_trade.get("status") in CLOSABLE_STATUSES:
+                print(f"⚠️ [NEW_SIGNAL] msg_id {msg_id} ha già un'operazione a mercato: segnale ignorato per non perdere i ticket esistenti.")
+                return {"action": "IGNORE", "reason": "Operazione già esistente per questo messaggio."}
+
             ticket_id = str(uuid.uuid4())[:8].upper()
 
             # Recuperiamo il riferimento all'ultima operazione attiva (se presente)
@@ -312,50 +327,44 @@ class OrderManager:
 
             return {"action": "IGNORE", "reason": "Nessuna modifica applicabile (nessun trade idoneo)."}
 
-        # 3. CHIUSURA SEGNALE
+        # 3. CHIUSURA SEGNALE (per ora sempre chiusura TOTALE della catena)
         elif intent == "CLOSE_SIGNAL":
-            target_msg_id = reply_to if (reply_to and reply_to in self.active_trades) else msg_id
+            # Stessa logica di targeting dell'UPDATE: 'reply_to' punta al messaggio
+            # COMPLETO dell'operazione; in mancanza, ricadiamo sull'ultima operazione
+            # ancora a mercato. Non usiamo mai msg_id del messaggio di chiusura:
+            # quel messaggio non è un'operazione.
+            target_msg_id = reply_to if (reply_to and reply_to in self.active_trades) else None
 
-            # Se ancora non lo troviamo, cerchiamo se tra i messaggi attivi ce n'è uno valido (fallback utile se il reply_to è vuoto ma c'è un solo trade attivo)
             if not target_msg_id:
                 latest_trade = self._get_latest_trade()
-                if latest_trade and latest_trade.get("status") == "ACTIVE":
+                if latest_trade and latest_trade.get("status") in CLOSABLE_STATUSES:
                     target_msg_id = latest_trade["msg_id"]
 
-            # 2. Se abbiamo trovato un trade bersaglio, chiudiamo TUTTA la catena collegata
-            if target_msg_id and target_msg_id in self.active_trades:
-                target_trade = self.active_trades[target_msg_id]
+            if not target_msg_id or target_msg_id not in self.active_trades:
+                return {"action": "IGNORE", "reason": "Nessuna operazione a mercato da chiudere."}
 
-                # Recuperiamo il root ID: ci serve per trovare tutte le operazioni collegate (re-entry inclusi)
-                root_id = target_trade.get("root_msg_id", target_trade["msg_id"])
-                closed_chain = []
+            target_trade = self.active_trades[target_msg_id]
+            root_id = target_trade.get("root_msg_id", target_trade.get("msg_id"))
 
-                # Scansioniamo tutte le operazioni in memoria
-                for m_id, trade in self.active_trades.items():
-                    # Se fa parte della stessa "famiglia" (stesso root_msg_id) ed è ancora attiva
-                    if trade.get("root_msg_id", trade["msg_id"]) == root_id and trade.get("status") == "ACTIVE":
-                        
-                        # Modifichiamo lo stato
-                        trade["status"] = "CLOSED"
-                        
-                        # Impostiamo i ticket interni come non più aperti (ma NON svuotiamo
-                        # l'mt5_ticket, altrimenti l'MT5Executor non saprà cosa chiudere sul broker)
-                        if "tickets" in trade:
-                            for tp_config in trade["tickets"].values():
-                                tp_config["closed"] = True
+            # Raccogliamo tutta la famiglia collegata (originale + re-entry).
+            # Lo stato diventa CLOSING, non CLOSED: la chiusura è confermata solo
+            # dall'esito reale restituito da MT5 (vedi telegram_listener.py).
+            closing_chain = []
+            for trade in self.active_trades.values():
+                if trade.get("root_msg_id", trade.get("msg_id")) == root_id and trade.get("status") in CLOSABLE_STATUSES:
+                    trade["status"] = "CLOSING"
+                    closing_chain.append(trade)
 
-                        closed_chain.append(trade)
+            if not closing_chain:
+                return {"action": "IGNORE", "reason": "Nessuna operazione a mercato da chiudere."}
 
-                self.save_state_to_file()
+            self.save_state_to_file()
+            print(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: {len(closing_chain)} operazioni da chiudere (Originale + Re-entry).")
 
-                print(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: Chiuse e mantenute in memoria {len(closed_chain)} operazioni (Originale + Re-entry).")
-                
-                # Passiamo l'intera lista di trade chiusi così che l'MT5Executor 
-                # possa iterare e chiudere tutto sul broker
-                return {
-                    "action": "CLOSE", 
-                    "trade": target_trade, 
-                    "closed_chain": closed_chain 
-                }
+            return {
+                "action": "CLOSE",
+                "trade": target_trade,
+                "closed_chain": closing_chain
+            }
 
         return None

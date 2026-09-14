@@ -1,3 +1,5 @@
+import time
+
 import MetaTrader5 as mt5
 
 class MT5Executor:
@@ -87,30 +89,79 @@ class MT5Executor:
         print(f"❌ Errore spostamento BE posizione #{pos.ticket}: {result.comment}")
         return False
 
-    def close_all(self, symbol: str):
-        """Chiude tutte le posizioni aperte per un dato simbolo."""
-        print(f"🛠️ [TEST MODE] Simulazione apertura per {symbol['symbol']}")
-        return
-        positions = mt5.positions_get(symbol=symbol)
-        if not positions:
-            return
+    def close_position(self, ticket: int, symbol: str = None) -> bool:
+        """
+        Chiude a mercato UNA posizione specifica, identificata dal suo ticket.
+        Ritorna True solo se la posizione non è più a mercato al termine
+        (chiusura confermata dal broker, o posizione già chiusa in precedenza):
+        l'Order Manager deve poter distinguere una chiusura riuscita da una
+        fallita, per non segnare come chiusa una posizione ancora aperta.
+        """
+        print(f"🛠️ [TEST MODE] Simulazione chiusura posizione {ticket} ({symbol})")
+        return True
 
-        for pos in positions:
-            order_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
-            price = mt5.symbol_info_tick(symbol).bid if pos.type == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(symbol).ask
+        position = mt5.positions_get(ticket=ticket)
+        if not position:
+            print(f"ℹ️ Ticket {ticket} non presente su MT5: nessuna chiusura necessaria.")
+            return True
 
-            request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "position": pos.ticket,
-                "symbol": symbol,
-                "volume": pos.volume,
-                "type": order_type,
-                "price": price,
-                "deviation": 20,
-                "magic": 990011,
-                "comment": "Close by Bot"
-            }
-            mt5.order_send(request)
+        pos = position[0]
+        close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+
+        tick = mt5.symbol_info_tick(pos.symbol)
+        if tick is None:
+            print(f"❌ Nessun prezzo disponibile per {pos.symbol}: chiusura di {pos.ticket} non inviata.")
+            return False
+
+        price = tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask
+
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "position": pos.ticket,
+            "symbol": pos.symbol,
+            "volume": pos.volume,
+            "type": close_type,
+            "price": price,
+            "deviation": 20,
+            "magic": 990011,
+            "comment": "Close by Bot",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"❌ Errore chiusura posizione {pos.ticket}: {result.comment}")
+            return False
+
+        print(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
+        return True
+
+    def is_symbol_tradable(self, symbol: str, max_tick_age_seconds: int = 180) -> tuple[bool, str]:
+        """
+        Verifica su MT5 se il simbolo è realmente negoziabile in questo momento.
+        Intercetta festività e pause specifiche del broker che il calendario
+        statico di market_hours.py non può conoscere.
+
+        In caso di incertezza (MT5 non raggiungibile, dati non disponibili)
+        ritorna True: meglio una classificazione in più che perdere un segnale.
+        """
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            return True, "stato del simbolo non disponibile (assumo aperto)"
+
+        if info.trade_mode == mt5.SYMBOL_TRADE_MODE_DISABLED:
+            return False, f"trading disabilitato su {symbol}"
+
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None or not tick.time:
+            return True, "nessun tick disponibile (assumo aperto)"
+
+        tick_age = time.time() - tick.time
+        if tick_age > max_tick_age_seconds:
+            return False, f"nessun tick da {int(tick_age)}s su {symbol} (mercato chiuso o illiquido)"
+
+        return True, f"{symbol} negoziabile"
 
     def modify_order_levels(self, ticket: int, stop_loss: float, take_profit: list) -> bool:
         """

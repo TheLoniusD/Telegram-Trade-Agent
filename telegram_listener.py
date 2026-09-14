@@ -9,6 +9,7 @@ from agent_classifier import agent_classify_telegram_message
 from order_manager import OrderManager
 from risk_manager import RiskManager
 from mt5_executor import MT5Executor
+from market_hours import is_market_time_open
 
 manager = OrderManager()
 risk_agent = RiskManager()
@@ -28,6 +29,9 @@ TARGET_CHANNEL = os.getenv("TARGET_CHANNEL", "")
 tg_client = TelegramClient('session_test', TELEGRAM_API_ID, TELEGRAM_API_HASH)
 
 OWNER_ID = 462122085
+
+# Simbolo su cui verifichiamo l'apertura del mercato prima di classificare
+TRADED_SYMBOL = "XAUUSD"
 
 async def process_and_print(event, is_edit: bool):
 
@@ -55,6 +59,17 @@ async def process_and_print(event, is_edit: bool):
     print(f"[{'✏️ EDIT MESSAGGIO' if is_edit else '🆕 NUOVO MESSAGGIO'}] ID: {msg_id} | Reply-To: {reply_to}")
     print(f"TESTO RICEVUTO:\n{text}")
     print("="*50)
+
+    # A mercato chiuso nessuna azione sarebbe eseguibile su MT5: scartiamo il
+    # messaggio PRIMA di chiamare l'agente, così non consumiamo token inutilmente.
+    # Prima il calendario statico (non richiede MT5), poi lo stato reale del simbolo.
+    market_open, market_reason = is_market_time_open()
+    if market_open:
+        market_open, market_reason = mt5_agent.is_symbol_tradable(TRADED_SYMBOL)
+
+    if not market_open:
+        print(f"⏸️ Messaggio scartato senza classificarlo: {market_reason}")
+        return
 
     try:
         # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
@@ -92,11 +107,17 @@ async def process_and_print(event, is_edit: bool):
 
                     # Aggiorniamo lo status in base all'esito complessivo
                     trade_data["status"] = "ACTIVE" if all_success else "PENDING_FAILED"
+
+                    # Persistiamo SUBITO: fino a questo punto il file su disco
+                    # contiene ancora mt5_ticket a null. Se il bot si riavviasse
+                    # ora, perderebbe il riferimento a posizioni già a mercato.
+                    manager.save_state_to_file()
                     print(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
 
                 else:
                     print(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
                     trade_data["status"] = "REJECTED"
+                    manager.save_state_to_file()
 
             # CASO 2: Aggiornamento ordine esistente (SL/TP reali e/o BE+)
             elif action == "UPDATE":
@@ -146,17 +167,33 @@ async def process_and_print(event, is_edit: bool):
 
                 manager.save_state_to_file()
 
-            # CASO 3: Chiusura posizione
+            # CASO 3: Chiusura posizione (totale su tutta la catena)
             elif action == "CLOSE":
-                trade_data = manager_result.get("trade", {})
-                tickets = trade_data.get("tickets", {})
-    
-                for tp_key, tp_config in tickets.items():
-                    real_mt5_ticket = tp_config.get("mt5_ticket")
-                    if real_mt5_ticket:
-                        # Chiamata al metodo di chiusura per il singolo ticket
-                        mt5_agent.close_all(ticket=real_mt5_ticket) # Oppure il nome del metodo corretto nel tuo MT5Executor
-                        print(f"🔒 Chiusura eseguita su MT5 per il ticket: {real_mt5_ticket}")
+                closing_chain = manager_result.get("closed_chain", [])
+
+                for trade in closing_chain:
+                    all_closed = True
+
+                    for tp_key, tp_config in trade.get("tickets", {}).items():
+                        real_mt5_ticket = tp_config.get("mt5_ticket")
+
+                        # Niente ticket (mai aperto) o già chiuso: nulla da fare
+                        if not real_mt5_ticket or tp_config.get("closed"):
+                            continue
+
+                        if mt5_agent.close_position(ticket=real_mt5_ticket, symbol=tp_config.get("symbol")):
+                            tp_config["closed"] = True
+                        else:
+                            all_closed = False
+
+                    # Lo stato riflette l'esito REALE: se anche un solo ticket non
+                    # è stato chiuso, l'operazione resta segnalata come problematica
+                    # invece di risultare chiusa mentre è ancora a mercato.
+                    trade["status"] = "CLOSED" if all_closed else "CLOSE_FAILED"
+                    if not all_closed:
+                        print(f"⚠️ Chiusura INCOMPLETA per il trade {trade.get('ticket_id')}: verificare manualmente su MT5.")
+
+                manager.save_state_to_file()
         
         print("\n📦 STATO MEMORIA (ORDER MANAGER):")
         print(json.dumps(manager_result, indent=2, ensure_ascii=False))
