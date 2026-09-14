@@ -32,18 +32,49 @@ Ottimizzazione Sistema Bot
     -> Vedi nota sopra: il fix è nel prompt riscritto in agent_classifier.py.
 
 
+PRIMA DEL RILASCIO (bloccanti, emersi durante lo sviluppo)
+
+    OWNER_ID in telegram_listener.py
+        Attualmente contiene l'ID personale usato per i test (462122085): con questo valore il bot scarta tutti i
+        messaggi reali del canale. Va sostituito con l'ID Telegram del trader "Maestro Fx" prima di andare in
+        autonomia, altrimenti non verrà classificato nessun segnale vero.
+
+    entry_price reale restituito da MT5
+        Nei ticket, 'entry_price' è ancora il prezzo teorico del segnale (o ereditato da un re-entry): MT5Executor
+        non restituisce il prezzo di riempimento effettivo dell'ordine. Finché non viene cablato, il BE sposta lo
+        stop loss su un prezzo che potrebbe non essere quello di ingresso reale.
+        Collegato al controllo di slippage (entry_min/entry_max servono a verificare che il fill sia nel range).
+
+
 Gestione del Breakeven (BE+)
 
-    Gestione parziale del Breakeven (BE+) con TP1 già colpito
-        Motivo: Quando il canale invia "BE+", il ticket_1 potrebbe essere già stato chiuso da MT5 perché ha colpito il TP1. 
+    [RISOLTO] Gestione parziale del Breakeven (BE+) con TP1 già colpito
+        Motivo: Quando il canale invia "BE+", il ticket_1 potrebbe essere già stato chiuso da MT5 perché ha colpito il TP1.
         La funzione deve gestire il caso in cui uno dei due ticket non esista più a mercato e applicare il Breakeven solo al ticket_2 ancora aperto.
+        -> Il BE ora è per-ticket (campo 'be_active' dentro ogni ticket, non più a livello di trade) e viene tentato su
+           tutti i ticket della famiglia (originale + re-entry) ancora aperti e non già protetti.
+           Non deduciamo dal testo quale ticket sia ancora a mercato: lo verifica MT5Executor.set_sl_to_be() in tempo
+           reale sul singolo ticket. Se la posizione non esiste più (TP già scattato) viene segnata 'closed' e saltata.
+        -> Fix collegati: campo 'success' sdoppiato in 'success' (ordine aperto) e 'closed' (non più a mercato);
+           sincronizzazione dello stop_loss radice dopo il BE; layer_target mappato per distanza dall'entry.
 
     Gestione dei 2 Take Profit e della Size
         Motivo: Quando entriamo a mercato con 2 posizioni (per gestire TP1 e TP2), dividiamo il rischio a metà (50% e 50%) o dare più peso al primo obiettivo (es. 70% su TP1 e 30% su TP2)?
+        Stato attuale: risk_manager.py divide 50/50 (total_calculated_lots / 2). Decisione ancora da prendere.
 
 
 Gestione dei CLOSE_SIGNAL
-    Mettere aposto logica in order_manager
+    [RISOLTO] Mettere aposto logica in order_manager
+        -> close_all(symbol) era inutilizzabile: veniva chiamato con ticket= mentre accettava symbol, e il print di
+           test indicizzava una stringa come dizionario. Ogni CLOSE_SIGNAL finiva in eccezione (mai funzionato).
+           Sostituito da MT5Executor.close_position(ticket), che chiude la singola posizione e ritorna l'esito reale.
+        -> Lo stato non passa più a CLOSED in modo ottimistico: ACTIVE -> CLOSING -> CLOSED (confermato dal broker)
+           oppure CLOSE_FAILED se anche un solo ticket non si chiude (visibile nei log e ritentabile).
+        -> Il targeting non usa più msg_id del messaggio di chiusura come fallback (non è un'operazione):
+           usa reply_to, poi l'ultima operazione a mercato, come già fa l'UPDATE.
+        -> Per ora TUTTE le chiusure sono totali sull'intera catena. Le chiusure parziali restano da fare
+           (vedi "Gestione Ibrida Multi-Posizione" più sotto).
+
     Aggiungere più esempi nel propmt dell'agente classificatore.
 
 
@@ -68,8 +99,25 @@ Capire funzionamento della classe MT5Executor
     MT5Executor()
 
 Check di Allineamento e Resilienza allo Startup/Crash
-    Se il script Telegram o la connessione a MT5 si interrompe e viene riavviata, come recupera self.active_trades? 
-    Serve prevedere una persistenza su file JSON (o piccolo SQLite) per non perdere la traccia dei ticket aperti tra una sessione e l'altra. 
+    Se il script Telegram o la connessione a MT5 si interrompe e viene riavviata, come recupera self.active_trades?
+    Serve prevedere una persistenza su file JSON (o piccolo SQLite) per non perdere la traccia dei ticket aperti tra una sessione e l'altra.
+
+    [RISOLTO] Persistenza dello stato su file
+        -> Lo stato veniva salvato solo dentro handle_agent_output, PRIMA che telegram_listener.py scrivesse
+           mt5_ticket/volume restituiti da MT5: dopo un riavvio il bot leggeva mt5_ticket a null e perdeva il
+           riferimento a posizioni realmente a mercato. Ora si salva subito dopo l'esecuzione (apertura, BE,
+           chiusura) e anche in caso di rifiuto del Risk Manager.
+        -> Aggiunta guardia: un NEW_SIGNAL su un msg_id che ha già un'operazione a mercato non sovrascrive più il
+           record esistente (avrebbe lasciato i ticket MT5 orfani, non più chiudibili dal bot).
+
+    [DA FARE] Riconciliazione con MT5 allo startup
+        Al riavvio il bot si fida del JSON senza verificare che le posizioni elencate esistano ancora davvero su MT5
+        (potrebbero essere state chiuse dal broker o a mano mentre il bot era spento). Serve un controllo all'avvio
+        che confronti active_trades con mt5.positions_get() e allinei gli stati.
+
+    [DA FARE] Pulizia delle operazioni concluse
+        active_trades cresce all'infinito: i trade CLOSED restano in memoria e nel JSON per sempre.
+        Valutare un'archiviazione su file separato o una scadenza temporale.
 
 Filtri di Sicurezza e Prezzo Scappato (Slippage)
     Motivo: Tolleranza sull'ingresso (Slippage): "L'Oro è velocissimo. Se il segnale dice BUY 2640 e quando il bot legge il messaggio il prezzo è già a 2642 (+20 pips), 
@@ -92,8 +140,16 @@ Titolo: Gestione Invalidation Level: Hard SL vs Soft SL (Conditional Break)
     ed esegue la chiusura a mercato solo dopo la conferma della rottura della candela su MT5, evitando lo stop-out da spike temporanei.
 
     
-Aggiungere sitema di blocco per quando i mercati sono chiusi
+[RISOLTO] Aggiungere sitema di blocco per quando i mercati sono chiusi
     Essendo i mercati chiusi se venisse digitato un messaggio durante il weekend bverrebbero usati token dell'agente, per penso richieste sempre Ignorate.
+    -> Nuovo market_hours.py: calendario statico UTC (chiusura del venerdì, riapertura domenicale, pausa di
+       rollover giornaliera), senza dipendenze da MT5. Le costanti in cima al file vanno verificate sul proprio
+       broker, che ha il suo server time.
+    -> MT5Executor.is_symbol_tradable(): controlla lo stato reale del simbolo e l'età dell'ultimo tick, così da
+       intercettare festività e pause del broker che il calendario statico non può conoscere.
+       Nota: l'oro spot non ha una pausa pranzo (esiste su alcuni futures/azionari, non su XAUUSD).
+    -> telegram_listener.py scarta i messaggi a mercato chiuso PRIMA di chiamare l'agente, quindi senza consumare
+       token. In caso di incertezza si assume aperto: meglio una classificazione in più che perdere un segnale.
 
 
 Utilizzare variabile di Stop Loss temporanea in risk_manager.py
