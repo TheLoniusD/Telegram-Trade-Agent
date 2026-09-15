@@ -1,0 +1,2 @@
+MetaTrader5>=5.0.45
+flask>=3.0.0

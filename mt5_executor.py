@@ -1,7 +1,8 @@
+import os
 import time
 from typing import Optional
 
-import MetaTrader5 as mt5
+import requests
 
 from logger_config import setup_logger
 
@@ -14,6 +15,25 @@ logger = setup_logger(__name__)
 # dimenticarne uno per ritrovarsi a metà tra simulazione e operatività reale.
 TEST_MODE = True
 
+# MT5 (pacchetto Windows-only) non è installabile sul laptop Linux che ospita
+# il bot: quando MT5_BRIDGE_URL è valorizzata, tutte le chiamate reali passano
+# per HTTP al piccolo servizio che gira sulla VM Windows dove MT5 è nativo
+# (vedi doc/PLAN_B_WINDOWS_BRIDGE.md). Se invece si esegue questo file
+# direttamente su Windows (es. sviluppo/test), lasciando la variabile vuota si
+# torna al vecchio comportamento con import locale del pacchetto.
+MT5_BRIDGE_URL = os.getenv("MT5_BRIDGE_URL", "").rstrip("/")
+MT5_BRIDGE_TOKEN = os.getenv("MT5_BRIDGE_TOKEN", "")
+MT5_BRIDGE_TIMEOUT = float(os.getenv("MT5_BRIDGE_TIMEOUT", "10"))
+USE_BRIDGE = bool(MT5_BRIDGE_URL)
+
+# L'import del pacchetto Windows-only avviene solo se serve davvero: in
+# modalità bridge questo file deve poter essere importato anche su Linux,
+# dove il pacchetto non esiste. NB: anche in TEST MODE la connessione a MT5
+# resta necessaria per is_symbol_tradable() (stato reale del mercato), quindi
+# l'import locale non dipende da TEST_MODE, solo da USE_BRIDGE.
+if not USE_BRIDGE:
+    import MetaTrader5 as mt5
+
 
 class MT5Executor:
     """
@@ -23,21 +43,83 @@ class MT5Executor:
     Tutti i metodi che agiscono sul broker restituiscono un esito esplicito, con
     la STESSA forma sia in TEST MODE che in reale: l'Order Manager deve poter
     allineare la memoria a ciò che è realmente successo su MT5.
+
+    In modalità reale esistono due backend, scelti da MT5_BRIDGE_URL:
+      - bridge HTTP: chiama il servizio su Windows (vedi windows_bridge/), usato
+        quando il bot gira sul laptop Linux;
+      - import locale: chiama direttamente il pacchetto MetaTrader5, usato solo
+        se questo processo gira già su Windows.
     """
 
     def __init__(self):
         self.test_mode = TEST_MODE
+        self.use_bridge = USE_BRIDGE
 
-        if not mt5.initialize():
-            logger.error(f"❌ Impossibile connettersi a MT5: {mt5.last_error()}")
+        # La connessione a MT5 serve SEMPRE, anche in TEST MODE: is_symbol_tradable()
+        # controlla lo stato reale del mercato prima di classificare un messaggio.
+        # Solo l'invio effettivo degli ordini è condizionato da TEST_MODE.
+        if self.use_bridge:
+            self._bridge_init()
         else:
-            logger.info("🚀 Connessione a MetaTrader 5 riuscita!")
+            if not mt5.initialize():
+                logger.error(f"❌ Impossibile connettersi a MT5: {mt5.last_error()}")
+            else:
+                logger.info("🚀 Connessione a MetaTrader 5 riuscita!")
 
         if self.test_mode:
             logger.info("🧪 TEST MODE attivo: nessun ordine verrà realmente inviato a MT5.")
 
         # Solo per TEST MODE: contatore per generare ticket fittizi distinti
         self._test_ticket_counter = 90000000
+
+    # ------------------------------------------------------------------
+    # Bridge HTTP verso la VM Windows
+    # ------------------------------------------------------------------
+
+    def _bridge_headers(self) -> dict:
+        headers = {"Content-Type": "application/json"}
+        if MT5_BRIDGE_TOKEN:
+            headers["X-Bridge-Token"] = MT5_BRIDGE_TOKEN
+        return headers
+
+    def _bridge_init(self):
+        try:
+            resp = requests.get(
+                f"{MT5_BRIDGE_URL}/health",
+                headers=self._bridge_headers(),
+                timeout=MT5_BRIDGE_TIMEOUT,
+            )
+            data = resp.json() if resp.ok else {}
+            if resp.ok and data.get("mt5_initialized"):
+                logger.info(f"🚀 Bridge Windows raggiunto, MT5 connesso: {MT5_BRIDGE_URL}")
+            else:
+                logger.error(f"❌ Bridge Windows raggiunto ma MT5 non connesso: {data}")
+        except requests.RequestException as e:
+            logger.error(f"❌ Impossibile raggiungere il bridge Windows ({MT5_BRIDGE_URL}): {e}")
+
+    def _bridge_call(self, method: str, path: str, **kwargs) -> Optional[dict]:
+        """
+        Esegue una chiamata HTTP al bridge, restituendo il JSON di risposta o
+        None in caso di errore di rete/timeout/HTTP: il chiamante decide come
+        tradurre l'assenza di risposta nel proprio esito (di norma "fallito",
+        mai "riuscito per default", per non rischiare falsi positivi su ordini
+        realmente inviati).
+        """
+        try:
+            resp = requests.request(
+                method,
+                f"{MT5_BRIDGE_URL}{path}",
+                headers=self._bridge_headers(),
+                timeout=MT5_BRIDGE_TIMEOUT,
+                **kwargs,
+            )
+            if not resp.ok:
+                logger.error(f"❌ Bridge Windows ha risposto {resp.status_code} su {path}: {resp.text}")
+                return None
+            return resp.json()
+        except requests.RequestException as e:
+            logger.error(f"❌ Errore di rete verso il bridge Windows su {path}: {e}")
+            return None
 
     def execute_open(self, order_plan: dict) -> dict:
         """
@@ -52,8 +134,6 @@ class MT5Executor:
         symbol = order_plan["symbol"]
         direction = order_plan["direction"]
         volume = order_plan["volume"]
-        sl = order_plan["stop_loss"]
-        tp_value = order_plan["take_profit"]
 
         if self.test_mode:
             self._test_ticket_counter += 1
@@ -66,6 +146,15 @@ class MT5Executor:
                 "volume": volume,
                 "error": None,
             }
+
+        if self.use_bridge:
+            result = self._bridge_call("POST", "/execute_open", json=order_plan)
+            if result is None:
+                return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": "bridge non raggiungibile"}
+            return result
+
+        sl = order_plan["stop_loss"]
+        tp_value = order_plan["take_profit"]
 
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
@@ -122,6 +211,10 @@ class MT5Executor:
             logger.info(f"🛠️ [TEST MODE] Simulazione BE per ticket {ticket} | nuovo SL: {entry_price}")
             return True
 
+        if self.use_bridge:
+            result = self._bridge_call("POST", "/set_sl_to_be", json={"ticket": ticket, "entry_price": entry_price})
+            return bool(result and result.get("applied"))
+
         position = mt5.positions_get(ticket=ticket)
         if not position:
             logger.info(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
@@ -153,6 +246,10 @@ class MT5Executor:
         if self.test_mode:
             logger.info(f"🛠️ [TEST MODE] Simulazione chiusura posizione {ticket} ({symbol})")
             return True
+
+        if self.use_bridge:
+            result = self._bridge_call("POST", "/close_position", json={"ticket": ticket, "symbol": symbol})
+            return bool(result and result.get("closed"))
 
         position = mt5.positions_get(ticket=ticket)
         if not position:
@@ -202,6 +299,13 @@ class MT5Executor:
         # Se la lista TP contiene valori, prendiamo il primo (TP1)
         tp_price = take_profit[0] if take_profit else 0.0
 
+        if self.use_bridge:
+            result = self._bridge_call(
+                "POST", "/modify_order_levels",
+                json={"ticket": ticket, "stop_loss": stop_loss, "take_profit": tp_price},
+            )
+            return bool(result and result.get("success"))
+
         request = {
             "action": mt5.TRADE_ACTION_SLTP,  # Dice a MT5 che vogliamo solo modificare SL/TP
             "position": ticket,                # Il ticket dell'ordine aperto
@@ -230,6 +334,9 @@ class MT5Executor:
         if self.test_mode:
             return None
 
+        if self.use_bridge:
+            return self._bridge_call("GET", f"/get_open_position/{ticket}")
+
         position = mt5.positions_get(ticket=ticket)
         if not position:
             return None
@@ -253,6 +360,12 @@ class MT5Executor:
         In caso di incertezza (MT5 non raggiungibile, dati non disponibili)
         ritorna True: meglio una classificazione in più che perdere un segnale.
         """
+        if self.use_bridge:
+            result = self._bridge_call("GET", f"/is_symbol_tradable/{symbol}?max_tick_age_seconds={max_tick_age_seconds}")
+            if result is None:
+                return True, "bridge non raggiungibile (assumo aperto)"
+            return bool(result.get("tradable")), result.get("reason", "")
+
         info = mt5.symbol_info(symbol)
         if info is None:
             return True, "stato del simbolo non disponibile (assumo aperto)"

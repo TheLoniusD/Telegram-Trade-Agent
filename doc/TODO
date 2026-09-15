@@ -32,6 +32,19 @@ Ottimizzazione Sistema Bot
     -> Vedi nota sopra: il fix è nel prompt riscritto in agent_classifier.py.
 
 
+[RISOLTO] MT5 non eseguibile sul laptop Linux always-on
+    Tentato a lungo MT5 sotto Wine/Docker sul laptop Linux (due immagini diverse): login al broker
+    riuscito ma canale IPC locale Python<->terminale mai funzionante (-10005 IPC timeout, bug noto e
+    irrisolto anche upstream); l'immagine inoltre non sopravvive a un riavvio in-place (crash loop).
+    -> Deciso Piano B: MT5 nativo (nessun Wine) su una VM Windows KVM/QEMU sullo stesso laptop, a
+       costo zero (Windows non attivato o Server eval), raggiunta dal bot via un bridge HTTP interno
+       (windows_bridge/mt5_bridge_server.py). mt5_executor.py ora supporta MT5_BRIDGE_URL e usa il
+       bridge quando configurata, altrimenti si comporta come prima (import locale del pacchetto).
+       Vedi doc/PLAN_B_WINDOWS_BRIDGE.md per l'architettura e i passi di provisioning.
+    -> RESTA DA FARE: provisioning vero della VM sul laptop dell'utente (richiede sessione con
+       accesso SSH/console alla macchina) e test end-to-end del bridge con il conto demo.
+
+
 PRIMA DEL RILASCIO (bloccanti, emersi durante lo sviluppo)
 
     OWNER_ID in telegram_listener.py

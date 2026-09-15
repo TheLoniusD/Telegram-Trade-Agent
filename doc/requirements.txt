@@ -1,5 +1,8 @@
 telethon>=1.30.0
 anthropic>=1.0.0
 python-dotenv>=1.0.0
+requests>=2.31.0
 
-# MT5 applicazione installata ed eseguita
+# MT5 gira su una VM Windows separata (vedi doc/PLAN_B_WINDOWS_BRIDGE.md):
+# il pacchetto Windows-only MetaTrader5 NON va installato qui, si usa il
+# bridge HTTP in windows_bridge/ tramite MT5_BRIDGE_URL.
