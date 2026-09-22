@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-import MetaTrader5 as mt5
+from mt5_connection import mt5
 
 from logger_config import setup_logger
 
@@ -12,7 +12,7 @@ logger = setup_logger(__name__)
 # False = il bot opera davvero sul conto collegato al terminale MT5.
 # Prima era gestito con un 'return' anticipato dentro ogni metodo: bastava
 # dimenticarne uno per ritrovarsi a metà tra simulazione e operatività reale.
-TEST_MODE = True
+TEST_MODE = False
 
 
 class MT5Executor:

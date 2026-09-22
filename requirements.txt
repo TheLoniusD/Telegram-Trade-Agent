@@ -1,0 +1,4 @@
+telethon>=1.30.0
+anthropic>=1.0.0
+python-dotenv>=1.0.0
+rpyc==6.0.2

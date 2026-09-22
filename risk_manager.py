@@ -1,4 +1,4 @@
-import MetaTrader5 as mt5
+from mt5_connection import mt5
 
 
 DEFAULT_SL_DIST_GOLD = 5.0
