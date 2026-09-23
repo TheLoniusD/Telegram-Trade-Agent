@@ -357,10 +357,15 @@ class MT5Executor:
         broker e con l'Algo Trading attivo; se il terminale non risponde prova a
         reinizializzare la connessione. Usato dal controllo periodico del listener.
         """
-        info = mt5.terminal_info()
-        if info is None:
-            mt5.initialize()
+        try:
             info = mt5.terminal_info()
+            if info is None:
+                mt5.initialize()
+                info = mt5.terminal_info()
+        except Exception as e:
+            # Collegamento con il terminale caduto (es. connessione RPyC chiusa):
+            # la prossima chiamata proverà a riaprirlo.
+            return False, f"collegamento con MT5 interrotto ({type(e).__name__}: {e})"
         if info is None:
             return False, f"terminale MT5 non raggiungibile {mt5.last_error()}"
         if not info.connected:
