@@ -1,14 +1,19 @@
+import asyncio
 import json
 import os
+import time
+import traceback
+
 from telethon import TelegramClient, events
 
 from dotenv import load_dotenv
 load_dotenv()
 
+import journal
 from agent_classifier import agent_classify_telegram_message
-from order_manager import OrderManager
+from order_manager import OrderManager, CLOSABLE_STATUSES
 from risk_manager import RiskManager
-from mt5_executor import MT5Executor
+from mt5_executor import MT5Executor, MT5UnavailableError
 from market_hours import is_market_time_open
 from logger_config import setup_logger
 
@@ -19,7 +24,7 @@ risk_agent = RiskManager()
 mt5_agent = MT5Executor()
 
 # ==========================================
-# CONFIGURAZIONI TELEGRAM 
+# CONFIGURAZIONI TELEGRAM
 # ==========================================
 # Puoi usare le variabili d'ambiente o inserire i dati direttamente qui sotto
 TELEGRAM_API_ID = int(os.getenv("TELEGRAM_API_ID", "0"))
@@ -31,10 +36,20 @@ TARGET_CHANNEL = os.getenv("TARGET_CHANNEL", "")
 # Inizializzazione del client Telethon (creerà una sessione locale chiamata 'session_test')
 tg_client = TelegramClient('session_test', TELEGRAM_API_ID, TELEGRAM_API_HASH)
 
-OWNER_ID = 462122085
+# Mittenti autorizzati: ID Telegram separati da virgola in ALLOWED_SENDER_IDS (.env).
+# Vuoto = accetta tutti i messaggi di TARGET_CHANNEL: è il caso del canale
+# ufficiale, dove i post arrivano con l'ID del canale e non di una persona.
+ALLOWED_SENDER_IDS = {int(x) for x in os.getenv("ALLOWED_SENDER_IDS", "").replace(" ", "").split(",") if x}
 
 # Simbolo su cui verifichiamo l'apertura del mercato prima di classificare
 TRADED_SYMBOL = "XAUUSD"
+
+# Controllo periodico mentre il bot gira da solo: posizioni chiuse dal broker
+# (TP/SL scattati, chiusure manuali), stato della connessione a MT5 e un
+# battito di vita nel log per capire, a posteriori, se il bot era attivo.
+MONITOR_INTERVAL_SECONDS = 30
+HEARTBEAT_INTERVAL_SECONDS = 3600
+
 
 def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
     """
@@ -52,16 +67,57 @@ def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
     return True
 
 
+def trade_summary(trade: dict) -> dict:
+    """Istantanea compatta di un'operazione per il diario."""
+    fields = ("mt5_ticket", "direction", "volume", "entry_price", "stop_loss", "take_profit", "closed", "be_active")
+    return {
+        "ticket_id": trade.get("ticket_id"),
+        "trade_msg_id": trade.get("msg_id"),
+        "root_msg_id": trade.get("root_msg_id"),
+        "status": trade.get("status"),
+        "tickets": {key: {f: t.get(f) for f in fields} for key, t in trade.get("tickets", {}).items()},
+    }
+
+
+def record_position_closed(mt5_ticket: int, closed_by: str, trade: dict = None) -> None:
+    """Registra come si è chiusa una posizione (motivo, prezzo, profitto netto)."""
+    info = mt5_agent.get_close_info(mt5_ticket)
+    logger.info(f"🏁 Posizione {mt5_ticket} chiusa ({closed_by}) | motivo: {info.get('close_reason', 'n/d')} "
+                f"| prezzo: {info.get('close_price', 'n/d')} | profitto: {info.get('profit', 'n/d')}")
+    journal.record("POSITION_CLOSED", mt5_ticket=mt5_ticket, closed_by=closed_by,
+                   ticket_id=trade.get("ticket_id") if trade else None, **info)
+
+
+def broker_position_lookup(mt5_ticket: int):
+    """
+    Lookup per OrderManager.reconcile_with_broker: oltre a dire se la posizione
+    è ancora aperta, registra nel diario come si è chiusa quella che non lo è
+    più (TP/SL scattati o chiusura manuale mentre nessuno guardava).
+    """
+    state = mt5_agent.get_open_position(mt5_ticket)
+    if state is None:
+        record_position_closed(mt5_ticket, closed_by="RILEVATA_SU_MT5")
+    return state
+
+
 def sync_ticket_with_broker(tp_config: dict, mt5_ticket: int) -> None:
     """
     Riallinea un ticket in memoria allo stato reale su MT5, dopo un'operazione
     rifiutata: se la posizione non esiste più viene segnata chiusa, altrimenti
     SL/TP in memoria tornano ai valori effettivamente attivi sul broker.
     """
-    state = mt5_agent.get_open_position(mt5_ticket)
+    try:
+        state = mt5_agent.get_open_position(mt5_ticket)
+    except MT5UnavailableError as e:
+        # Senza risposta da MT5 non sappiamo se la posizione sia aperta: meglio
+        # non toccare nulla, ci penserà il controllo periodico.
+        logger.error(f"❌ Impossibile verificare il ticket {mt5_ticket} su MT5 ({e}): memoria lasciata invariata.")
+        return
+
     if state is None:
         tp_config["closed"] = True
         logger.info(f"ℹ️ Ticket MT5 {mt5_ticket} non più aperto (TP/SL già raggiunto): segnato come chiuso.")
+        record_position_closed(mt5_ticket, closed_by="RILEVATA_SU_MT5")
         return
 
     # MT5 usa 0.0 per "nessun livello"
@@ -69,30 +125,47 @@ def sync_ticket_with_broker(tp_config: dict, mt5_ticket: int) -> None:
     tp_config["take_profit"] = state["take_profit"] or None
     logger.warning(f"🔄 Ticket MT5 {mt5_ticket} ancora aperto: memoria riallineata al broker "
                    f"(SL {tp_config['stop_loss']}, TP {tp_config['take_profit']}).")
+    journal.record("MEMORY_RESYNC", mt5_ticket=mt5_ticket,
+                   stop_loss=tp_config["stop_loss"], take_profit=tp_config["take_profit"])
 
 
 async def process_message(event, is_edit: bool):
+    # Tutti gli eventi del diario registrati durante l'elaborazione (compresi
+    # gli ordini inviati da MT5Executor) portano il msg_id di questo messaggio.
+    token = journal.set_current_message(event.id)
+    try:
+        handle_message(event, is_edit)
+    except Exception:
+        logger.exception("❌ Errore durante l'elaborazione del messaggio")
+        journal.record("ERROR", where="process_message", error=traceback.format_exc())
+    finally:
+        journal.clear_current_message(token)
 
+
+def handle_message(event, is_edit: bool):
     sender_id = event.sender_id
-    # Se il messaggio non arriva dall'owner, scartalo subito (nessuna chiamata AI)
-    if sender_id != OWNER_ID:
+    text = event.raw_text
+
+    # Filtro mittenti (nessuna chiamata AI per i messaggi scartati)
+    if ALLOWED_SENDER_IDS and sender_id not in ALLOWED_SENDER_IDS:
+        logger.info(f"🚫 Messaggio {event.id} scartato: mittente {sender_id} non autorizzato.")
+        journal.record("MESSAGE_SKIPPED", reason="mittente non autorizzato", sender_id=sender_id, text=text)
         return
 
-    text = event.raw_text
+    # Ignoriamo i messaggi vuoti (es. solo foto senza didascalia o sticker)
     if not text or not text.strip():
+        journal.record("MESSAGE_SKIPPED", reason="messaggio senza testo", sender_id=sender_id)
         return
-    
+
     msg_id = event.id
     reply_to = event.reply_to_msg_id if hasattr(event, 'reply_to_msg_id') else None
     has_media = bool(event.media) if hasattr(event, 'media') else False
     is_forwarded = bool(event.forward) if hasattr(event, 'forward') else False
     timestamp = event.date.timestamp() if getattr(event, 'date', None) else None
 
-    # Ignoriamo i messaggi vuoti (es. solo foto senza didascalia o sticker)
-    if not text.strip():
-        return
-
     logger.info(f"{'✏️ EDIT' if is_edit else '🆕 NUOVO'} MESSAGGIO | ID: {msg_id} | Reply-To: {reply_to} | Testo: {text!r}")
+    journal.record("MESSAGE", is_edit=is_edit, reply_to=reply_to, sender_id=sender_id,
+                   has_media=has_media, is_forwarded=is_forwarded, text=text)
 
     # A mercato chiuso nessuna azione sarebbe eseguibile su MT5: scartiamo il
     # messaggio PRIMA di chiamare l'agente, così non consumiamo token inutilmente.
@@ -103,176 +176,238 @@ async def process_message(event, is_edit: bool):
 
     if not market_open:
         logger.info(f"⏸️ Messaggio scartato senza classificarlo: {market_reason}")
+        journal.record("MESSAGE_SKIPPED", reason=market_reason)
         return
 
-    try:
-        # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
-        ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
-        
-        logger.info(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
+    # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
+    ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
 
-        # 2. Passaggio all'Order Manager (il tuo file separato)
-        manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output)
+    logger.info(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
+    journal.record("CLASSIFIED", intent=ai_output.get("intent"), is_actionable=ai_output.get("is_actionable"),
+                   data=ai_output.get("data"), reasoning=ai_output.get("raw_reasoning"))
 
-        if manager_result:
-            action = manager_result.get("action")
-            trade_data = manager_result.get("trade", {})
+    # 2. Passaggio all'Order Manager (il tuo file separato)
+    manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output)
+    if manager_result:
+        journal.record("DECISION", action=manager_result.get("action"), reason=manager_result.get("reason"))
+    else:
+        journal.record("DECISION", action="NESSUNA", reason=f"intent {ai_output.get('intent')}: nessuna azione prevista")
 
-            # CASO 1: Apertura nuovo ordine (Fase Rapida)
-            if action == "OPEN":
-                validated_orders = risk_agent.validate_and_build_order(trade_data)
-                if validated_orders.get("approved"):
-                    orders_dict = validated_orders.get("orders", {})
-        
-                    opened_count = 0
-                    for target_key, order_config in orders_dict.items():
-                        # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
-                        exec_result = mt5_agent.execute_open(order_config)
+    if manager_result:
+        action = manager_result.get("action")
+        trade_data = manager_result.get("trade", {})
 
-                        # Scriviamo in memoria i valori REALI restituiti dal broker:
-                        # prezzo di riempimento e volume effettivo possono differire da
-                        # quelli pianificati (slippage, riempimento parziale), e sono loro
-                        # a dover guidare il Breakeven e i controlli successivi.
-                        if target_key in trade_data["tickets"]:
-                            ticket_data = trade_data["tickets"][target_key]
-                            ticket_data["mt5_ticket"] = exec_result.get("mt5_ticket")
-                            ticket_data["success"] = exec_result.get("success", False)
-                            ticket_data["volume"] = exec_result.get("volume") or order_config.get("volume")
+        # CASO 1: Apertura nuovo ordine (Fase Rapida)
+        if action == "OPEN":
+            validated_orders = risk_agent.validate_and_build_order(trade_data)
+            if validated_orders.get("approved"):
+                orders_dict = validated_orders.get("orders", {})
 
-                            fill_price = exec_result.get("fill_price")
-                            if fill_price:
-                                ticket_data["entry_price"] = fill_price
+                opened_count = 0
+                for target_key, order_config in orders_dict.items():
+                    # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
+                    exec_result = mt5_agent.execute_open(order_config)
 
-                            # Lo SL inviato a MT5 (anche quello temporaneo della fase
-                            # rapida) va in memoria: altrimenti resta None e un update
-                            # successivo con soli TP invierebbe sl=0, togliendolo.
-                            if exec_result.get("success"):
-                                ticket_data["stop_loss"] = order_config.get("stop_loss")
-                                trade_data["stop_loss"] = order_config.get("stop_loss")
+                    # Scriviamo in memoria i valori REALI restituiti dal broker:
+                    # prezzo di riempimento e volume effettivo possono differire da
+                    # quelli pianificati (slippage, riempimento parziale), e sono loro
+                    # a dover guidare il Breakeven e i controlli successivi.
+                    if target_key in trade_data["tickets"]:
+                        ticket_data = trade_data["tickets"][target_key]
+                        ticket_data["mt5_ticket"] = exec_result.get("mt5_ticket")
+                        ticket_data["success"] = exec_result.get("success", False)
+                        ticket_data["volume"] = exec_result.get("volume") or order_config.get("volume")
 
+                        fill_price = exec_result.get("fill_price")
+                        if fill_price:
+                            ticket_data["entry_price"] = fill_price
+
+                        # Lo SL inviato a MT5 (anche quello temporaneo della fase
+                        # rapida) va in memoria: altrimenti resta None e un update
+                        # successivo con soli TP invierebbe sl=0, togliendolo.
                         if exec_result.get("success"):
-                            opened_count += 1
-                        else:
-                            logger.warning(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
+                            ticket_data["stop_loss"] = order_config.get("stop_loss")
+                            trade_data["stop_loss"] = order_config.get("stop_loss")
 
-                    # Se anche un solo ticket è a mercato l'operazione resta ACTIVE,
-                    # così update e chiusure continuano a gestirlo (i ticket non
-                    # aperti hanno mt5_ticket a None e vengono saltati). Con uno
-                    # stato diverso il CLOSE la ignorerebbe, lasciando la posizione
-                    # aperta su MT5 senza più controllo.
-                    trade_data["status"] = "ACTIVE" if opened_count > 0 else "OPEN_FAILED"
-                    if 0 < opened_count < len(orders_dict):
-                        logger.warning(f"⚠️ Apertura PARZIALE: {opened_count}/{len(orders_dict)} ticket a mercato, l'operazione resta gestita.")
-
-                    # Persistiamo SUBITO: fino a questo punto il file su disco
-                    # contiene ancora mt5_ticket a null. Se il bot si riavviasse
-                    # ora, perderebbe il riferimento a posizioni già a mercato.
-                    manager.save_state_to_file()
-                    logger.info(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
-
-                else:
-                    logger.warning(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
-                    trade_data["status"] = "REJECTED"
-                    manager.save_state_to_file()
-
-            # CASO 2: Aggiornamento ordine esistente (SL/TP reali e/o BE+)
-            elif action == "UPDATE":
-                trades = manager_result.get("trades", [])
-                be_candidates = manager_result.get("be_candidates", [])
-                sl_tp_changed = manager_result.get("sl_tp_changed", False)
-
-                # 2a. Breakeven, ticket per ticket. MT5 stesso verifica se la posizione
-                # esiste ancora: se il TP è già scattato, il broker l'ha già chiusa e
-                # set_sl_to_be non applica nulla (ritorna False).
-                for candidate in be_candidates:
-                    parent_trade = candidate["trade"]
-                    tp_config = candidate["ticket"]
-                    real_mt5_ticket = tp_config.get("mt5_ticket")
-                    entry_price = tp_config.get("entry_price")
-
-                    be_applied = mt5_agent.set_sl_to_be(ticket=real_mt5_ticket, entry_price=entry_price)
-                    if be_applied:
-                        tp_config["be_active"] = True
-                        tp_config["stop_loss"] = entry_price
-                        # Risincronizziamo anche lo stop_loss a livello radice del trade,
-                        # altrimenti resta al valore pre-BE (usato per ereditarietà re-entry).
-                        parent_trade["stop_loss"] = entry_price
-                        logger.info(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
+                    if exec_result.get("success"):
+                        opened_count += 1
                     else:
-                        # BE non applicato: o la posizione non esiste più (TP già
-                        # scattato) o il broker ha rifiutato il nuovo SL (es. prezzo
-                        # non ancora in profitto). Solo MT5 sa quale dei due: segnare
-                        # 'closed' a priori renderebbe una posizione aperta invisibile
-                        # alla chiusura successiva.
-                        sync_ticket_with_broker(tp_config, real_mt5_ticket)
+                        logger.warning(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
 
-                # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
-                # solo se il messaggio conteneva davvero nuovi valori.
-                if sl_tp_changed:
-                    for trade in trades:
-                        # Letto una volta sola: in caso di rifiuto lo SL radice viene
-                        # riallineato al broker e non deve contaminare il ticket successivo.
-                        new_sl = trade.get("stop_loss")
-                        for tp_key, tp_config in trade.get("tickets", {}).items():
-                            real_mt5_ticket = tp_config.get("mt5_ticket")
-                            if not real_mt5_ticket or tp_config.get("closed"):
-                                continue
+                # Se anche un solo ticket è a mercato l'operazione resta ACTIVE,
+                # così update e chiusure continuano a gestirlo (i ticket non
+                # aperti hanno mt5_ticket a None e vengono saltati). Con uno
+                # stato diverso il CLOSE la ignorerebbe, lasciando la posizione
+                # aperta su MT5 senza più controllo.
+                trade_data["status"] = "ACTIVE" if opened_count > 0 else "OPEN_FAILED"
+                if 0 < opened_count < len(orders_dict):
+                    logger.warning(f"⚠️ Apertura PARZIALE: {opened_count}/{len(orders_dict)} ticket a mercato, l'operazione resta gestita.")
+                journal.record("TRADE_STATUS", **trade_summary(trade_data))
 
-                            new_tp = tp_config.get("take_profit")
+                # Persistiamo SUBITO: fino a questo punto il file su disco
+                # contiene ancora mt5_ticket a null. Se il bot si riavviasse
+                # ora, perderebbe il riferimento a posizioni già a mercato.
+                manager.save_state_to_file()
+                logger.info(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
 
-                            if not levels_match_direction(tp_config.get("direction"), new_sl, new_tp):
-                                logger.warning(f"⚠️ Livelli incoerenti con la posizione {tp_config.get('direction')} #{real_mt5_ticket} "
-                                               f"(SL {new_sl}, TP {new_tp}): modifica NON inviata a MT5.")
-                                sync_ticket_with_broker(tp_config, real_mt5_ticket)
-                                trade["stop_loss"] = tp_config.get("stop_loss")
-                                continue
-
-                            modified = mt5_agent.modify_order_levels(
-                                ticket=real_mt5_ticket,
-                                stop_loss=new_sl,
-                                take_profit=[new_tp] if new_tp is not None else []
-                            )
-                            if not modified:
-                                # MT5 ha rifiutato: la memoria deve tornare ai valori
-                                # realmente attivi sul broker, non a quelli del messaggio.
-                                sync_ticket_with_broker(tp_config, real_mt5_ticket)
-                                trade["stop_loss"] = tp_config.get("stop_loss")
-
+            else:
+                logger.warning(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
+                journal.record("RISK_REJECTED", ticket_id=trade_data.get("ticket_id"), reason=validated_orders.get("reason"))
+                trade_data["status"] = "REJECTED"
                 manager.save_state_to_file()
 
-            # CASO 3: Chiusura posizione (totale su tutta la catena)
-            elif action == "CLOSE":
-                closing_chain = manager_result.get("closed_chain", [])
+        # CASO 2: Aggiornamento ordine esistente (SL/TP reali e/o BE+)
+        elif action == "UPDATE":
+            trades = manager_result.get("trades", [])
+            be_candidates = manager_result.get("be_candidates", [])
+            sl_tp_changed = manager_result.get("sl_tp_changed", False)
 
-                for trade in closing_chain:
-                    all_closed = True
+            # 2a. Breakeven, ticket per ticket. MT5 stesso verifica se la posizione
+            # esiste ancora: se il TP è già scattato, il broker l'ha già chiusa e
+            # set_sl_to_be non applica nulla (ritorna False).
+            for candidate in be_candidates:
+                parent_trade = candidate["trade"]
+                tp_config = candidate["ticket"]
+                real_mt5_ticket = tp_config.get("mt5_ticket")
+                entry_price = tp_config.get("entry_price")
 
+                be_applied = mt5_agent.set_sl_to_be(ticket=real_mt5_ticket, entry_price=entry_price)
+                if be_applied:
+                    tp_config["be_active"] = True
+                    tp_config["stop_loss"] = entry_price
+                    # Risincronizziamo anche lo stop_loss a livello radice del trade,
+                    # altrimenti resta al valore pre-BE (usato per ereditarietà re-entry).
+                    parent_trade["stop_loss"] = entry_price
+                    logger.info(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
+                else:
+                    # BE non applicato: o la posizione non esiste più (TP già
+                    # scattato) o il broker ha rifiutato il nuovo SL (es. prezzo
+                    # non ancora in profitto). Solo MT5 sa quale dei due: segnare
+                    # 'closed' a priori renderebbe una posizione aperta invisibile
+                    # alla chiusura successiva.
+                    sync_ticket_with_broker(tp_config, real_mt5_ticket)
+
+            # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
+            # solo se il messaggio conteneva davvero nuovi valori.
+            if sl_tp_changed:
+                for trade in trades:
+                    # Letto una volta sola: in caso di rifiuto lo SL radice viene
+                    # riallineato al broker e non deve contaminare il ticket successivo.
+                    new_sl = trade.get("stop_loss")
                     for tp_key, tp_config in trade.get("tickets", {}).items():
                         real_mt5_ticket = tp_config.get("mt5_ticket")
-
-                        # Niente ticket (mai aperto) o già chiuso: nulla da fare
                         if not real_mt5_ticket or tp_config.get("closed"):
                             continue
 
-                        if mt5_agent.close_position(ticket=real_mt5_ticket, symbol=tp_config.get("symbol")):
-                            tp_config["closed"] = True
-                        else:
-                            all_closed = False
+                        new_tp = tp_config.get("take_profit")
 
-                    # Lo stato riflette l'esito REALE: se anche un solo ticket non
-                    # è stato chiuso, l'operazione resta segnalata come problematica
-                    # invece di risultare chiusa mentre è ancora a mercato.
-                    trade["status"] = "CLOSED" if all_closed else "CLOSE_FAILED"
-                    if not all_closed:
-                        logger.warning(f"⚠️ Chiusura INCOMPLETA per il trade {trade.get('ticket_id')}: verificare manualmente su MT5.")
+                        if not levels_match_direction(tp_config.get("direction"), new_sl, new_tp):
+                            logger.warning(f"⚠️ Livelli incoerenti con la posizione {tp_config.get('direction')} #{real_mt5_ticket} "
+                                           f"(SL {new_sl}, TP {new_tp}): modifica NON inviata a MT5.")
+                            journal.record("LEVELS_INCOHERENT", mt5_ticket=real_mt5_ticket,
+                                           direction=tp_config.get("direction"), stop_loss=new_sl, take_profit=new_tp)
+                            sync_ticket_with_broker(tp_config, real_mt5_ticket)
+                            trade["stop_loss"] = tp_config.get("stop_loss")
+                            continue
 
-                manager.save_state_to_file()
-        
-        logger.info(f"📦 ESITO ORDER MANAGER: {json.dumps(manager_result, default=str, ensure_ascii=False)}")
-        logger.info(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
-        
-    except Exception as e:
-        logger.exception("❌ Errore durante l'elaborazione del messaggio")
+                        modified = mt5_agent.modify_order_levels(
+                            ticket=real_mt5_ticket,
+                            stop_loss=new_sl,
+                            take_profit=[new_tp] if new_tp is not None else []
+                        )
+                        if not modified:
+                            # MT5 ha rifiutato: la memoria deve tornare ai valori
+                            # realmente attivi sul broker, non a quelli del messaggio.
+                            sync_ticket_with_broker(tp_config, real_mt5_ticket)
+                            trade["stop_loss"] = tp_config.get("stop_loss")
+
+            for trade in trades:
+                journal.record("TRADE_STATUS", **trade_summary(trade))
+            manager.save_state_to_file()
+
+        # CASO 3: Chiusura posizione (totale su tutta la catena)
+        elif action == "CLOSE":
+            closing_chain = manager_result.get("closed_chain", [])
+
+            for trade in closing_chain:
+                all_closed = True
+
+                for tp_key, tp_config in trade.get("tickets", {}).items():
+                    real_mt5_ticket = tp_config.get("mt5_ticket")
+
+                    # Niente ticket (mai aperto) o già chiuso: nulla da fare
+                    if not real_mt5_ticket or tp_config.get("closed"):
+                        continue
+
+                    if mt5_agent.close_position(ticket=real_mt5_ticket, symbol=tp_config.get("symbol")):
+                        tp_config["closed"] = True
+                        record_position_closed(real_mt5_ticket, closed_by="SEGNALE_CHIUSURA", trade=trade)
+                    else:
+                        all_closed = False
+
+                # Lo stato riflette l'esito REALE: se anche un solo ticket non
+                # è stato chiuso, l'operazione resta segnalata come problematica
+                # invece di risultare chiusa mentre è ancora a mercato.
+                trade["status"] = "CLOSED" if all_closed else "CLOSE_FAILED"
+                if not all_closed:
+                    logger.warning(f"⚠️ Chiusura INCOMPLETA per il trade {trade.get('ticket_id')}: verificare manualmente su MT5.")
+                journal.record("TRADE_STATUS", **trade_summary(trade))
+
+            manager.save_state_to_file()
+
+    logger.info(f"📦 ESITO ORDER MANAGER: {json.dumps(manager_result, default=str, ensure_ascii=False)}")
+    logger.info(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
+
+
+def write_heartbeat(mt5_ok: bool, mt5_reason: str) -> None:
+    """Battito periodico: conferma nel log che il bot è vivo e fotografa il conto."""
+    account = mt5_agent.account_snapshot()
+    live_trades = [t for t in manager.active_trades.values() if t.get("status") in CLOSABLE_STATUSES]
+    logger.info(f"💓 Bot attivo | MT5: {mt5_reason} | operazioni vive: {len(live_trades)} "
+                f"| saldo: {account.get('balance')} | equity: {account.get('equity')} "
+                f"| posizioni aperte sul conto: {account.get('open_positions')}")
+    journal.record("HEARTBEAT", mt5_ok=mt5_ok, mt5_reason=mt5_reason, live_trades=len(live_trades), **account)
+
+
+async def monitor_loop():
+    """
+    Controllo periodico mentre il bot aspetta messaggi:
+      - stato di MT5 (terminale raggiungibile, collegato, Algo Trading attivo),
+        segnalato nel log solo quando cambia;
+      - riconciliazione delle operazioni vive: registra le posizioni chiuse dal
+        broker (TP/SL) o a mano, con motivo e profitto, e allinea SL/TP;
+      - battito orario nel log.
+    Gira nello stesso event loop di Telethon, tra un messaggio e l'altro: non
+    si sovrappone mai all'elaborazione di un messaggio.
+    """
+    mt5_ok = True
+    last_heartbeat = None
+
+    while True:
+        await asyncio.sleep(MONITOR_INTERVAL_SECONDS)
+        try:
+            ok, reason = mt5_agent.check_health()
+            if ok != mt5_ok:
+                mt5_ok = ok
+                if ok:
+                    logger.info(f"✅ {reason}: situazione tornata normale.")
+                else:
+                    logger.error(f"❌ Problema MT5: {reason}")
+                journal.record("MT5_CONNECTION", ok=ok, reason=reason)
+
+            if ok and not mt5_agent.test_mode:
+                manager.reconcile_with_broker(broker_position_lookup)
+
+            if last_heartbeat is None or time.monotonic() - last_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
+                last_heartbeat = time.monotonic()
+                write_heartbeat(ok, reason)
+
+        except MT5UnavailableError as e:
+            logger.warning(f"⚠️ Controllo periodico: MT5 non ha risposto ({e}), riprovo al prossimo giro.")
+        except Exception:
+            logger.exception("❌ Errore nel controllo periodico")
+            journal.record("ERROR", where="monitor_loop", error=traceback.format_exc())
+
 
 # Listener per i NUOVI messaggi nel canale
 @tg_client.on(events.NewMessage(chats=TARGET_CHANNEL))
@@ -285,18 +420,48 @@ async def handle_edited_message(event):
     await process_message(event, is_edit=True)
 
 
+async def main():
+    await tg_client.start()
+    logger.info(f"🤖 Ascolto attivo sul canale: {TARGET_CHANNEL}")
+    logger.info("In attesa di messaggi... (Premi Ctrl+C per fermare)")
+    # Il riferimento al task va tenuto: asyncio conserva solo riferimenti deboli
+    monitor_task = asyncio.create_task(monitor_loop())
+    try:
+        await tg_client.run_until_disconnected()
+    finally:
+        monitor_task.cancel()
+
+
 # Avvio del client
 if __name__ == "__main__":
+    account = mt5_agent.account_snapshot()
+    journal.record("BOT_START", test_mode=mt5_agent.test_mode, channel=TARGET_CHANNEL,
+                   allowed_senders=sorted(ALLOWED_SENDER_IDS), **account)
+    if account and not account.get("demo"):
+        logger.warning("⚠️ ATTENZIONE: il terminale MT5 è collegato a un conto REALE.")
+    if ALLOWED_SENDER_IDS:
+        logger.info(f"👤 Accetto solo i messaggi dei mittenti: {sorted(ALLOWED_SENDER_IDS)}")
+    else:
+        logger.info("👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.")
+
     # Riconciliazione con MT5: mentre il bot era spento un TP/SL può essere
     # scattato, o un'operazione può essere stata chiusa a mano dal terminale.
     # In TEST MODE non esistono posizioni reali, quindi si salta.
     if not mt5_agent.test_mode:
-        corrette = manager.reconcile_with_broker(mt5_agent.get_open_position)
-        logger.info(f"🔄 Riconciliazione con MT5 completata ({corrette} valori allineati).")
+        try:
+            corrette = manager.reconcile_with_broker(broker_position_lookup)
+            logger.info(f"🔄 Riconciliazione con MT5 completata ({corrette} valori allineati).")
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Riconciliazione iniziale non eseguita, MT5 non risponde ({e}): riproverà il controllo periodico.")
     else:
         logger.info("🧪 TEST MODE: riconciliazione con MT5 saltata.")
 
-    logger.info(f"🤖 Ascolto attivo sul canale: {TARGET_CHANNEL}")
-    logger.info("In attesa di messaggi... (Premi Ctrl+C per fermare)")
-    tg_client.start()
-    tg_client.run_until_disconnected()
+    try:
+        tg_client.loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot fermato manualmente.")
+    except Exception:
+        logger.exception("❌ Il bot si è fermato per un errore imprevisto")
+        journal.record("ERROR", where="main", error=traceback.format_exc())
+    finally:
+        journal.record("BOT_STOP")
