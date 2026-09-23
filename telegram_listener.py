@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import time
 import traceback
 
@@ -59,7 +60,21 @@ IGNORE_FORWARDED_MESSAGES = True
 # Margine del BE in $ oltre il prezzo di ingresso: lo SL va a ingresso + BE_OFFSET
 # per un BUY e a ingresso - BE_OFFSET per un SELL, così un ritorno al prezzo di
 # ingresso chiude con un piccolo guadagno invece che a zero. 0 = BE esatto.
-BE_OFFSET = float(os.getenv("BE_OFFSET", "0"))
+# Il 23/09 un SELL portato a BE esatto si è chiuso a 0,00 due minuti dopo.
+BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
+
+# Filtro locale PRIMA dell'agente: un messaggio senza nemmeno una parola del
+# lessico operativo (solo emoji, "Another profitable day💪", "Thanks sir",
+# "READY US SESSION") non può essere un comando, quindi non paghiamo una
+# classificazione per sentirci dire IGNORE. L'elenco è volutamente largo:
+# meglio una chiamata in più che un segnale perso. Verificato su tutti i
+# messaggi del 23/09: nessun segnale o comando reale viene scartato.
+OPERATIVE_KEYWORDS = re.compile(
+    r"\b(buy|sell|long|short|tp\d?|sl|be\+?|b/e|break\s*even|breakeven|close[ds]?|closing|exit|cut|invalid\w*|"
+    r"entry|entries|hit|protect|secure|layers?|collect|half|partial|stop|targets?|gold|xau\w*|again|"
+    r"zero\s*float|trade\s*active|risk|hold|pips?)\b",
+    re.IGNORECASE,
+)
 
 # Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
 # cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
@@ -265,6 +280,11 @@ def handle_message(event, is_edit: bool):
     if is_forwarded and IGNORE_FORWARDED_MESSAGES:
         logger.info(f"⏭️ Messaggio {msg_id} scartato: inoltrato (testimonianza, non un segnale del trader).")
         journal.record("MESSAGE_SKIPPED", reason="messaggio inoltrato")
+        return
+
+    if not OPERATIVE_KEYWORDS.search(text):
+        logger.info(f"⏭️ Messaggio {msg_id} scartato: nessuna parola operativa (emoji, celebrazione, avviso).")
+        journal.record("MESSAGE_SKIPPED", reason="nessuna parola operativa")
         return
 
     # A mercato chiuso nessuna azione sarebbe eseguibile su MT5: scartiamo il

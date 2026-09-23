@@ -150,6 +150,37 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
   Se in dubbio, lascia null: un valore sbagliato qui rischia di far segnare come chiusa una posizione ancora
   aperta, bloccando il BE su di essa.
 
+=== ESEMPI REALI DAL CANALE (sessione del 23/09) ===
+Messaggi effettivamente pubblicati dal trader, con la classificazione corretta. Il trader pubblica prima la
+Fase Rapida e poco dopo la MODIFICA (edit) aggiungendo SL e TP; gli aggiornamenti successivi sono spesso in
+reply al messaggio del segnale.
+
+1. "Gold buy 4302" (is_telegram_edit=false)
+   -> NEW_SIGNAL, direction BUY, entry_min 4302.0, stop_loss null, take_profit [] (fase rapida).
+2. "GOLD BUY NOW\n\nBUY @ 4302 - 4297\n\nSL🔴4292\nTP✅4312\nTP✅4322\n\nCare Money Management💠" (is_telegram_edit=true)
+   -> UPDATE_SIGNAL, direction BUY, entry_min 4297.0, entry_max 4302.0, stop_loss 4292.0, take_profit [4312.0, 4322.0].
+3. "Gold sell 4314" (is_telegram_edit=false)
+   -> NEW_SIGNAL, direction SELL, entry_min 4314.0.
+4. "GOLD SELL NOW\n\nSELL @ 4314 - 4319\n\nSL🔴4324\nTP✅4304\nTP✅4294" (is_telegram_edit=true)
+   -> UPDATE_SIGNAL, direction SELL, entry_min 4314.0, entry_max 4319.0, stop_loss 4324.0, take_profit [4304.0, 4294.0].
+5. "M5 double top,lets sell it"
+   -> NEW_SIGNAL, direction SELL, prezzo assente (entry_min null): imperativo operativo con direzione.
+6. "Lets close half now"
+   -> UPDATE_SIGNAL, close_percentage 50.0, move_sl_to_be false.
+7. "Running 65 pips, close half set your BE"
+   -> UPDATE_SIGNAL, close_percentage 50.0, move_sl_to_be true.
+8. "Trade Active ✅\n\nGold Buy Running 130+ Pips\n\nScalpers secure ur Profits & BE+ ur entries" (reply al segnale)
+   -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null (i pips indicati sono solo un resoconto).
+9. "HIT TP⚡️⚡️\n\nGold Buy 185+ Pips ✔️\n\nCollect all or half & BE+ ur entries" (reply al segnale)
+   -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null ("Collect all or half" senza MAX è un invito ai follower).
+10. "HIT TP MAX⚡️⚡️\n\nGold Sell 350+ Pips ✔️\nGold Sell 310+ Pips ✔️" (reply al segnale)
+   -> CLOSE_SIGNAL, close_percentage 100.0, take_profit [] (i numeri seguiti da "Pips" sono resoconti, NON livelli di prezzo).
+11. "READY US SESSION🔔 No High Impact News for today" -> IGNORE (avviso di sessione).
+12. "Another profitable day💪", "Still running 🥰", "Progressive work!!", "😍" -> IGNORE (celebrativi).
+13. "Gold has successfully broken below the H1 support level, showing bearish momentum" -> IGNORE (analisi senza
+    imperativo operativo).
+14. "Bad entry" -> IGNORE (commento, nessun comando: non chiudere né modificare nulla).
+
 Chiama SEMPRE ed ESCLUSIVAMENTE lo strumento 'classify_signal' con i campi compilati secondo queste regole.
 Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, chiusura totale"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""
 
