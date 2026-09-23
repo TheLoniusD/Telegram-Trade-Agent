@@ -18,11 +18,14 @@ Tipi di evento principali:
   CLASSIFIED                 output dell'agente classificatore
   CLASSIFIER_CALL            token consumati dalla chiamata all'agente
   DECISION                   esito dell'Order Manager (OPEN/UPDATE/CLOSE/IGNORE)
+  RISK_CALC                  calcolo dei lotti (rischio, tetto sul margine, totale)
   RISK_REJECTED              segnale scartato dal Risk Manager
   MT5_ORDER                  ogni richiesta inviata a MT5 con il suo esito
   TRADE_STATUS               stato finale di un'operazione dopo un'azione
   LEVELS_INCOHERENT          SL/TP incoerenti con la direzione, non inviati
   MEMORY_RESYNC              memoria riallineata ai valori reali del broker
+  BE_PENDING                 BE rifiutato (prezzo troppo vicino), resta in attesa
+  BE_PENDING_APPLIED         BE in attesa applicato dal controllo periodico
   POSITION_CLOSED            posizione chiusa (dal bot o dal broker: TP/SL/manuale)
   MT5_CONNECTION             connessione a MT5 persa / ripristinata
   HEARTBEAT                  battito periodico: bot vivo, saldo, operazioni

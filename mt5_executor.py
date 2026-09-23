@@ -298,6 +298,27 @@ class MT5Executor:
             "take_profit": pos.tp,
         }
 
+    def can_move_sl(self, ticket: int, new_sl: float) -> bool:
+        """
+        True se MT5 accetterebbe adesso questo SL sulla posizione: dal lato
+        giusto del prezzo di chiusura e oltre la distanza minima imposta dal
+        broker (stops level). Evita di inviare modifiche destinate al rifiuto.
+        """
+        if self.test_mode or new_sl is None:
+            return False
+        pos = self._find_position(ticket)
+        if pos is None:
+            return False
+        info = mt5.symbol_info(pos.symbol)
+        tick = mt5.symbol_info_tick(pos.symbol)
+        if info is None or tick is None:
+            return False
+
+        min_distance = info.trade_stops_level * info.point
+        if pos.type == mt5.ORDER_TYPE_BUY:
+            return tick.bid - new_sl > min_distance
+        return new_sl - tick.ask > min_distance
+
     def get_close_info(self, ticket: int) -> dict:
         """
         Esito finale di una posizione chiusa, letto dallo storico dei deal di MT5:

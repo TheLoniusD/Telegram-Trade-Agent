@@ -50,6 +50,18 @@ TRADED_SYMBOL = "XAUUSD"
 MONITOR_INTERVAL_SECONDS = 30
 HEARTBEAT_INTERVAL_SECONDS = 3600
 
+# I messaggi inoltrati nel canale sono testimonianze dei follower ("Thanks sir",
+# "Got it..continue sell👍"), mai segnali del trader: il 23/09 lo erano tutti.
+# Scartarli prima dell'agente risparmia token ed evita che un "continue sell"
+# di un follower venga scambiato per un comando.
+IGNORE_FORWARDED_MESSAGES = True
+
+# Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
+# cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
+# di ripetere azioni già eseguite.
+_last_text_by_msg: dict = {}
+_LAST_TEXT_MAX_ENTRIES = 1000
+
 
 def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
     """
@@ -170,6 +182,16 @@ def handle_message(event, is_edit: bool):
     journal.record("MESSAGE", is_edit=is_edit, reply_to=reply_to, sender_id=sender_id, post_author=post_author,
                    has_media=has_media, is_forwarded=is_forwarded, text=text)
 
+    if is_edit and _last_text_by_msg.get(msg_id) == text:
+        logger.info(f"⏭️ Edit del messaggio {msg_id} scartato: il testo non è cambiato.")
+        journal.record("MESSAGE_SKIPPED", reason="edit senza modifiche al testo")
+        return
+
+    if is_forwarded and IGNORE_FORWARDED_MESSAGES:
+        logger.info(f"⏭️ Messaggio {msg_id} scartato: inoltrato (testimonianza, non un segnale del trader).")
+        journal.record("MESSAGE_SKIPPED", reason="messaggio inoltrato")
+        return
+
     # A mercato chiuso nessuna azione sarebbe eseguibile su MT5: scartiamo il
     # messaggio PRIMA di chiamare l'agente, così non consumiamo token inutilmente.
     # Prima il calendario statico (non richiede MT5), poi lo stato reale del simbolo.
@@ -186,6 +208,12 @@ def handle_message(event, is_edit: bool):
     ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
 
     logger.info(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
+
+    # Memorizzato solo dopo una classificazione riuscita: se l'agente fallisce,
+    # un edit successivo con lo stesso testo avrà un'altra possibilità.
+    _last_text_by_msg[msg_id] = text
+    if len(_last_text_by_msg) > _LAST_TEXT_MAX_ENTRIES:
+        _last_text_by_msg.pop(next(iter(_last_text_by_msg)))
     journal.record("CLASSIFIED", intent=ai_output.get("intent"), is_actionable=ai_output.get("is_actionable"),
                    data=ai_output.get("data"), reasoning=ai_output.get("raw_reasoning"))
 
@@ -289,6 +317,14 @@ def handle_message(event, is_edit: bool):
                     # 'closed' a priori renderebbe una posizione aperta invisibile
                     # alla chiusura successiva.
                     sync_ticket_with_broker(tp_config, real_mt5_ticket)
+                    if not tp_config.get("closed"):
+                        # Il trader ha chiesto il BE ma il prezzo è ancora troppo
+                        # vicino all'ingresso (il 23/09: "running 65 pips" contati
+                        # dal fondo della zona). Resta in attesa: il controllo
+                        # periodico lo applica appena MT5 lo accetta.
+                        tp_config["be_pending"] = True
+                        logger.info(f"⏳ BE del ticket {real_mt5_ticket} in attesa: verrà applicato appena il prezzo lo consente.")
+                        journal.record("BE_PENDING", mt5_ticket=real_mt5_ticket, entry_price=entry_price)
 
             # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
             # solo se il messaggio conteneva davvero nuovi valori.
@@ -323,6 +359,10 @@ def handle_message(event, is_edit: bool):
                             # realmente attivi sul broker, non a quelli del messaggio.
                             sync_ticket_with_broker(tp_config, real_mt5_ticket)
                             trade["stop_loss"] = tp_config.get("stop_loss")
+                        else:
+                            # Un nuovo SL esplicito del trader sostituisce un BE
+                            # ancora in attesa: non va sovrascritto più tardi.
+                            tp_config["be_pending"] = False
 
             for trade in trades:
                 journal.record("TRADE_STATUS", **trade_summary(trade))
@@ -360,6 +400,40 @@ def handle_message(event, is_edit: bool):
 
     logger.info(f"📦 ESITO ORDER MANAGER: {json.dumps(manager_result, default=str, ensure_ascii=False)}")
     logger.info(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
+
+
+def retry_pending_breakeven() -> None:
+    """
+    Applica i BE chiesti dal trader ma rifiutati da MT5 perché il prezzo era
+    ancora troppo vicino all'ingresso. Invia la modifica solo quando MT5 la
+    accetterebbe, così non riempie il log di rifiuti a ogni giro.
+    """
+    changed = False
+    for trade in manager.active_trades.values():
+        if trade.get("status") != "ACTIVE":
+            continue
+        for tp_config in trade.get("tickets", {}).values():
+            if not tp_config.get("be_pending") or tp_config.get("closed") or tp_config.get("be_active"):
+                continue
+            mt5_ticket = tp_config.get("mt5_ticket")
+            entry_price = tp_config.get("entry_price")
+            if not mt5_agent.can_move_sl(mt5_ticket, entry_price):
+                continue
+
+            # Nel diario l'evento resta legato al messaggio dell'operazione
+            token = journal.set_current_message(trade.get("msg_id"))
+            try:
+                if mt5_agent.set_sl_to_be(ticket=mt5_ticket, entry_price=entry_price):
+                    tp_config.update(be_active=True, be_pending=False, stop_loss=entry_price)
+                    trade["stop_loss"] = entry_price
+                    logger.info(f"🎯 BE in attesa applicato al ticket MT5 {mt5_ticket}")
+                    journal.record("BE_PENDING_APPLIED", mt5_ticket=mt5_ticket, entry_price=entry_price)
+                    changed = True
+            finally:
+                journal.clear_current_message(token)
+
+    if changed:
+        manager.save_state_to_file()
 
 
 def write_heartbeat(mt5_ok: bool, mt5_reason: str) -> None:
@@ -400,6 +474,7 @@ async def monitor_loop():
 
             if ok and not mt5_agent.test_mode:
                 manager.reconcile_with_broker(broker_position_lookup)
+                retry_pending_breakeven()
 
             if last_heartbeat is None or time.monotonic() - last_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
                 last_heartbeat = time.monotonic()

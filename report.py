@@ -91,6 +91,13 @@ def describe(event: dict) -> str:
         return f"📋 operazione {e.get('ticket_id')} → {e.get('status')} | {tickets}"
     if kind == "LEVELS_INCOHERENT":
         return f"⚠️ livelli incoerenti con {e.get('direction')} #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')} (non inviati)"
+    if kind == "BE_PENDING":
+        return f"⏳ BE di #{e.get('mt5_ticket')} in attesa (prezzo ancora troppo vicino all'ingresso {e.get('entry_price')})"
+    if kind == "BE_PENDING_APPLIED":
+        return f"🎯 BE in attesa applicato a #{e.get('mt5_ticket')} (SL {e.get('entry_price')})"
+    if kind == "RISK_CALC":
+        return (f"🧮 lotti: rischio {e.get('risk_percent')}% → {e.get('lots_by_risk')} | tetto margine {e.get('lots_by_margin')} "
+                f"| totale {e.get('lots_total')} (prezzo {e.get('price')}, SL {e.get('stop_loss')})")
     if kind == "MEMORY_RESYNC":
         return f"🔄 memoria riallineata a MT5 #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')}"
     if kind == "POSITION_CLOSED":

@@ -2,8 +2,15 @@ import math
 
 import MetaTrader5 as mt5
 
+import journal
 
-DEFAULT_SL_DIST_GOLD = 5.0
+
+# Distanza dello SL temporaneo (fase rapida) dal prezzo del segnale.
+# 10$ è la distanza usata dal trader nei segnali completi osservati il 23/09
+# (BUY 4302 -> SL 4292, SELL 4314 -> SL 4324): così lo SL temporaneo coincide
+# quasi sempre con quello reale e il lottaggio calcolato resta valido anche
+# dopo l'edit con i livelli definitivi.
+DEFAULT_SL_DIST_GOLD = 10.0
 
 # Quota massima del margine libero impegnabile da un singolo segnale (2 ticket)
 MARGIN_USAGE_LIMIT = 0.5
@@ -66,9 +73,15 @@ class RiskManager:
             else:
                 stop_loss = entry_price + DEFAULT_SL_DIST_GOLD
 
-        # 3. Calcolo Lottaggio basato su % di Rischio, limitato dal margine libero
-        total_calculated_lots = self._calculate_lot_size(symbol, entry_price, stop_loss)
-        total_calculated_lots = min(total_calculated_lots, self._max_lots_by_margin(symbol, direction, current_price))
+        # 3. Calcolo Lottaggio basato su % di Rischio, limitato dal margine libero.
+        # La distanza dallo SL si misura dal prezzo corrente: l'ordine è a
+        # mercato e verrà eseguito lì, non al prezzo scritto nel segnale.
+        risk_lots = self._calculate_lot_size(symbol, direction, current_price, stop_loss)
+        margin_lots = self._max_lots_by_margin(symbol, direction, current_price)
+        total_calculated_lots = min(risk_lots, margin_lots)
+        journal.record("RISK_CALC", ticket_id=trade_data.get("ticket_id"), direction=direction,
+                       price=current_price, stop_loss=stop_loss, risk_percent=self.risk_percent,
+                       lots_by_risk=risk_lots, lots_by_margin=round(margin_lots, 2), lots_total=total_calculated_lots)
 
         # SDOPPIAMENTO LOTTAGGIO: dividiamo a metà arrotondando PER DIFETTO allo
         # step del broker. Arrotondare per eccesso (o forzare il minimo) può
@@ -112,7 +125,7 @@ class RiskManager:
         return (account_info.margin_free * MARGIN_USAGE_LIMIT) / margin_per_lot
 
 
-    def _calculate_lot_size(self, symbol: str, entry_price: float, stop_loss: float) -> float:
+    def _calculate_lot_size(self, symbol: str, direction: str, entry_price: float, stop_loss: float) -> float:
         """
     CALCOLO AUTOMATICO E DINAMICO DELLA DIMENSIONE DELL'ORDINE (LOTTI)
 
@@ -138,13 +151,19 @@ class RiskManager:
         if sl_distance <= 0:
             return 0.01
 
-        # Per XAUUSD (Oro): 1 lotto standard = 100 oz. 1.0$ di movimento = $100 per lotto
+        # Perdita di 1 lotto se lo SL viene colpito, calcolata da MT5 stesso nella
+        # valuta del conto (con la conversione USD->valuta del conto inclusa).
+        # Il calcolo manuale con trade_tick_value/trade_tick_size il 23/09 ha
+        # prodotto almeno 3 volte i lotti dovuti: li ha fermati solo il tetto sul
+        # margine, con un rischio reale intorno al 12% del conto invece del 2%.
         symbol_info = mt5.symbol_info(symbol)
-        tick_value = symbol_info.trade_tick_value if symbol_info else 1.0
-        tick_size = symbol_info.trade_tick_size if symbol_info else 0.01
+        order_type = mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL
+        loss_at_sl = mt5.order_calc_profit(order_type, symbol, 1.0, entry_price, stop_loss)
+        if loss_at_sl is None:
+            # MT5 non ha risposto: meglio il lotto minimo che un lotto sbagliato
+            return symbol_info.volume_min if symbol_info else 0.01
+        loss_per_lot = abs(loss_at_sl)
 
-        loss_per_lot = (sl_distance / tick_size) * tick_value if tick_size > 0 else sl_distance * 100.0
-        
         if loss_per_lot <= 0:
             return 0.01
 
@@ -155,5 +174,6 @@ class RiskManager:
         max_lot = symbol_info.volume_max if symbol_info else 100.0
         step_lot = symbol_info.volume_step if symbol_info else 0.01
 
-        lots = round(raw_lots / step_lot) * step_lot
+        # Per difetto: arrotondare per eccesso supererebbe il rischio impostato
+        lots = math.floor(raw_lots / step_lot) * step_lot
         return max(min_lot, min(max_lot, round(lots, 2)))
