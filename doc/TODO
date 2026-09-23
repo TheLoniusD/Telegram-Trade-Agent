@@ -34,10 +34,13 @@ Ottimizzazione Sistema Bot
 
 PRIMA DEL RILASCIO (bloccanti, emersi durante lo sviluppo)
 
-    OWNER_ID in telegram_listener.py
+    [RISOLTO] OWNER_ID in telegram_listener.py
         Attualmente contiene l'ID personale usato per i test (462122085): con questo valore il bot scarta tutti i
         messaggi reali del canale. Va sostituito con l'ID Telegram del trader "Maestro Fx" prima di andare in
         autonomia, altrimenti non verrà classificato nessun segnale vero.
+        -> Sostituito da ALLOWED_SENDER_IDS nel .env (ID separati da virgola). Vuoto = accetta tutti i messaggi
+           di TARGET_CHANNEL, che è il caso del canale ufficiale (i post arrivano con l'ID del canale).
+           I messaggi scartati dal filtro compaiono nel log con il mittente, così l'ID giusto si trova lì.
 
     [RISOLTO] entry_price reale restituito da MT5
         Nei ticket, 'entry_price' è ancora il prezzo teorico del segnale (o ereditato da un re-entry): MT5Executor

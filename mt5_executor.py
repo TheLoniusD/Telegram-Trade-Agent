@@ -3,6 +3,7 @@ from typing import Optional
 
 from mt5_connection import mt5
 
+import journal
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -13,6 +14,17 @@ logger = setup_logger(__name__)
 # Prima era gestito con un 'return' anticipato dentro ogni metodo: bastava
 # dimenticarne uno per ritrovarsi a metà tra simulazione e operatività reale.
 TEST_MODE = False
+
+# Codice di esito "nessun errore" restituito da mt5.last_error()
+MT5_RESULT_OK = 1
+
+
+class MT5UnavailableError(Exception):
+    """
+    MT5 non ha risposto alla richiesta (terminale chiuso, connessione persa).
+    Va distinto da "posizione non trovata": scambiarli farebbe segnare come
+    chiuse posizioni che in realtà sono ancora a mercato.
+    """
 
 
 class MT5Executor:
@@ -38,6 +50,43 @@ class MT5Executor:
 
         # Solo per TEST MODE: contatore per generare ticket fittizi distinti
         self._test_ticket_counter = 90000000
+
+    def _send(self, operation: str, request: dict):
+        """
+        Unico punto di invio degli ordini a MT5: registra nel diario ogni
+        richiesta con il suo esito, e gestisce il caso in cui order_send
+        restituisca None (richiesta malformata o terminale non connesso), che
+        prima mandava in errore l'intera elaborazione del messaggio.
+        Ritorna (ok, result, error).
+        """
+        # Via RPyC i campi vanno passati come argomenti con nome: un dict locale
+        # arriverebbe al server come riferimento remoto, non come dizionario.
+        result = mt5.order_send(**request)
+        if result is None:
+            ok, error = False, f"nessuna risposta da MT5 {mt5.last_error()}"
+        else:
+            ok = result.retcode == mt5.TRADE_RETCODE_DONE
+            error = None if ok else f"{result.comment} (retcode {result.retcode})"
+
+        journal.record(
+            "MT5_ORDER", operation=operation, ok=ok, error=error, request=request,
+            retcode=getattr(result, "retcode", None), order=getattr(result, "order", None),
+            price=getattr(result, "price", None), volume=getattr(result, "volume", None),
+        )
+        return ok, result, error
+
+    def _find_position(self, ticket: int):
+        """
+        La posizione aperta con questo ticket, o None se non esiste più.
+        Solleva MT5UnavailableError se MT5 non risponde: in quel caso non
+        sappiamo se la posizione sia aperta o chiusa.
+        """
+        positions = mt5.positions_get(ticket=ticket)
+        if positions is None:
+            code, description = mt5.last_error()
+            if code != MT5_RESULT_OK:
+                raise MT5UnavailableError(f"positions_get({ticket}) fallita: {code} {description}")
+        return positions[0] if positions else None
 
     def execute_open(self, order_plan: dict) -> dict:
         """
@@ -93,10 +142,10 @@ class MT5Executor:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
-        result = mt5.order_send(**request)
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error(f"❌ Errore apertura ordine MT5: {result.comment}")
-            return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": result.comment}
+        ok, result, error = self._send("OPEN", request)
+        if not ok:
+            logger.error(f"❌ Errore apertura ordine MT5: {error}")
+            return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": error}
 
         logger.info(f"✅ Ordine eseguito su MT5 | Ticket: {result.order} | Volume: {result.volume} | Prezzo: {result.price}")
         return {
@@ -122,24 +171,27 @@ class MT5Executor:
             logger.info(f"🛠️ [TEST MODE] Simulazione BE per ticket {ticket} | nuovo SL: {entry_price}")
             return True
 
-        position = mt5.positions_get(ticket=ticket)
-        if not position:
+        try:
+            pos = self._find_position(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ BE non applicato al ticket {ticket}: {e}")
+            return False
+        if pos is None:
             logger.info(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
             return False
 
-        pos = position[0]
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
             "position": pos.ticket,
             "sl": float(entry_price),
             "tp": pos.tp
         }
-        result = mt5.order_send(**request)
-        if result.retcode == mt5.TRADE_RETCODE_DONE:
+        ok, result, error = self._send("BREAKEVEN", request)
+        if ok:
             logger.info(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
             return True
 
-        logger.error(f"❌ Errore spostamento BE posizione #{pos.ticket}: {result.comment}")
+        logger.error(f"❌ Errore spostamento BE posizione #{pos.ticket}: {error}")
         return False
 
     def close_position(self, ticket: int, symbol: str = None) -> bool:
@@ -154,12 +206,15 @@ class MT5Executor:
             logger.info(f"🛠️ [TEST MODE] Simulazione chiusura posizione {ticket} ({symbol})")
             return True
 
-        position = mt5.positions_get(ticket=ticket)
-        if not position:
+        try:
+            pos = self._find_position(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Chiusura del ticket {ticket} non inviata: {e}")
+            return False
+        if pos is None:
             logger.info(f"ℹ️ Ticket {ticket} non presente su MT5: nessuna chiusura necessaria.")
             return True
 
-        pos = position[0]
         close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
 
         tick = mt5.symbol_info_tick(pos.symbol)
@@ -183,9 +238,9 @@ class MT5Executor:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
-        result = mt5.order_send(**request)
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error(f"❌ Errore chiusura posizione {pos.ticket}: {result.comment}")
+        ok, result, error = self._send("CLOSE", request)
+        if not ok:
+            logger.error(f"❌ Errore chiusura posizione {pos.ticket}: {error}")
             return False
 
         logger.info(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
@@ -209,10 +264,9 @@ class MT5Executor:
             "tp": float(tp_price)
         }
 
-        result = mt5.order_send(**request)
-
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error(f"❌ Errore modifica ordine {ticket}: {result.comment}")
+        ok, result, error = self._send("MODIFY_SL_TP", request)
+        if not ok:
+            logger.error(f"❌ Errore modifica ordine {ticket}: {error}")
             return False
 
         logger.info(f"✅ Ordine {ticket} aggiornato con successo | SL: {stop_loss} | TP: {tp_price}")
@@ -226,15 +280,17 @@ class MT5Executor:
 
         In TEST MODE non esistono posizioni reali, quindi la riconciliazione va
         saltata dal chiamante (vedi telegram_listener.py): qui ritorniamo None.
+
+        Solleva MT5UnavailableError se MT5 non risponde: ritornare None in quel
+        caso farebbe credere che la posizione sia stata chiusa.
         """
         if self.test_mode:
             return None
 
-        position = mt5.positions_get(ticket=ticket)
-        if not position:
+        pos = self._find_position(ticket)
+        if pos is None:
             return None
 
-        pos = position[0]
         return {
             "ticket": pos.ticket,
             "symbol": pos.symbol,
@@ -242,6 +298,92 @@ class MT5Executor:
             "price_open": pos.price_open,
             "stop_loss": pos.sl,
             "take_profit": pos.tp,
+        }
+
+    def can_move_sl(self, ticket: int, new_sl: float) -> bool:
+        """
+        True se MT5 accetterebbe adesso questo SL sulla posizione: dal lato
+        giusto del prezzo di chiusura e oltre la distanza minima imposta dal
+        broker (stops level). Evita di inviare modifiche destinate al rifiuto.
+        """
+        if self.test_mode or new_sl is None:
+            return False
+        pos = self._find_position(ticket)
+        if pos is None:
+            return False
+        info = mt5.symbol_info(pos.symbol)
+        tick = mt5.symbol_info_tick(pos.symbol)
+        if info is None or tick is None:
+            return False
+
+        min_distance = info.trade_stops_level * info.point
+        if pos.type == mt5.ORDER_TYPE_BUY:
+            return tick.bid - new_sl > min_distance
+        return new_sl - tick.ask > min_distance
+
+    def get_close_info(self, ticket: int) -> dict:
+        """
+        Esito finale di una posizione chiusa, letto dallo storico dei deal di MT5:
+        motivo (TP, SL, bot, manuale...), prezzo di chiusura e profitto netto
+        (profitto + commissioni + swap). Dizionario vuoto se non disponibile.
+        """
+        if self.test_mode:
+            return {}
+
+        deals = mt5.history_deals_get(position=ticket)
+        if not deals:
+            return {}
+        exits = [d for d in deals if d.entry in (mt5.DEAL_ENTRY_OUT, mt5.DEAL_ENTRY_OUT_BY)]
+        if not exits:
+            return {}
+
+        reasons = {
+            mt5.DEAL_REASON_TP: "TAKE_PROFIT",
+            mt5.DEAL_REASON_SL: "STOP_LOSS",
+            mt5.DEAL_REASON_SO: "STOP_OUT",
+            mt5.DEAL_REASON_EXPERT: "BOT",
+            mt5.DEAL_REASON_CLIENT: "MANUALE_PC",
+            mt5.DEAL_REASON_MOBILE: "MANUALE_MOBILE",
+            mt5.DEAL_REASON_WEB: "MANUALE_WEB",
+        }
+        last_exit = exits[-1]
+        return {
+            "close_reason": reasons.get(last_exit.reason, f"ALTRO_{last_exit.reason}"),
+            "close_price": last_exit.price,
+            "profit": round(sum(d.profit + d.commission + d.swap for d in deals), 2),
+        }
+
+    def check_health(self) -> tuple[bool, str]:
+        """
+        Verifica che il terminale MT5 sia raggiungibile, collegato al server del
+        broker e con l'Algo Trading attivo; se il terminale non risponde prova a
+        reinizializzare la connessione. Usato dal controllo periodico del listener.
+        """
+        info = mt5.terminal_info()
+        if info is None:
+            mt5.initialize()
+            info = mt5.terminal_info()
+        if info is None:
+            return False, f"terminale MT5 non raggiungibile {mt5.last_error()}"
+        if not info.connected:
+            return False, "terminale MT5 non collegato al server del broker"
+        if not info.trade_allowed:
+            return False, "Algo Trading disattivato nel terminale MT5: gli ordini verrebbero rifiutati"
+        return True, "MT5 operativo"
+
+    def account_snapshot(self) -> dict:
+        """Stato sintetico del conto per il battito periodico e il diario."""
+        info = mt5.account_info()
+        if info is None:
+            return {}
+        return {
+            "login": info.login,
+            "server": info.server,
+            "demo": info.trade_mode == mt5.ACCOUNT_TRADE_MODE_DEMO,
+            "balance": info.balance,
+            "equity": info.equity,
+            "margin_free": info.margin_free,
+            "open_positions": mt5.positions_total(),
         }
 
     def is_symbol_tradable(self, symbol: str, max_tick_age_seconds: int = 180) -> tuple[bool, str]:

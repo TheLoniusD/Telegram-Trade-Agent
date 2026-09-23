@@ -16,7 +16,7 @@ CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 
 # Stati definitivi: l'operazione non tornerà più a mercato, quindi esce dallo
 # stato vivo e finisce nell'archivio giornaliero.
-TERMINAL_STATUSES = ("CLOSED", "REJECTED")
+TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 
 
 class OrderManager:
@@ -139,7 +139,7 @@ class OrderManager:
                 if state is None:
                     tp_config["closed"] = True
                     corrections += 1
-                    logger.warning(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
+                    logger.info(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
                     continue
 
                 # La posizione esiste ancora: i valori del broker vincono sempre
@@ -153,7 +153,7 @@ class OrderManager:
             # Se tutti i ticket sono chiusi, lo è anche l'operazione
             if tickets and all(t.get("closed") for t in tickets.values()):
                 trade["status"] = "CLOSED"
-                logger.warning(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
+                logger.info(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
 
         if corrections:
             self.save_state_to_file()

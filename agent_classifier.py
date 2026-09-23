@@ -1,6 +1,8 @@
 import os
 import anthropic
 
+import journal
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -223,6 +225,16 @@ def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: 
         tools=[CLASSIFY_SIGNAL_TOOL],
         tool_choice={"type": "tool", "name": "classify_signal"},
         messages=[{"role": "user", "content": user_payload}],
+    )
+
+    # Token consumati: sul canale ufficiale ogni messaggio costa una chiamata,
+    # così report.py può mostrare quanto ha speso il bot in una giornata.
+    usage = response.usage
+    journal.record(
+        "CLASSIFIER_CALL", model=MODEL_ID, stop_reason=response.stop_reason, request_id=response._request_id,
+        input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
+        cache_read_input_tokens=usage.cache_read_input_tokens,
+        cache_creation_input_tokens=usage.cache_creation_input_tokens,
     )
 
     for block in response.content:
