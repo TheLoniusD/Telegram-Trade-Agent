@@ -98,16 +98,7 @@ def main():
         parser.error("indica --scenario (oppure --elenco)")
 
     install_stubs()
-    try:
-        import telegram_listener
-    except ModuleNotFoundError as e:
-        sys.exit(f"❌ Modulo mancante ({e.name}): esegui 'pip install -r requirements.txt'.")
-    except (ConnectionRefusedError, OSError) as e:
-        host = os.getenv("MT5_RPYC_HOST", "localhost")
-        porta = os.getenv("MT5_RPYC_PORT", "18812")
-        sys.exit(f"❌ Nessun mt5server.exe raggiungibile su {host}:{porta} ({e}).\n"
-                 "   Lo script va lanciato dove gira mt5server.exe (il server), oppure attraverso un tunnel SSH\n"
-                 f"   (ssh -L {porta}:localhost:{porta} utente@server).")
+    import telegram_listener
     from mt5_connection import mt5
     from order_manager import OrderManager
 
