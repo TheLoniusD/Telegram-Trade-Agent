@@ -11,6 +11,8 @@ session_test.session
 active_trades.json
 logs/
 storico/
+test_run/
+.pytest_cache/
 
 # Cache e file temporanei di Python
 __pycache__/
