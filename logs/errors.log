@@ -1,0 +1,8 @@
+2026-09-23 13:42:40 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58589662541: Invalid stops (retcode 10016)
+2026-09-23 13:42:40 | WARNING  | telegram_listener | 🔄 Ticket MT5 58589662541 ancora aperto: memoria riallineata al broker (SL 4292.0, TP 4312.0).
+2026-09-23 13:42:40 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58589662571: Invalid stops (retcode 10016)
+2026-09-23 13:42:40 | WARNING  | telegram_listener | 🔄 Ticket MT5 58589662571 ancora aperto: memoria riallineata al broker (SL 4292.0, TP 4322.0).
+2026-09-23 13:42:51 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58589662541: Invalid stops (retcode 10016)
+2026-09-23 13:42:51 | WARNING  | telegram_listener | 🔄 Ticket MT5 58589662541 ancora aperto: memoria riallineata al broker (SL 4292.0, TP 4312.0).
+2026-09-23 13:42:51 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58589662571: Invalid stops (retcode 10016)
+2026-09-23 13:42:51 | WARNING  | telegram_listener | 🔄 Ticket MT5 58589662571 ancora aperto: memoria riallineata al broker (SL 4292.0, TP 4322.0).

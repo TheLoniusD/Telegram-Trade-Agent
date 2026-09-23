@@ -13,7 +13,7 @@ logger = setup_logger(__name__)
 # False = il bot opera davvero sul conto collegato al terminale MT5.
 # Prima era gestito con un 'return' anticipato dentro ogni metodo: bastava
 # dimenticarne uno per ritrovarsi a metà tra simulazione e operatività reale.
-TEST_MODE = True
+TEST_MODE = False
 
 # Codice di esito "nessun errore" restituito da mt5.last_error()
 MT5_RESULT_OK = 1
