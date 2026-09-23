@@ -16,7 +16,7 @@ CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 
 # Stati definitivi: l'operazione non tornerà più a mercato, quindi esce dallo
 # stato vivo e finisce nell'archivio giornaliero.
-TERMINAL_STATUSES = ("CLOSED", "REJECTED")
+TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 
 
 class OrderManager:

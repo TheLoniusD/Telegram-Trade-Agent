@@ -89,7 +89,7 @@ async def process_message(event, is_edit: bool):
                 if validated_orders.get("approved"):
                     orders_dict = validated_orders.get("orders", {})
         
-                    all_success = True
+                    opened_count = 0
                     for target_key, order_config in orders_dict.items():
                         # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
                         exec_result = mt5_agent.execute_open(order_config)
@@ -108,12 +108,26 @@ async def process_message(event, is_edit: bool):
                             if fill_price:
                                 ticket_data["entry_price"] = fill_price
 
-                        if not exec_result.get("success"):
-                            all_success = False
+                            # Lo SL inviato a MT5 (anche quello temporaneo della fase
+                            # rapida) va in memoria: altrimenti resta None e un update
+                            # successivo con soli TP invierebbe sl=0, togliendolo.
+                            if exec_result.get("success"):
+                                ticket_data["stop_loss"] = order_config.get("stop_loss")
+                                trade_data["stop_loss"] = order_config.get("stop_loss")
+
+                        if exec_result.get("success"):
+                            opened_count += 1
+                        else:
                             logger.warning(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
 
-                    # Aggiorniamo lo status in base all'esito complessivo
-                    trade_data["status"] = "ACTIVE" if all_success else "PENDING_FAILED"
+                    # Se anche un solo ticket è a mercato l'operazione resta ACTIVE,
+                    # così update e chiusure continuano a gestirlo (i ticket non
+                    # aperti hanno mt5_ticket a None e vengono saltati). Con uno
+                    # stato diverso il CLOSE la ignorerebbe, lasciando la posizione
+                    # aperta su MT5 senza più controllo.
+                    trade_data["status"] = "ACTIVE" if opened_count > 0 else "OPEN_FAILED"
+                    if 0 < opened_count < len(orders_dict):
+                        logger.warning(f"⚠️ Apertura PARZIALE: {opened_count}/{len(orders_dict)} ticket a mercato, l'operazione resta gestita.")
 
                     # Persistiamo SUBITO: fino a questo punto il file su disco
                     # contiene ancora mt5_ticket a null. Se il bot si riavviasse

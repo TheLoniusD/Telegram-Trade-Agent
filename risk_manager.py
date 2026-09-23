@@ -1,7 +1,12 @@
+import math
+
 import MetaTrader5 as mt5
 
 
 DEFAULT_SL_DIST_GOLD = 5.0
+
+# Quota massima del margine libero impegnabile da un singolo segnale (2 ticket)
+MARGIN_USAGE_LIMIT = 0.5
 
 class RiskManager:
     """
@@ -30,11 +35,20 @@ class RiskManager:
         self.max_open_trades = max_open_trades
 
     def validate_and_build_order(self, trade_data: dict) -> dict:
-        symbol = trade_data.get("symbol", "XAUUSD")
-        direction = trade_data.get("direction")
-        stop_loss = trade_data.get("stop_loss")
+        # L'Order Manager salva simbolo, direzione, SL e TP dentro 'tickets'
+        # (uno per ogni target), non alla radice del trade: leggerli dalla radice
+        # dava sempre None, quindi ogni BUY veniva aperto come SELL, sempre con
+        # SL temporaneo e senza TP.
+        tickets = trade_data.get("tickets", {})
+        first_ticket = tickets.get("tp1", {})
+
+        symbol = first_ticket.get("symbol") or "XAUUSD"
+        direction = first_ticket.get("direction")
+        stop_loss = first_ticket.get("stop_loss")
         entry_min = trade_data.get("entry_min")
-        entry_max = trade_data.get("entry_max")
+
+        if direction not in ("BUY", "SELL"):
+            return {"approved": False, "reason": f"Direzione non valida: {direction}"}
 
         # 1. Calcolo Prezzo d'Ingresso Stimato
         symbol_info = mt5.symbol_info(symbol)
@@ -44,59 +58,59 @@ class RiskManager:
         current_price = symbol_info.ask if direction == "BUY" else symbol_info.bid
         entry_price = entry_min if entry_min is not None else current_price
 
-        # 1. Gestione Stop Loss Mancante (Segnale Rapido)
-        is_temp_sl = False
+        # 2. Gestione Stop Loss Mancante (Segnale Rapido)
         if not stop_loss:
-            is_temp_sl = True
             # Calcolo di uno SL temporaneo per entrare subito a mercato in sicurezza
             if direction == "BUY":
                 stop_loss = entry_price - DEFAULT_SL_DIST_GOLD
             else:
                 stop_loss = entry_price + DEFAULT_SL_DIST_GOLD
 
-        # 3. Calcolo Lottaggio basato su % di Rischio
+        # 3. Calcolo Lottaggio basato su % di Rischio, limitato dal margine libero
         total_calculated_lots = self._calculate_lot_size(symbol, entry_price, stop_loss)
+        total_calculated_lots = min(total_calculated_lots, self._max_lots_by_margin(symbol, direction, current_price))
 
-        # SDOPPIAMENTO LOTTAGGIO: Dividiamo a metà, garantendo almeno il lotto minimo (es. 0.01)
-        single_ticket_lots = max(0.01, round(total_calculated_lots / 2, 2))
+        # SDOPPIAMENTO LOTTAGGIO: dividiamo a metà arrotondando PER DIFETTO allo
+        # step del broker. Arrotondare per eccesso (o forzare il minimo) può
+        # superare il margine disponibile: il primo ordine passa e il secondo
+        # viene rifiutato con "No money".
+        step_lot = symbol_info.volume_step or 0.01
+        single_ticket_lots = round(math.floor(total_calculated_lots / 2 / step_lot) * step_lot, 2)
+        if single_ticket_lots < symbol_info.volume_min:
+            return {"approved": False, "reason": f"Margine insufficiente per aprire 2 posizioni da almeno {symbol_info.volume_min} lotti"}
 
-        # 4. Gestione Multi-Ticket (TP1 e TP2 inizialmente vuoti/None in attesa di update o definiti se presenti)
-        raw_tps = trade_data.get("take_profit")
-        tp1, tp2 = None, None
-        
-        if raw_tps and isinstance(raw_tps, list):
-            tp1 = raw_tps[0]
-            tp2 = raw_tps[-1] if len(raw_tps) > 1 else raw_tps[0]
-        else:
-            # Nessun TP specificato in fase di apertura: li lasciamo None per gestirli via update successivi
-            tp1 = None
-            tp2 = None
-
-        # 5. Creazione della lista dei due ordini separati
-        orders_to_execute = {
-            "tp1": {
+        # 4. Gestione Multi-Ticket: ogni ticket usa il TP salvato per il suo target
+        # (None in fase rapida, in attesa degli update successivi)
+        orders_to_execute = {}
+        for key in ("tp1", "tp2"):
+            orders_to_execute[key] = {
                 "symbol": symbol,
                 "direction": direction,
                 "entry_price": entry_price,
                 "stop_loss": stop_loss,
-                "take_profit": tp1,
-                "volume": single_ticket_lots
-            },
-            "tp2": {
-                "symbol": symbol,
-                "direction": direction,
-                "entry_price": entry_price,
-                "stop_loss": stop_loss,
-                "take_profit": tp2,
-                "volume": single_ticket_lots
+                "take_profit": tickets.get(key, {}).get("take_profit"),
+                "volume": single_ticket_lots,
+                "ticket_id": trade_data.get("ticket_id"),
             }
-        }
 
         return {
             "approved": True,
-            "orders": orders_to_execute 
+            "orders": orders_to_execute
         }
-    
+
+    def _max_lots_by_margin(self, symbol: str, direction: str, price: float) -> float:
+        """
+        Lotti totali apribili con il margine libero del conto, lasciando un
+        cuscinetto (MARGIN_USAGE_LIMIT) per non avvicinarsi allo stop-out.
+        Se MT5 non fornisce i dati ritorna infinito: decide solo il rischio.
+        """
+        account_info = mt5.account_info()
+        order_type = mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL
+        margin_per_lot = mt5.order_calc_margin(order_type, symbol, 1.0, price)
+        if not account_info or not margin_per_lot:
+            return float("inf")
+        return (account_info.margin_free * MARGIN_USAGE_LIMIT) / margin_per_lot
+
 
     def _calculate_lot_size(self, symbol: str, entry_price: float, stop_loss: float) -> float:
         """
