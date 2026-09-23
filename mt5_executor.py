@@ -93,7 +93,7 @@ class MT5Executor:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
-        result = mt5.order_send(request)
+        result = mt5.order_send(**request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             logger.error(f"❌ Errore apertura ordine MT5: {result.comment}")
             return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": result.comment}
@@ -134,7 +134,7 @@ class MT5Executor:
             "sl": float(entry_price),
             "tp": pos.tp
         }
-        result = mt5.order_send(request)
+        result = mt5.order_send(**request)
         if result.retcode == mt5.TRADE_RETCODE_DONE:
             logger.info(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
             return True
@@ -183,7 +183,7 @@ class MT5Executor:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
-        result = mt5.order_send(request)
+        result = mt5.order_send(**request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             logger.error(f"❌ Errore chiusura posizione {pos.ticket}: {result.comment}")
             return False
@@ -209,7 +209,7 @@ class MT5Executor:
             "tp": float(tp_price)
         }
 
-        result = mt5.order_send(request)
+        result = mt5.order_send(**request)
 
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             logger.error(f"❌ Errore modifica ordine {ticket}: {result.comment}")
