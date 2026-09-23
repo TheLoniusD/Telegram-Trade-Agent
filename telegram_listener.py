@@ -56,6 +56,11 @@ HEARTBEAT_INTERVAL_SECONDS = 3600
 # di un follower venga scambiato per un comando.
 IGNORE_FORWARDED_MESSAGES = True
 
+# Margine del BE in $ oltre il prezzo di ingresso: lo SL va a ingresso + BE_OFFSET
+# per un BUY e a ingresso - BE_OFFSET per un SELL, così un ritorno al prezzo di
+# ingresso chiude con un piccolo guadagno invece che a zero. 0 = BE esatto.
+BE_OFFSET = float(os.getenv("BE_OFFSET", "0"))
+
 # Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
 # cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
 # di ripetere azioni già eseguite.
@@ -77,6 +82,76 @@ def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
     if direction == "SELL":
         return stop_loss > take_profit
     return True
+
+
+def breakeven_price(tp_config: dict):
+    """Prezzo dello SL di breakeven per un ticket, con l'eventuale margine BE_OFFSET."""
+    entry = tp_config.get("entry_price")
+    if entry is None:
+        return None
+    offset = BE_OFFSET if tp_config.get("direction") == "BUY" else -BE_OFFSET
+    return round(entry + offset, 2)
+
+
+def mark_closed_if_complete(trade: dict) -> None:
+    """Un'operazione è chiusa quando lo sono tutti i suoi ticket aperti su MT5."""
+    opened = [t for t in trade.get("tickets", {}).values() if t.get("mt5_ticket")]
+    if opened and all(t.get("closed") for t in opened):
+        trade["status"] = "CLOSED"
+
+
+def execute_partial_close(trades: list, percentage: float) -> None:
+    """
+    "Close half" e simili: chiude circa la percentuale indicata del volume ancora
+    aperto sull'intera famiglia (originale + re-entry). Chiude per primi i ticket
+    con il TP più vicino all'ingresso, quelli che incasserebbero comunque per
+    primi, e lascia correre quelli con il TP più lontano; se serve, l'ultimo
+    ticket viene chiuso solo in parte.
+    """
+    open_tickets = [(trade, t) for trade in trades for t in trade.get("tickets", {}).values()
+                    if t.get("mt5_ticket") and not t.get("closed")]
+    if not open_tickets:
+        logger.info("ℹ️ Chiusura parziale richiesta ma nessuna posizione aperta.")
+        return
+
+    def tp_distance(item):
+        tp, entry = item[1].get("take_profit"), item[1].get("entry_price")
+        return abs(tp - entry) if tp is not None and entry is not None else float("inf")
+
+    open_tickets.sort(key=tp_distance)
+    open_volume = sum(t.get("volume") or 0 for _, t in open_tickets)
+    to_close = open_volume * percentage / 100
+    logger.info(f"✂️ Chiusura parziale {percentage:g}%: {to_close:.3f} lotti su {open_volume:.2f} aperti "
+                f"(arrotondati per difetto allo step del broker).")
+    journal.record("PARTIAL_CLOSE_PLAN", percentage=percentage, open_volume=round(open_volume, 2),
+                   target_volume=round(to_close, 3))
+
+    for trade, tp_config in open_tickets:
+        if to_close < 1e-9:
+            break
+        mt5_ticket = tp_config["mt5_ticket"]
+        volume = tp_config.get("volume") or 0
+
+        if volume <= to_close + 1e-9:
+            if mt5_agent.close_position(ticket=mt5_ticket, symbol=tp_config.get("symbol")):
+                tp_config["closed"] = True
+                to_close -= volume
+                record_position_closed(mt5_ticket, closed_by="CHIUSURA_PARZIALE", trade=trade)
+            continue
+
+        closed_volume = mt5_agent.partial_close_position(mt5_ticket, to_close)
+        if closed_volume:
+            tp_config["volume"] = round(volume - closed_volume, 2)
+            if tp_config["volume"] <= 0:
+                tp_config["closed"] = True
+                record_position_closed(mt5_ticket, closed_by="CHIUSURA_PARZIALE", trade=trade)
+            else:
+                journal.record("POSITION_PARTIAL_CLOSED", mt5_ticket=mt5_ticket, closed_volume=closed_volume,
+                               remaining_volume=tp_config["volume"], ticket_id=trade.get("ticket_id"))
+        break
+
+    for trade in trades:
+        mark_closed_if_complete(trade)
 
 
 def trade_summary(trade: dict) -> dict:
@@ -293,14 +368,21 @@ def handle_message(event, is_edit: bool):
             be_candidates = manager_result.get("be_candidates", [])
             sl_tp_changed = manager_result.get("sl_tp_changed", False)
 
+            # 2.0 Chiusura parziale ("close half"), PRIMA del BE: il BE va poi
+            # applicato solo a ciò che resta aperto.
+            if manager_result.get("close_percentage"):
+                execute_partial_close(trades, manager_result["close_percentage"])
+
             # 2a. Breakeven, ticket per ticket. MT5 stesso verifica se la posizione
             # esiste ancora: se il TP è già scattato, il broker l'ha già chiusa e
             # set_sl_to_be non applica nulla (ritorna False).
             for candidate in be_candidates:
                 parent_trade = candidate["trade"]
                 tp_config = candidate["ticket"]
+                if tp_config.get("closed"):
+                    continue
                 real_mt5_ticket = tp_config.get("mt5_ticket")
-                entry_price = tp_config.get("entry_price")
+                entry_price = breakeven_price(tp_config)
 
                 be_applied = mt5_agent.set_sl_to_be(ticket=real_mt5_ticket, entry_price=entry_price)
                 if be_applied:
@@ -416,7 +498,7 @@ def retry_pending_breakeven() -> None:
             if not tp_config.get("be_pending") or tp_config.get("closed") or tp_config.get("be_active"):
                 continue
             mt5_ticket = tp_config.get("mt5_ticket")
-            entry_price = tp_config.get("entry_price")
+            entry_price = breakeven_price(tp_config)
             if not mt5_agent.can_move_sl(mt5_ticket, entry_price):
                 continue
 

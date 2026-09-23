@@ -89,6 +89,11 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
        "Exit if X breaks" -> intent: 'UPDATE_SIGNAL', is_actionable: true; estrai il prezzo in `stop_loss`.
      - Chiusura parziale + protezione in stile libero: "Running 90pips, lets close half now and BE your entry"
        -> intent: 'UPDATE_SIGNAL', is_actionable: true; estrai close_percentage e/o move_sl_to_be.
+       Esempi reali dal canale: "Lets close half now" -> close_percentage: 50.0, move_sl_to_be: false;
+       "Running 65 pips, close half set your BE" -> close_percentage: 50.0, move_sl_to_be: true.
+       "half" = 50.0, "close 30%" = 30.0. Il bot chiude davvero quella quota delle posizioni aperte: imposta
+       close_percentage SOLO per un comando diretto di chiusura ("close half", "take partial", "close 50%"),
+       mai per l'invito ai follower "Collect all or half" (vedi punto b).
      - Comandi di protezione generici su trade aperto: "BE+", "BE", "B/E", "break even", "set BE",
        "move SL to entry", "protect", "zero risk", "Try hold a few layer with BE".
      - Chiusura di uno specifico layer: "close lowest layer" -> layer_target: "LOWEST".

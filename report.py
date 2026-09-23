@@ -76,10 +76,10 @@ def describe(event: dict) -> str:
     if kind == "MT5_ORDER":
         req = e.get("request") or {}
         parts = [f"MT5 {e.get('operation')} #{req.get('position') or e.get('order') or ''}"]
-        if e.get("operation") in ("OPEN", "CLOSE"):
+        if e.get("operation") in ("OPEN", "CLOSE", "CLOSE_PARTIAL"):
             parts.append(f"vol {e.get('volume') or req.get('volume')}")
             parts.append(f"prezzo {e.get('price') or req.get('price')}")
-        if e.get("operation") != "CLOSE":
+        if e.get("operation") not in ("CLOSE", "CLOSE_PARTIAL"):
             parts.append(f"SL {req.get('sl')} TP {req.get('tp')}")
         if e.get("ok"):
             return "✅ " + " | ".join(parts)
@@ -91,6 +91,10 @@ def describe(event: dict) -> str:
         return f"📋 operazione {e.get('ticket_id')} → {e.get('status')} | {tickets}"
     if kind == "LEVELS_INCOHERENT":
         return f"⚠️ livelli incoerenti con {e.get('direction')} #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')} (non inviati)"
+    if kind == "PARTIAL_CLOSE_PLAN":
+        return f"✂️ chiusura parziale {e.get('percentage')}%: {e.get('target_volume')} lotti su {e.get('open_volume')} aperti"
+    if kind == "POSITION_PARTIAL_CLOSED":
+        return f"✂️ #{e.get('mt5_ticket')}: chiusi {e.get('closed_volume')} lotti, restano {e.get('remaining_volume')}"
     if kind == "BE_PENDING":
         return f"⏳ BE di #{e.get('mt5_ticket')} in attesa (prezzo ancora troppo vicino all'ingresso {e.get('entry_price')})"
     if kind == "BE_PENDING_APPLIED":

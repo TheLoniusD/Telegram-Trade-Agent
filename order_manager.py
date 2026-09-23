@@ -340,6 +340,10 @@ class OrderManager:
 
             update_details = data.get("update_details", {})
             move_to_be = update_details.get("move_sl_to_be", False)
+            # Chiusura parziale ("close half" = 50): la esegue il listener su MT5,
+            # scegliendo quali ticket chiudere in base ai volumi reali.
+            close_percentage = update_details.get("close_percentage")
+            partial_close = close_percentage is not None and 0 < close_percentage < 100
             layer_target = update_details.get("layer_target")
 
             # 1. Identificazione del Trade Bersaglio: 'reply_to' punta sempre al
@@ -416,7 +420,7 @@ class OrderManager:
                 if modified:
                     updated_trades.append(trade)
 
-            if updated_trades or be_candidates:
+            if updated_trades or be_candidates or partial_close:
                 self.save_state_to_file()
                 logger.info(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
                 return {
@@ -424,6 +428,7 @@ class OrderManager:
                     "trades": trades_to_update,
                     "be_candidates": be_candidates,
                     "sl_tp_changed": bool(new_sl is not None or (new_tp_list and isinstance(new_tp_list, list))),
+                    "close_percentage": close_percentage if partial_close else None,
                 }
 
             return {"action": "IGNORE", "reason": "Nessuna modifica applicabile (nessun trade idoneo)."}

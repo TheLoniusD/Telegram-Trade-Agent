@@ -1,3 +1,4 @@
+import math
 import time
 from typing import Optional
 
@@ -243,6 +244,64 @@ class MT5Executor:
 
         logger.info(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
         return True
+
+    def partial_close_position(self, ticket: int, volume: float) -> Optional[float]:
+        """
+        Chiude a mercato solo una parte di una posizione. Il volume viene
+        arrotondato PER DIFETTO allo step del broker; se il risultato è sotto il
+        lotto minimo non si chiude nulla, se il residuo resterebbe sotto il
+        minimo si chiude tutta la posizione. Ritorna il volume chiuso, o None
+        se la chiusura non è avvenuta.
+        """
+        if self.test_mode:
+            logger.info(f"🛠️ [TEST MODE] Simulazione chiusura parziale di {volume} lotti del ticket {ticket}")
+            return volume
+
+        try:
+            pos = self._find_position(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Chiusura parziale del ticket {ticket} non inviata: {e}")
+            return None
+        if pos is None:
+            logger.info(f"ℹ️ Ticket {ticket} non presente su MT5: chiusura parziale non necessaria.")
+            return None
+
+        info = mt5.symbol_info(pos.symbol)
+        tick = mt5.symbol_info_tick(pos.symbol)
+        if info is None or tick is None:
+            logger.error(f"❌ Dati di {pos.symbol} non disponibili: chiusura parziale di {pos.ticket} non inviata.")
+            return None
+
+        step = info.volume_step or 0.01
+        volume = round(math.floor(volume / step + 1e-9) * step, 2)
+        if volume < info.volume_min:
+            logger.warning(f"⚠️ Chiusura parziale di {pos.ticket} non eseguita: {volume} lotti è sotto il minimo del broker ({info.volume_min}).")
+            return None
+        if pos.volume - volume < info.volume_min - 1e-9:
+            volume = pos.volume
+
+        close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "position": pos.ticket,
+            "symbol": pos.symbol,
+            "volume": volume,
+            "type": close_type,
+            "price": tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask,
+            "deviation": 20,
+            "magic": 990011,
+            "comment": "Partial close by Bot",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+
+        ok, result, error = self._send("CLOSE_PARTIAL", request)
+        if not ok:
+            logger.error(f"❌ Errore chiusura parziale posizione {pos.ticket}: {error}")
+            return None
+
+        logger.info(f"✂️ Chiusi {volume} lotti su {pos.volume} della posizione {pos.ticket}.")
+        return volume
 
     def modify_order_levels(self, ticket: int, stop_loss: float, take_profit: list) -> bool:
         """
