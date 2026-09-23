@@ -76,6 +76,13 @@ OPERATIVE_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
+# Il trader tende a ripetere lo stesso comando a distanza di pochi minuti
+# (23/09: "Lets close half now" alle 13:40, "Running 65 pips, close half set
+# your BE" alle 13:42). Una seconda chiusura parziale sulla stessa operazione
+# entro questa finestra è considerata la stessa istruzione: non si chiude altro
+# volume (il BE richiesto nel messaggio viene comunque applicato).
+PARTIAL_CLOSE_REPEAT_WINDOW_SECONDS = 15 * 60
+
 # Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
 # cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
 # di ripetere azioni già eseguite.
@@ -123,11 +130,22 @@ def execute_partial_close(trades: list, percentage: float) -> None:
     primi, e lascia correre quelli con il TP più lontano; se serve, l'ultimo
     ticket viene chiuso solo in parte.
     """
+    now = time.time()
+    last_partial = max((t.get("partial_close_at") or 0 for t in trades), default=0)
+    if now - last_partial < PARTIAL_CLOSE_REPEAT_WINDOW_SECONDS:
+        minutes = int((now - last_partial) / 60)
+        logger.info(f"ℹ️ Chiusura parziale già eseguita {minutes} minuti fa su questa operazione: "
+                    f"considerata una ripetizione dello stesso comando, nessun altro volume chiuso.")
+        journal.record("PARTIAL_CLOSE_REPEATED", minutes_since_last=minutes, percentage=percentage)
+        return
+
     open_tickets = [(trade, t) for trade in trades for t in trade.get("tickets", {}).values()
                     if t.get("mt5_ticket") and not t.get("closed")]
     if not open_tickets:
         logger.info("ℹ️ Chiusura parziale richiesta ma nessuna posizione aperta.")
         return
+    for trade in trades:
+        trade["partial_close_at"] = now
 
     def tp_distance(item):
         tp, entry = item[1].get("take_profit"), item[1].get("entry_price")
