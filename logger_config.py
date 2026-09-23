@@ -6,15 +6,18 @@ persistenti per ricostruire cosa è successo, soprattutto in caso di errore.
 
 Scrive contemporaneamente su:
   - console (come prima, per seguire il bot durante i test)
-  - logs/bot.log: tutto, ruotato a mezzanotte e conservato per N giorni
-  - logs/errors.log: solo avvisi ed errori, per trovare subito cosa è andato storto
-
-Il diario strutturato delle operazioni (logs/journal_*.jsonl) è in journal.py.
+  - una cartella per giorno, logs/AAAA-MM-GG/, con dentro:
+      bot.log        tutto
+      errors.log     solo avvisi ed errori, per trovare subito cosa è andato storto
+      journal.jsonl  il diario strutturato delle operazioni (vedi journal.py)
+    Le cartelle più vecchie di LOG_RETENTION_DAYS giorni vengono cancellate.
 """
 
 import logging
 import os
-from logging.handlers import TimedRotatingFileHandler
+import re
+import shutil
+from datetime import datetime, timedelta
 
 LOG_DIR = "logs"
 LOG_FILE = "bot.log"
@@ -22,24 +25,65 @@ ERROR_LOG_FILE = "errors.log"
 LOG_RETENTION_DAYS = 30
 
 # Logger padre condiviso: i moduli ne ottengono un figlio (trade_bot.<modulo>)
-# che propaga qui. Gli handler su file esistono così una volta sola: con un
-# handler per modulo sullo stesso file, su Windows la rotazione di mezzanotte
-# fallisce perché il file è ancora aperto dagli altri handler.
+# che propaga qui. Gli handler su file esistono così una volta sola.
 ROOT_LOGGER_NAME = "trade_bot"
 
+_DAY_FOLDER = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-def _rotating_file_handler(filename: str, level: int, formatter: logging.Formatter) -> logging.Handler:
-    handler = TimedRotatingFileHandler(
-        filename=os.path.join(LOG_DIR, filename),
-        when="midnight",
-        backupCount=LOG_RETENTION_DAYS,
-        encoding="utf-8",
-    )
-    # I file ruotati diventano bot.log.2026-09-14
-    handler.suffix = "%Y-%m-%d"
-    handler.setLevel(level)
-    handler.setFormatter(formatter)
-    return handler
+
+def day_folder(day: str) -> str:
+    """Cartella dei log di un giorno (AAAA-MM-GG), creata se non esiste."""
+    folder = os.path.join(LOG_DIR, day)
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def remove_old_log_folders() -> None:
+    """Cancella le cartelle giornaliere più vecchie di LOG_RETENTION_DAYS."""
+    if not os.path.isdir(LOG_DIR):
+        return
+    limit = (datetime.now() - timedelta(days=LOG_RETENTION_DAYS)).strftime("%Y-%m-%d")
+    for name in os.listdir(LOG_DIR):
+        if _DAY_FOLDER.match(name) and name < limit:
+            shutil.rmtree(os.path.join(LOG_DIR, name), ignore_errors=True)
+
+
+class DailyFolderFileHandler(logging.Handler):
+    """
+    Scrive in logs/<giorno>/<filename> e passa alla cartella del giorno nuovo
+    alla prima riga dopo mezzanotte (ora locale). Non rinomina mai file, quindi
+    funziona anche su Windows, dove rinominare un file aperto fallisce.
+    """
+
+    def __init__(self, filename: str, level: int, formatter: logging.Formatter):
+        super().__init__(level)
+        self.filename = filename
+        self.setFormatter(formatter)
+        self._day = None
+        self._stream = None
+
+    def _open_day(self, day: str) -> None:
+        if self._stream:
+            self._stream.close()
+        self._stream = open(os.path.join(day_folder(day), self.filename), "a", encoding="utf-8")
+        self._day = day
+        remove_old_log_folders()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            day = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d")
+            if day != self._day:
+                self._open_day(day)
+            self._stream.write(self.format(record) + "\n")
+            self._stream.flush()
+        except Exception:
+            self.handleError(record)
+
+    def close(self) -> None:
+        if self._stream:
+            self._stream.close()
+            self._stream = None
+        super().close()
 
 
 def _configure_root_logger() -> logging.Logger:
@@ -62,9 +106,8 @@ def _configure_root_logger() -> logging.Logger:
     console_handler.setFormatter(formatter)
     root.addHandler(console_handler)
 
-    os.makedirs(LOG_DIR, exist_ok=True)
-    root.addHandler(_rotating_file_handler(LOG_FILE, logging.INFO, formatter))
-    root.addHandler(_rotating_file_handler(ERROR_LOG_FILE, logging.WARNING, formatter))
+    root.addHandler(DailyFolderFileHandler(LOG_FILE, logging.INFO, formatter))
+    root.addHandler(DailyFolderFileHandler(ERROR_LOG_FILE, logging.WARNING, formatter))
 
     return root
 
