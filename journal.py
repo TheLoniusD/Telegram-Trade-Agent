@@ -1,5 +1,5 @@
 """
-Diario strutturato delle operazioni: logs/journal_AAAA-MM-GG.jsonl
+Diario strutturato delle operazioni: logs/AAAA-MM-GG/journal.jsonl
 
 Mentre bot.log è pensato per essere letto a occhio, il diario registra ogni
 evento rilevante come una riga JSON (un evento per riga, in append), così lo
@@ -40,7 +40,7 @@ import json
 import os
 from datetime import datetime
 
-from logger_config import LOG_DIR, setup_logger
+from logger_config import day_folder, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -59,7 +59,8 @@ def clear_current_message(token):
 
 
 def journal_path(day: str) -> str:
-    return os.path.join(LOG_DIR, f"journal_{day}.jsonl")
+    """Diario del giorno, nella stessa cartella di bot.log ed errors.log."""
+    return os.path.join(day_folder(day), "journal.jsonl")
 
 
 def record(event: str, **fields) -> None:
@@ -76,7 +77,6 @@ def record(event: str, **fields) -> None:
     entry.update(fields)
 
     try:
-        os.makedirs(LOG_DIR, exist_ok=True)
         with open(journal_path(now.strftime("%Y-%m-%d")), "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
     except Exception:

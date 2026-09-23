@@ -1,5 +1,5 @@
 """
-Riassunto leggibile del diario di una giornata (logs/journal_AAAA-MM-GG.jsonl).
+Riassunto leggibile del diario di una giornata (logs/AAAA-MM-GG/journal.jsonl).
 
 Pensato per quando il bot ha girato da solo: in pochi secondi mostra cosa è
 arrivato dal canale, cosa ha deciso il bot, cosa è successo su MT5, come si

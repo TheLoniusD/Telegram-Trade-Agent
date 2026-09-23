@@ -126,9 +126,11 @@ def execute_partial_close(trades: list, percentage: float) -> None:
     """
     "Close half" e simili: chiude circa la percentuale indicata del volume ancora
     aperto sull'intera famiglia (originale + re-entry). Chiude per primi i ticket
-    con il TP più vicino all'ingresso, quelli che incasserebbero comunque per
-    primi, e lascia correre quelli con il TP più lontano; se serve, l'ultimo
-    ticket viene chiuso solo in parte.
+    con il TP più LONTANO, che raramente viene raggiunto, e tiene aperti quelli
+    col TP più vicino, che hanno più probabilità di incassare; se serve, l'ultimo
+    ticket viene chiuso solo in parte. Il 23/09 alle 13:40 questa scelta avrebbe
+    reso circa +390 contro circa +15 chiudendo il ticket col TP vicino, che poi è
+    stato raggiunto (+381), mentre l'altro è tornato al BE.
     """
     now = time.time()
     last_partial = max((t.get("partial_close_at") or 0 for t in trades), default=0)
@@ -151,7 +153,9 @@ def execute_partial_close(trades: list, percentage: float) -> None:
         tp, entry = item[1].get("take_profit"), item[1].get("entry_price")
         return abs(tp - entry) if tp is not None and entry is not None else float("inf")
 
-    open_tickets.sort(key=tp_distance)
+    # Senza TP (fase rapida non ancora completata) la distanza è infinita:
+    # quei ticket vengono chiusi per primi, come i più lontani.
+    open_tickets.sort(key=tp_distance, reverse=True)
     open_volume = sum(t.get("volume") or 0 for _, t in open_tickets)
     to_close = open_volume * percentage / 100
     logger.info(f"✂️ Chiusura parziale {percentage:g}%: {to_close:.3f} lotti su {open_volume:.2f} aperti "
