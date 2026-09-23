@@ -36,6 +36,41 @@ OWNER_ID = 462122085
 # Simbolo su cui verifichiamo l'apertura del mercato prima di classificare
 TRADED_SYMBOL = "XAUUSD"
 
+def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
+    """
+    SL e TP devono stare ai lati opposti coerenti con la direzione: per un BUY
+    SL sotto e TP sopra, per un SELL il contrario. Intercetta un messaggio con
+    i livelli dell'operazione opposta (es. edit "GOLD BUY" su una posizione SELL),
+    che MT5 rifiuterebbe comunque con "Invalid stops".
+    """
+    if stop_loss is None or take_profit is None:
+        return True
+    if direction == "BUY":
+        return stop_loss < take_profit
+    if direction == "SELL":
+        return stop_loss > take_profit
+    return True
+
+
+def sync_ticket_with_broker(tp_config: dict, mt5_ticket: int) -> None:
+    """
+    Riallinea un ticket in memoria allo stato reale su MT5, dopo un'operazione
+    rifiutata: se la posizione non esiste più viene segnata chiusa, altrimenti
+    SL/TP in memoria tornano ai valori effettivamente attivi sul broker.
+    """
+    state = mt5_agent.get_open_position(mt5_ticket)
+    if state is None:
+        tp_config["closed"] = True
+        logger.info(f"ℹ️ Ticket MT5 {mt5_ticket} non più aperto (TP/SL già raggiunto): segnato come chiuso.")
+        return
+
+    # MT5 usa 0.0 per "nessun livello"
+    tp_config["stop_loss"] = state["stop_loss"] or None
+    tp_config["take_profit"] = state["take_profit"] or None
+    logger.warning(f"🔄 Ticket MT5 {mt5_ticket} ancora aperto: memoria riallineata al broker "
+                   f"(SL {tp_config['stop_loss']}, TP {tp_config['take_profit']}).")
+
+
 async def process_message(event, is_edit: bool):
 
     sender_id = event.sender_id
@@ -164,27 +199,44 @@ async def process_message(event, is_edit: bool):
                         parent_trade["stop_loss"] = entry_price
                         logger.info(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
                     else:
-                        # Non più aperto su MT5: il TP era già scattato prima del BE.
-                        tp_config["closed"] = True
-                        logger.info(f"ℹ️ Ticket MT5 {real_mt5_ticket} non più aperto (TP già raggiunto), BE non applicabile.")
+                        # BE non applicato: o la posizione non esiste più (TP già
+                        # scattato) o il broker ha rifiutato il nuovo SL (es. prezzo
+                        # non ancora in profitto). Solo MT5 sa quale dei due: segnare
+                        # 'closed' a priori renderebbe una posizione aperta invisibile
+                        # alla chiusura successiva.
+                        sync_ticket_with_broker(tp_config, real_mt5_ticket)
 
                 # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
                 # solo se il messaggio conteneva davvero nuovi valori.
                 if sl_tp_changed:
                     for trade in trades:
+                        # Letto una volta sola: in caso di rifiuto lo SL radice viene
+                        # riallineato al broker e non deve contaminare il ticket successivo.
+                        new_sl = trade.get("stop_loss")
                         for tp_key, tp_config in trade.get("tickets", {}).items():
                             real_mt5_ticket = tp_config.get("mt5_ticket")
                             if not real_mt5_ticket or tp_config.get("closed"):
                                 continue
 
-                            new_sl = trade.get("stop_loss")
                             new_tp = tp_config.get("take_profit")
 
-                            mt5_agent.modify_order_levels(
+                            if not levels_match_direction(tp_config.get("direction"), new_sl, new_tp):
+                                logger.warning(f"⚠️ Livelli incoerenti con la posizione {tp_config.get('direction')} #{real_mt5_ticket} "
+                                               f"(SL {new_sl}, TP {new_tp}): modifica NON inviata a MT5.")
+                                sync_ticket_with_broker(tp_config, real_mt5_ticket)
+                                trade["stop_loss"] = tp_config.get("stop_loss")
+                                continue
+
+                            modified = mt5_agent.modify_order_levels(
                                 ticket=real_mt5_ticket,
                                 stop_loss=new_sl,
                                 take_profit=[new_tp] if new_tp is not None else []
                             )
+                            if not modified:
+                                # MT5 ha rifiutato: la memoria deve tornare ai valori
+                                # realmente attivi sul broker, non a quelli del messaggio.
+                                sync_ticket_with_broker(tp_config, real_mt5_ticket)
+                                trade["stop_loss"] = tp_config.get("stop_loss")
 
                 manager.save_state_to_file()
 
