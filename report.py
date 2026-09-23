@@ -93,6 +93,8 @@ def describe(event: dict) -> str:
         return f"⚠️ livelli incoerenti con {e.get('direction')} #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')} (non inviati)"
     if kind == "PARTIAL_CLOSE_PLAN":
         return f"✂️ chiusura parziale {e.get('percentage')}%: {e.get('target_volume')} lotti su {e.get('open_volume')} aperti"
+    if kind == "PARTIAL_CLOSE_REPEATED":
+        return f"✂️ chiusura parziale ripetuta dopo {e.get('minutes_since_last')} min: stesso comando, nessun altro volume chiuso"
     if kind == "POSITION_PARTIAL_CLOSED":
         return f"✂️ #{e.get('mt5_ticket')}: chiusi {e.get('closed_volume')} lotti, restano {e.get('remaining_volume')}"
     if kind == "BE_PENDING":
