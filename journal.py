@@ -26,6 +26,8 @@ Tipi di evento principali:
   MEMORY_RESYNC              memoria riallineata ai valori reali del broker
   BE_PENDING                 BE rifiutato (prezzo troppo vicino), resta in attesa
   BE_PENDING_APPLIED         BE in attesa applicato dal controllo periodico
+  PARTIAL_CLOSE_PLAN         chiusura parziale richiesta: percentuale e lotti da chiudere
+  POSITION_PARTIAL_CLOSED    posizione chiusa solo in parte (volume chiuso e residuo)
   POSITION_CLOSED            posizione chiusa (dal bot o dal broker: TP/SL/manuale)
   MT5_CONNECTION             connessione a MT5 persa / ripristinata
   HEARTBEAT                  battito periodico: bot vivo, saldo, operazioni
