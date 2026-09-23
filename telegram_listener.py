@@ -162,9 +162,12 @@ def handle_message(event, is_edit: bool):
     has_media = bool(event.media) if hasattr(event, 'media') else False
     is_forwarded = bool(event.forward) if hasattr(event, 'forward') else False
     timestamp = event.date.timestamp() if getattr(event, 'date', None) else None
+    # Firma dell'autore, presente solo nei canali con "firma i messaggi" attiva
+    post_author = getattr(event, 'post_author', None)
 
-    logger.info(f"{'✏️ EDIT' if is_edit else '🆕 NUOVO'} MESSAGGIO | ID: {msg_id} | Reply-To: {reply_to} | Testo: {text!r}")
-    journal.record("MESSAGE", is_edit=is_edit, reply_to=reply_to, sender_id=sender_id,
+    logger.info(f"{'✏️ EDIT' if is_edit else '🆕 NUOVO'} MESSAGGIO | ID: {msg_id} | Reply-To: {reply_to} "
+                f"| Mittente: {sender_id}{f' ({post_author})' if post_author else ''} | Testo: {text!r}")
+    journal.record("MESSAGE", is_edit=is_edit, reply_to=reply_to, sender_id=sender_id, post_author=post_author,
                    has_media=has_media, is_forwarded=is_forwarded, text=text)
 
     # A mercato chiuso nessuna azione sarebbe eseguibile su MT5: scartiamo il
