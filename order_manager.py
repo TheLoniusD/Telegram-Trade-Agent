@@ -86,7 +86,9 @@ class OrderManager:
 
         with open(target_path, "w", encoding="utf-8") as f:
             json.dump(state_payload, f, indent=2, default=str, ensure_ascii=False)
-        logger.info(f"💾 Stato memoria salvato in: {target_path} ({len(self.active_trades)} operazioni vive)")
+        # debug: il salvataggio avviene più volte per messaggio (prima e dopo
+        # l'invio a MT5) e a INFO riempiva il log di righe identiche.
+        logger.debug(f"💾 Stato memoria salvato in: {target_path} ({len(self.active_trades)} operazioni vive)")
 
 
     def load_state_from_file(self, filepath: Optional[str] = None) -> bool:
