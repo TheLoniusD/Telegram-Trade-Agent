@@ -1,0 +1,27 @@
+2026-09-23 16:22:32 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-09-23 16:22:32 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-09-23 16:22:32 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-09-23 16:22:32 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/+9Z6pGst0PVZmM2U0
+2026-09-23 16:22:32 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-09-23 16:23:02 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 16:41:33 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-09-23 16:41:33 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-09-23 16:41:33 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-09-23 16:41:34 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-09-23 16:41:34 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-09-23 16:42:04 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 17:08:34 | INFO     | telegram_listener | 🆕 NUOVO MESSAGGIO | ID: 57770 | Reply-To: None | Mittente: -1001222394814 | Testo: 'YESTERDAY SUMMARY\n\n23th September 2026\n\n✔️GOLD Buy : 140 PIPS(TP)\n✔️GOLD Buy : 115 PIPS(TP)\n❌GOLD Buy : SL\n✔️GOLD Sell : 95 PIPS\n✔️GOLD Sell : 390 PIPS(TP)\n✔️GOLD Sell : 350 PIPS(TP)\n✔️GOLD Sell : 310 PIPS(TP)\n✔️GOLD Buy : 185 PIPS(TP)\n✔️GOLD Sell : 210 PIPS(TP)\n✔️GOLD Sell : 170 PIPS(TP)\n\nSignal             : 10 Total\nNet Pips         : 1965 PIPS\nWin Rate        : 9/10\n\n\n🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤\n\n9 Wins 1 Loss. Another solid finish for the day,clean and consistent performance throughout.🚀\n\nThat’s all for today, see you tomorrow 🌛\n\nCongrats to Those Following🍾\n\nEnjoy ur Profits💰\n\nHere’s to Greater Results Today🤝\n\n💠REGISTER TRADING ACCOUNT\n\n#tradelikeMaestro #MaestroPayout'
+2026-09-23 17:08:37 | INFO     | telegram_listener | 🧠 OUTPUT AGENTE 1: {"intent": "IGNORE", "is_actionable": false, "data": {"symbol": null, "direction": null, "entry_min": null, "entry_max": null, "stop_loss": null, "take_profit": [], "update_details": {"move_sl_to_be": false, "close_percentage": null, "layer_target": null}}, "raw_reasoning": "resoconto giornaliero, nessun comando operativo"}
+2026-09-23 17:08:37 | INFO     | telegram_listener | 📦 ESITO ORDER MANAGER: null
+2026-09-23 17:08:37 | INFO     | telegram_listener | 📋 Operazioni attive in memoria: []
+2026-09-23 17:08:37 | INFO     | telegram_listener | ✏️ EDIT MESSAGGIO | ID: 57770 | Reply-To: None | Mittente: -1001222394814 | Testo: 'YESTERDAY SUMMARY\n\n23th September 2026\n\n✔️GOLD Buy : 140 PIPS(TP)\n✔️GOLD Buy : 115 PIPS(TP)\n❌GOLD Buy : SL\n✔️GOLD Sell : 95 PIPS\n✔️GOLD Sell : 390 PIPS(TP)\n✔️GOLD Sell : 350 PIPS(TP)\n✔️GOLD Sell : 310 PIPS(TP)\n✔️GOLD Buy : 185 PIPS(TP)\n✔️GOLD Sell : 210 PIPS(TP)\n✔️GOLD Sell : 170 PIPS(TP)\n\nSignal             : 10 Total\nNet Pips         : 1965 PIPS\nWin Rate        : 9/10\n\n\n🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤\n\n9 Wins 1 Loss. Another solid finish for the day,clean and consistent performance throughout.🚀\n\nThat’s all for today, see you tomorrow 🌛\n\nCongrats to Those Following🍾\n\nEnjoy ur Profits💰\n\nHere’s to Greater Results Today🤝\n\n💠REGISTER TRADING ACCOUNT\n\n#tradelikeMaestro #MaestroPayout'
+2026-09-23 17:08:37 | INFO     | telegram_listener | ⏭️ Edit del messaggio 57770 scartato: il testo non è cambiato.
+2026-09-23 17:42:08 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 18:42:10 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 19:42:13 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 20:42:15 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 21:42:18 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 22:23:41 | INFO     | telegram_listener | ✏️ EDIT MESSAGGIO | ID: 57771 | Reply-To: None | Mittente: -1001222394814 | Testo: 'Good Morning | Day 267\n\nDon’t chase the Market\n\nWait for your Setup\n\n🌐 BullMaestro'
+2026-09-23 22:23:41 | INFO     | telegram_listener | ⏭️ Messaggio 57771 scartato: nessuna parola operativa (emoji, celebrazione, avviso).
+2026-09-23 22:42:20 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
+2026-09-23 23:42:23 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 8128.8 | equity: 8128.8 | posizioni aperte sul conto: 0
