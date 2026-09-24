@@ -6,7 +6,7 @@ evento rilevante come una riga JSON (un evento per riga, in append), così lo
 storico di una giornata si può ricostruire e analizzare anche a posteriori,
 quando il bot ha girato senza nessuno davanti al PC (vedi report.py).
 
-Ogni evento ha: ts (ora locale con fuso), event (tipo) e i campi specifici.
+Ogni evento ha: ts (ora nel fuso dei log, di default italiana, con offset), event (tipo) e i campi specifici.
 Gli eventi generati mentre si elabora un messaggio Telegram portano anche il
 suo msg_id, così si può seguire l'intera catena messaggio -> classificazione
 -> decisione -> ordini MT5 -> esito.
@@ -38,9 +38,7 @@ Tipi di evento principali:
 import contextvars
 import json
 import os
-from datetime import datetime
-
-from logger_config import day_folder, setup_logger
+from logger_config import day_folder, now_local, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -68,7 +66,7 @@ def record(event: str, **fields) -> None:
     Aggiunge un evento al diario del giorno. Non solleva mai eccezioni: un
     problema di scrittura del diario non deve bloccare la gestione degli ordini.
     """
-    now = datetime.now().astimezone()
+    now = now_local()
     entry = {"ts": now.isoformat(timespec="seconds"), "event": event}
 
     msg_id = _current_msg_id.get()

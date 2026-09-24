@@ -1,5 +1,6 @@
 """
-Riassunto leggibile del diario di una giornata (logs/AAAA-MM-GG/journal.jsonl).
+Riassunto leggibile del diario di una giornata (logs/AAAA-MM-GG/journal.jsonl),
+con tutti gli orari in ora italiana (fuso LOG_TIMEZONE).
 
 Pensato per quando il bot ha girato da solo: in pochi secondi mostra cosa è
 arrivato dal canale, cosa ha deciso il bot, cosa è successo su MT5, come si
@@ -12,9 +13,10 @@ Uso:
 import json
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 
-from journal import journal_path
+from logger_config import LOG_DIR, LOG_TIMEZONE_NAME, now_local, to_local
 
 # Stima del costo dell'agente classificatore (Claude Haiku 4.5, $ per milione di
 # token). La scrittura in cache con TTL 1h costa il doppio dell'input normale,
@@ -29,20 +31,36 @@ HEARTBEAT_GAP_SECONDS = 1.5 * 3600
 
 
 def load_events(day: str) -> list:
-    path = journal_path(day)
+    """
+    Eventi del giorno richiesto, con gli orari nel fuso dei log (ora italiana).
+    Legge anche le cartelle del giorno prima e dopo: i log scritti quando il
+    server registrava in UTC hanno gli eventi tra mezzanotte e le 02:00
+    italiane nella cartella del giorno precedente.
+    """
+    target = datetime.strptime(day, "%Y-%m-%d")
     events = []
-    try:
+    for offset in (-1, 0, 1):
+        folder_day = (target + timedelta(days=offset)).strftime("%Y-%m-%d")
+        path = os.path.join(LOG_DIR, folder_day, "journal.jsonl")
+        if not os.path.exists(path):
+            continue
         with open(path, encoding="utf-8") as f:
             for line_number, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
                     continue
                 try:
-                    events.append(json.loads(line))
+                    event = json.loads(line)
                 except json.JSONDecodeError:
-                    print(f"⚠️ Riga {line_number} del diario illeggibile, saltata.")
-    except FileNotFoundError:
-        sys.exit(f"Nessun diario per il {day} ({path}).")
+                    print(f"⚠️ Riga {line_number} di {path} illeggibile, saltata.")
+                    continue
+                local_ts = to_local(datetime.fromisoformat(event["ts"]))
+                if local_ts.strftime("%Y-%m-%d") == day:
+                    event["ts"] = local_ts.isoformat(timespec="seconds")
+                    events.append(event)
+    if not events:
+        sys.exit(f"Nessun evento per il {day} in {LOG_DIR}/.")
+    events.sort(key=lambda e: e["ts"])
     return events
 
 
@@ -135,7 +153,7 @@ def is_anomaly(event: dict) -> bool:
 
 
 def main():
-    day = sys.argv[1] if len(sys.argv) > 1 else datetime.now().strftime("%Y-%m-%d")
+    day = sys.argv[1] if len(sys.argv) > 1 else now_local().strftime("%Y-%m-%d")
     events = load_events(day)
     if not events:
         sys.exit(f"Il diario del {day} è vuoto.")
@@ -144,7 +162,7 @@ def main():
     for e in events:
         by_kind[e["event"]].append(e)
 
-    print(f"\n==================== REPORT {day} ====================")
+    print(f"\n==================== REPORT {day} (orari {LOG_TIMEZONE_NAME}) ====================")
     print(f"Periodo: {hhmmss(events[0])} → {hhmmss(events[-1])} | avvii: {len(by_kind['BOT_START'])} | arresti: {len(by_kind['BOT_STOP'])}")
 
     # --- Messaggi -------------------------------------------------------------
