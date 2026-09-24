@@ -83,6 +83,15 @@ OPERATIVE_KEYWORDS = re.compile(
 # volume (il BE richiesto nel messaggio viene comunque applicato).
 PARTIAL_CLOSE_REPEAT_WINDOW_SECONDS = 15 * 60
 
+# Guadagno minimo (in $ di prezzo, dal NOSTRO ingresso) prima di spostare lo SL
+# al BE. Il 24/09 il BE applicato appena possibile ha chiuso 7 operazioni su 12
+# entro 30 s - 3 min, spesso prima che andassero a TP: il trader conta i pips
+# dalla sua zona di ingresso, che è più favorevole del nostro ingresso a
+# mercato, quindi quando scrive "BE+" noi siamo spesso appena in pari. Finché
+# la posizione non ha questo margine il BE resta in attesa e lo SL originale
+# continua a proteggerla. 0 = comportamento precedente.
+BE_MIN_PROFIT = float(os.getenv("BE_MIN_PROFIT", "3.0"))
+
 # Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
 # cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
 # di ripetere azioni già eseguite.
@@ -113,6 +122,26 @@ def breakeven_price(tp_config: dict):
         return None
     offset = BE_OFFSET if tp_config.get("direction") == "BUY" else -BE_OFFSET
     return round(entry + offset, 2)
+
+
+def be_margin_reached(mt5_ticket: int, quiet: bool = False) -> bool:
+    """
+    True se la posizione è in guadagno di almeno BE_MIN_PROFIT $ rispetto al
+    nostro ingresso. Se il guadagno non è misurabile (TEST MODE, MT5 senza
+    dati) non blocca il BE: decide MT5 se accettarlo.
+    """
+    if BE_MIN_PROFIT <= 0:
+        return True
+    try:
+        move = mt5_agent.favorable_move(mt5_ticket)
+    except MT5UnavailableError:
+        return False
+    if move is None or move >= BE_MIN_PROFIT:
+        return True
+    if not quiet:
+        logger.info(f"⏳ BE del ticket {mt5_ticket} in attesa: guadagno attuale {move:+.2f}$, "
+                    f"minimo richiesto {BE_MIN_PROFIT}$. Lo SL originale resta attivo.")
+    return False
 
 
 def mark_closed_if_complete(trade: dict) -> None:
@@ -205,7 +234,13 @@ def trade_summary(trade: dict) -> dict:
 
 def record_position_closed(mt5_ticket: int, closed_by: str, trade: dict = None) -> None:
     """Registra come si è chiusa una posizione (motivo, prezzo, profitto netto)."""
-    info = mt5_agent.get_close_info(mt5_ticket)
+    # Solo informativo: un errore qui non deve mai interrompere le chiusure
+    # delle altre posizioni della stessa operazione.
+    try:
+        info = mt5_agent.get_close_info(mt5_ticket)
+    except Exception as e:
+        logger.warning(f"⚠️ Esito della chiusura di {mt5_ticket} non disponibile: {e}")
+        info = {}
     logger.info(f"🏁 Posizione {mt5_ticket} chiusa ({closed_by}) | motivo: {info.get('close_reason', 'n/d')} "
                 f"| prezzo: {info.get('close_price', 'n/d')} | profitto: {info.get('profit', 'n/d')}")
     journal.record("POSITION_CLOSED", mt5_ticket=mt5_ticket, closed_by=closed_by,
@@ -426,6 +461,14 @@ def handle_message(event, is_edit: bool):
                 real_mt5_ticket = tp_config.get("mt5_ticket")
                 entry_price = breakeven_price(tp_config)
 
+                if not be_margin_reached(real_mt5_ticket):
+                    # Posizione non ancora abbastanza in guadagno: nessun invio a
+                    # MT5, il BE resta in attesa del margine minimo.
+                    tp_config["be_pending"] = True
+                    journal.record("BE_PENDING", mt5_ticket=real_mt5_ticket, entry_price=entry_price,
+                                   reason=f"guadagno sotto il minimo di {BE_MIN_PROFIT}$")
+                    continue
+
                 be_applied = mt5_agent.set_sl_to_be(ticket=real_mt5_ticket, entry_price=entry_price)
                 if be_applied:
                     tp_config["be_active"] = True
@@ -541,7 +584,7 @@ def retry_pending_breakeven() -> None:
                 continue
             mt5_ticket = tp_config.get("mt5_ticket")
             entry_price = breakeven_price(tp_config)
-            if not mt5_agent.can_move_sl(mt5_ticket, entry_price):
+            if not be_margin_reached(mt5_ticket, quiet=True) or not mt5_agent.can_move_sl(mt5_ticket, entry_price):
                 continue
 
             # Nel diario l'evento resta legato al messaggio dell'operazione
