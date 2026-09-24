@@ -1,5 +1,6 @@
 import math
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 import MetaTrader5 as mt5
@@ -18,6 +19,16 @@ TEST_MODE = False
 
 # Codice di esito "nessun errore" restituito da mt5.last_error()
 MT5_RESULT_OK = 1
+
+
+def broker_time_str(broker_epoch) -> Optional[str]:
+    """
+    Orari di MT5 (tick, deal) come li mostra l'app MT5: sono secondi nel fuso
+    del server del broker, quindi vanno formattati "come se fossero UTC".
+    """
+    if not broker_epoch:
+        return None
+    return datetime.fromtimestamp(broker_epoch, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class MT5UnavailableError(Exception):
@@ -52,7 +63,17 @@ class MT5Executor:
         # Solo per TEST MODE: contatore per generare ticket fittizi distinti
         self._test_ticket_counter = 90000000
 
-    def _send(self, operation: str, request: dict):
+    def _broker_clock(self, symbol: Optional[str]) -> Optional[str]:
+        """Ora del server del broker adesso (dall'ultimo tick del simbolo)."""
+        if not symbol:
+            return None
+        try:
+            tick = mt5.symbol_info_tick(symbol)
+        except Exception:
+            return None
+        return broker_time_str(tick.time) if tick is not None else None
+
+    def _send(self, operation: str, request: dict, symbol: Optional[str] = None):
         """
         Unico punto di invio degli ordini a MT5: registra nel diario ogni
         richiesta con il suo esito, e gestisce il caso in cui order_send
@@ -69,6 +90,7 @@ class MT5Executor:
 
         journal.record(
             "MT5_ORDER", operation=operation, ok=ok, error=error, request=request,
+            broker_time=self._broker_clock(symbol or request.get("symbol")),
             retcode=getattr(result, "retcode", None), order=getattr(result, "order", None),
             price=getattr(result, "price", None), volume=getattr(result, "volume", None),
         )
@@ -185,7 +207,7 @@ class MT5Executor:
             "sl": float(entry_price),
             "tp": pos.tp
         }
-        ok, result, error = self._send("BREAKEVEN", request)
+        ok, result, error = self._send("BREAKEVEN", request, symbol=pos.symbol)
         if ok:
             logger.info(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
             return True
@@ -295,7 +317,7 @@ class MT5Executor:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
-        ok, result, error = self._send("CLOSE_PARTIAL", request)
+        ok, result, error = self._send("CLOSE_PARTIAL", request, symbol=pos.symbol)
         if not ok:
             logger.error(f"❌ Errore chiusura parziale posizione {pos.ticket}: {error}")
             return None
@@ -378,6 +400,25 @@ class MT5Executor:
             return tick.bid - new_sl > min_distance
         return new_sl - tick.ask > min_distance
 
+    def favorable_move(self, ticket: int) -> Optional[float]:
+        """
+        Di quanti $ di prezzo la posizione è in guadagno rispetto al NOSTRO
+        prezzo di ingresso (negativo se in perdita), misurato sul prezzo a cui
+        verrebbe chiusa adesso. None se non è misurabile (TEST MODE, posizione
+        chiusa, dati mancanti).
+        """
+        if self.test_mode:
+            return None
+        pos = self._find_position(ticket)
+        if pos is None:
+            return None
+        tick = mt5.symbol_info_tick(pos.symbol)
+        if tick is None:
+            return None
+        if pos.type == mt5.ORDER_TYPE_BUY:
+            return tick.bid - pos.price_open
+        return pos.price_open - tick.ask
+
     def get_close_info(self, ticket: int) -> dict:
         """
         Esito finale di una posizione chiusa, letto dallo storico dei deal di MT5:
@@ -407,6 +448,7 @@ class MT5Executor:
         return {
             "close_reason": reasons.get(last_exit.reason, f"ALTRO_{last_exit.reason}"),
             "close_price": last_exit.price,
+            "close_time_broker": broker_time_str(getattr(last_exit, "time", None)),
             "profit": round(sum(d.profit + d.commission + d.swap for d in deals), 2),
         }
 

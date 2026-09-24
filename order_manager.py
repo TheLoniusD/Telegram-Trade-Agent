@@ -18,6 +18,12 @@ CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 # stato vivo e finisce nell'archivio giornaliero.
 TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 
+# Un NEW_SIGNAL con stessa direzione e stesso prezzo (entro questa tolleranza
+# in $) dell'operazione ancora aperta è un secondo ingresso dello stesso setup
+# (23/09: "Gold sell 4285" alle 04:20 e di nuovo alle 04:25), non un segnale
+# nuovo: viene collegato al primo, così una chiusura li prende entrambi.
+SAME_SETUP_PRICE_TOLERANCE = 1.0
+
 
 class OrderManager:
     """
@@ -201,6 +207,21 @@ class OrderManager:
         return None
 
 
+    def _explicit_target(self, msg_id: int, reply_to: Optional[int]) -> Optional[int]:
+        """
+        Operazione a cui si riferisce esplicitamente un messaggio di update o
+        chiusura: quella a cui risponde (reply), oppure, se è l'EDIT di un
+        messaggio di segnale, quel segnale stesso. Senza riferimento esplicito
+        il chiamante ricade sull'ultima operazione aperta: prima anche l'edit
+        con SL/TP di un segnale più vecchio finiva sull'ultimo aperto.
+        """
+        if reply_to and reply_to in self.active_trades:
+            return reply_to
+        if msg_id in self.active_trades:
+            return msg_id
+        return None
+
+
     def _resolve_layer_target(self, trade: dict, layer_target: str) -> list:
         """
         Mappa LOWEST/HIGHEST/ALL sulle chiavi reali dei ticket (tp1/tp2) in base alla
@@ -257,15 +278,28 @@ class OrderManager:
             latest_trade = self._get_latest_trade()
             has_active_trade = latest_trade is not None and latest_trade.get("status") == "ACTIVE"
 
-            # CONDIZIONI RE-ENTRY:
-            # È re-entry se c'è un trade attivo E (manca il simbolo O (stesso simbolo E manca lo stop loss))
+            # CONDIZIONI RE-ENTRY (secondo ingresso collegato all'operazione aperta):
+            #  - manca il simbolo ("Try sell again"), oppure
+            #  - stesso simbolo e manca il prezzo di ingresso, oppure
+            #  - stesso simbolo, stessa direzione e stesso prezzo di ingresso.
+            # Simbolo e direzione vanno letti dai ticket (_get_param): alla radice
+            # del trade non esistono, e il confronto risultava sempre falso.
+            # NON basta che manchi lo SL: ogni fase rapida non ha SL, e segnali
+            # diversi (es. SELL 4286 e poi SELL 4284) finirebbero incatenati, con
+            # gli edit dell'uno applicati anche all'altro.
             missing_symbol = data.get("symbol") is None
-            missing_sl = data.get("stop_loss") is None
             missing_entry = data.get("entry_min") is None
 
-            same_symbol = has_active_trade and (data.get("symbol") == latest_trade.get("symbol"))
+            same_symbol = has_active_trade and data.get("symbol") == self._get_param(latest_trade, "symbol")
+            latest_entry = latest_trade.get("entry_min") if has_active_trade else None
+            same_setup = (
+                same_symbol
+                and data.get("direction") == self._get_param(latest_trade, "direction")
+                and not missing_entry and latest_entry is not None
+                and abs(data["entry_min"] - latest_entry) <= SAME_SETUP_PRICE_TOLERANCE
+            )
 
-            is_reentry = has_active_trade and (missing_symbol or (same_symbol and (missing_sl or missing_entry)))
+            is_reentry = has_active_trade and (missing_symbol or (same_symbol and missing_entry) or same_setup)
 
             # Se è re-entry ereditiamo da latest_trade, altrimenti disattiviamo l'ereditarietà (source_trade = None)
             source_trade = latest_trade if is_reentry else None
@@ -351,7 +385,7 @@ class OrderManager:
             # 1. Identificazione del Trade Bersaglio: 'reply_to' punta sempre al
             #    messaggio COMPLETO (quello con SL/TP impostati), che è la radice
             #    riconosciuta della famiglia di operazioni.
-            target_msg_id = reply_to if (reply_to and reply_to in self.active_trades) else None
+            target_msg_id = self._explicit_target(msg_id, reply_to)
 
             if not target_msg_id:
                 latest_trade = self._get_latest_trade()
@@ -441,7 +475,7 @@ class OrderManager:
             # COMPLETO dell'operazione; in mancanza, ricadiamo sull'ultima operazione
             # ancora a mercato. Non usiamo mai msg_id del messaggio di chiusura:
             # quel messaggio non è un'operazione.
-            target_msg_id = reply_to if (reply_to and reply_to in self.active_trades) else None
+            target_msg_id = self._explicit_target(msg_id, reply_to)
 
             if not target_msg_id:
                 latest_trade = self._get_latest_trade()

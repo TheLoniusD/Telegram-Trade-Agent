@@ -99,6 +99,8 @@ def describe(event: dict) -> str:
             parts.append(f"prezzo {e.get('price') or req.get('price')}")
         if e.get("operation") not in ("CLOSE", "CLOSE_PARTIAL"):
             parts.append(f"SL {req.get('sl')} TP {req.get('tp')}")
+        if e.get("broker_time"):
+            parts.append(f"ora MT5 {e['broker_time'][11:]}")
         if e.get("ok"):
             return "✅ " + " | ".join(parts)
         return "❌ " + " | ".join(parts) + f" → RIFIUTATO: {e.get('error')}"
@@ -116,7 +118,7 @@ def describe(event: dict) -> str:
     if kind == "POSITION_PARTIAL_CLOSED":
         return f"✂️ #{e.get('mt5_ticket')}: chiusi {e.get('closed_volume')} lotti, restano {e.get('remaining_volume')}"
     if kind == "BE_PENDING":
-        return f"⏳ BE di #{e.get('mt5_ticket')} in attesa (prezzo ancora troppo vicino all'ingresso {e.get('entry_price')})"
+        return f"⏳ BE di #{e.get('mt5_ticket')} in attesa ({e.get('reason') or 'prezzo ancora troppo vicino al livello di BE'}, SL di BE {e.get('entry_price')})"
     if kind == "BE_PENDING_APPLIED":
         return f"🎯 BE in attesa applicato a #{e.get('mt5_ticket')} (SL {e.get('entry_price')})"
     if kind == "RISK_CALC":
@@ -125,7 +127,8 @@ def describe(event: dict) -> str:
     if kind == "MEMORY_RESYNC":
         return f"🔄 memoria riallineata a MT5 #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')}"
     if kind == "POSITION_CLOSED":
-        return f"🏁 #{e.get('mt5_ticket')} chiusa ({e.get('closed_by')}) motivo {e.get('close_reason', 'n/d')} prezzo {e.get('close_price', 'n/d')} profitto {e.get('profit', 'n/d')}"
+        broker = f" | ora MT5 {e['close_time_broker'][11:]}" if e.get("close_time_broker") else ""
+        return f"🏁 #{e.get('mt5_ticket')} chiusa ({e.get('closed_by')}) motivo {e.get('close_reason', 'n/d')} prezzo {e.get('close_price', 'n/d')} profitto {e.get('profit', 'n/d')}{broker}"
     if kind == "MT5_CONNECTION":
         return f"{'✅' if e.get('ok') else '❌'} MT5: {e.get('reason')}"
     if kind == "HEARTBEAT":
