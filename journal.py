@@ -21,6 +21,9 @@ Tipi di evento principali:
   RISK_CALC                  calcolo dei lotti (rischio, tetto sul margine, totale)
   RISK_REJECTED              segnale scartato dal Risk Manager
   MT5_ORDER                  ogni richiesta inviata a MT5 con il suo esito
+  ENTRY_PENDING              ordine limite nella zona del trader in attesa di esecuzione
+  PENDING_FILLED             ordine limite eseguito (prezzo e volume reali)
+  PENDING_CANCELLED          ordine limite cancellato (scaduto, BE/chiusura del trader, sparito)
   TRADE_STATUS               stato finale di un'operazione dopo un'azione
   LEVELS_INCOHERENT          SL/TP incoerenti con la direzione, non inviati
   MEMORY_RESYNC              memoria riallineata ai valori reali del broker

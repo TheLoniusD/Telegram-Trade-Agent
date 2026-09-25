@@ -1,4 +1,5 @@
 import math
+import os
 
 import MetaTrader5 as mt5
 
@@ -14,6 +15,17 @@ DEFAULT_SL_DIST_GOLD = 10.0
 
 # Quota massima del margine libero impegnabile da un singolo segnale (2 ticket)
 MARGIN_USAGE_LIMIT = 0.5
+
+# Ingresso nella zona del trader. Il segnale rapido "Gold buy 4304" diventa poi
+# "BUY @ 4304 - 4299": la zona è sempre larga 5$ a favore del trader, che si
+# posiziona al suo interno. Entrando tutto subito a mercato noi finivamo sul
+# bordo peggiore o oltre (fino a 3,4$ peggio il 25/09), e quando il trader
+# scriveva "Running 45 pips, BE+" eravamo ancora in pari o in perdita.
+# 'zone'   = TP1 con ordine limite al prezzo del segnale, TP2 a metà zona
+#            (a mercato se il prezzo è già a quel livello o migliore)
+# 'market' = tutto a mercato subito, come prima
+ENTRY_MODE = os.getenv("ENTRY_MODE", "zone")
+ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
 
 class RiskManager:
     """
@@ -73,36 +85,44 @@ class RiskManager:
             else:
                 stop_loss = entry_price + DEFAULT_SL_DIST_GOLD
 
-        # 3. Calcolo Lottaggio basato su % di Rischio, limitato dal margine libero.
-        # La distanza dallo SL si misura dal prezzo corrente: l'ordine è a
-        # mercato e verrà eseguito lì, non al prezzo scritto nel segnale.
-        risk_lots = self._calculate_lot_size(symbol, direction, current_price, stop_loss)
+        # 3. Prezzi di ingresso dei due ticket (vedi ENTRY_MODE)
+        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"))
+
+        # 4. Lottaggio: metà del rischio per ticket, misurata dal prezzo a cui
+        # quel ticket entrerà (il livello limite, o il prezzo corrente se a
+        # mercato), poi limitata dal margine libero.
+        step_lot = symbol_info.volume_step or 0.01
+        lots = {}
+        for key in ("tp1", "tp2"):
+            level = entry_levels[key]
+            price = level if level is not None else current_price
+            lots[key] = self._calculate_lot_size(symbol, direction, price, stop_loss) / 2
         margin_lots = self._max_lots_by_margin(symbol, direction, current_price)
-        total_calculated_lots = min(risk_lots, margin_lots)
+        scale = min(1.0, margin_lots / sum(lots.values())) if sum(lots.values()) > 0 else 1.0
+        # Per difetto allo step del broker: per eccesso si supererebbe il rischio
+        # o il margine (il secondo ordine veniva rifiutato con "No money").
+        lots = {k: round(math.floor(v * scale / step_lot) * step_lot, 2) for k, v in lots.items()}
+
         journal.record("RISK_CALC", ticket_id=trade_data.get("ticket_id"), direction=direction,
                        price=current_price, stop_loss=stop_loss, risk_percent=self.risk_percent,
-                       lots_by_risk=risk_lots, lots_by_margin=round(margin_lots, 2), lots_total=total_calculated_lots)
+                       entry_levels=entry_levels, lots=lots, lots_by_margin=round(margin_lots, 2),
+                       lots_total=round(sum(lots.values()), 2))
 
-        # SDOPPIAMENTO LOTTAGGIO: dividiamo a metà arrotondando PER DIFETTO allo
-        # step del broker. Arrotondare per eccesso (o forzare il minimo) può
-        # superare il margine disponibile: il primo ordine passa e il secondo
-        # viene rifiutato con "No money".
-        step_lot = symbol_info.volume_step or 0.01
-        single_ticket_lots = round(math.floor(total_calculated_lots / 2 / step_lot) * step_lot, 2)
-        if single_ticket_lots < symbol_info.volume_min:
+        if min(lots.values()) < symbol_info.volume_min:
             return {"approved": False, "reason": f"Margine insufficiente per aprire 2 posizioni da almeno {symbol_info.volume_min} lotti"}
 
-        # 4. Gestione Multi-Ticket: ogni ticket usa il TP salvato per il suo target
+        # 5. Gestione Multi-Ticket: ogni ticket usa il TP salvato per il suo target
         # (None in fase rapida, in attesa degli update successivi)
         orders_to_execute = {}
         for key in ("tp1", "tp2"):
             orders_to_execute[key] = {
                 "symbol": symbol,
                 "direction": direction,
-                "entry_price": entry_price,
+                "entry_price": entry_levels[key] if entry_levels[key] is not None else entry_price,
+                "limit_price": entry_levels[key],
                 "stop_loss": stop_loss,
                 "take_profit": tickets.get(key, {}).get("take_profit"),
-                "volume": single_ticket_lots,
+                "volume": lots[key],
                 "ticket_id": trade_data.get("ticket_id"),
             }
 
@@ -110,6 +130,25 @@ class RiskManager:
             "approved": True,
             "orders": orders_to_execute
         }
+
+    def _entry_levels(self, direction: str, entry_min, entry_max) -> dict:
+        """
+        Prezzi limite dei due ticket nella zona del trader, o None (= a mercato).
+        TP1 al prezzo del segnale (il bordo della zona da cui il trader parte),
+        TP2 a metà zona. Senza prezzo nel segnale ("Try buy again") o con
+        ENTRY_MODE=market si entra a mercato come prima.
+        """
+        if ENTRY_MODE != "zone" or entry_min is None:
+            return {"tp1": None, "tp2": None}
+
+        low, high = entry_min, entry_max
+        if high is None:
+            # Fase rapida: solo il prezzo del segnale, la zona si estende a favore
+            low, high = (entry_min - ENTRY_ZONE_WIDTH, entry_min) if direction == "BUY" else (entry_min, entry_min + ENTRY_ZONE_WIDTH)
+        low, high = min(low, high), max(low, high)
+
+        signal_edge = high if direction == "BUY" else low
+        return {"tp1": round(signal_edge, 2), "tp2": round((low + high) / 2, 2)}
 
     def _max_lots_by_margin(self, symbol: str, direction: str, price: float) -> float:
         """
