@@ -94,10 +94,10 @@ def describe(event: dict) -> str:
     if kind == "MT5_ORDER":
         req = e.get("request") or {}
         parts = [f"MT5 {e.get('operation')} #{req.get('position') or e.get('order') or ''}"]
-        if e.get("operation") in ("OPEN", "CLOSE", "CLOSE_PARTIAL"):
+        if e.get("operation") in ("OPEN", "OPEN_LIMIT", "CLOSE", "CLOSE_PARTIAL"):
             parts.append(f"vol {e.get('volume') or req.get('volume')}")
             parts.append(f"prezzo {e.get('price') or req.get('price')}")
-        if e.get("operation") not in ("CLOSE", "CLOSE_PARTIAL"):
+        if e.get("operation") not in ("CLOSE", "CLOSE_PARTIAL", "CANCEL"):
             parts.append(f"SL {req.get('sl')} TP {req.get('tp')}")
         if e.get("broker_time"):
             parts.append(f"ora MT5 {e['broker_time'][11:]}")
@@ -106,11 +106,17 @@ def describe(event: dict) -> str:
         return "❌ " + " | ".join(parts) + f" → RIFIUTATO: {e.get('error')}"
     if kind == "TRADE_STATUS":
         tickets = ", ".join(
-            f"{k}:#{t.get('mt5_ticket')} SL {t.get('stop_loss')} TP {t.get('take_profit')}{' chiuso' if t.get('closed') else ''}{' BE' if t.get('be_active') else ''}"
+            f"{k}:#{t.get('mt5_ticket')} SL {t.get('stop_loss')} TP {t.get('take_profit')}{' chiuso' if t.get('closed') else ''}{' BE' if t.get('be_active') else ''}{' in attesa' if t.get('pending') else ''}"
             for k, t in (e.get("tickets") or {}).items())
         return f"📋 operazione {e.get('ticket_id')} → {e.get('status')} | {tickets}"
     if kind == "LEVELS_INCOHERENT":
         return f"⚠️ livelli incoerenti con {e.get('direction')} #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')} (non inviati)"
+    if kind == "ENTRY_PENDING":
+        return f"⏳ {e.get('key')}: ordine limite in attesa a {e.get('limit_price')} (vol {e.get('volume')}) #{e.get('mt5_ticket')}"
+    if kind == "PENDING_FILLED":
+        return f"✅ ordine limite #{e.get('mt5_ticket')} eseguito a {e.get('price')} (vol {e.get('volume')})"
+    if kind == "PENDING_CANCELLED":
+        return f"🗑️ ordine limite #{e.get('mt5_ticket')} cancellato: {e.get('reason')}"
     if kind == "PARTIAL_CLOSE_PLAN":
         return f"✂️ chiusura parziale {e.get('percentage')}%: {e.get('target_volume')} lotti su {e.get('open_volume')} aperti"
     if kind == "PARTIAL_CLOSE_REPEATED":
@@ -122,8 +128,11 @@ def describe(event: dict) -> str:
     if kind == "BE_PENDING_APPLIED":
         return f"🎯 BE in attesa applicato a #{e.get('mt5_ticket')} (SL {e.get('entry_price')})"
     if kind == "RISK_CALC":
-        return (f"🧮 lotti: rischio {e.get('risk_percent')}% → {e.get('lots_by_risk')} | tetto margine {e.get('lots_by_margin')} "
-                f"| totale {e.get('lots_total')} (prezzo {e.get('price')}, SL {e.get('stop_loss')})")
+        levels = e.get("entry_levels") or {}
+        entry = (f" | ingressi TP1 {levels.get('tp1') or 'mercato'} / TP2 {levels.get('tp2') or 'mercato'}"
+                 if levels else "")
+        return (f"🧮 lotti: rischio {e.get('risk_percent')}% → {e.get('lots') or e.get('lots_by_risk')} | tetto margine "
+                f"{e.get('lots_by_margin')} | totale {e.get('lots_total')} (prezzo {e.get('price')}, SL {e.get('stop_loss')}){entry}")
     if kind == "MEMORY_RESYNC":
         return f"🔄 memoria riallineata a MT5 #{e.get('mt5_ticket')}: SL {e.get('stop_loss')} TP {e.get('take_profit')}"
     if kind == "POSITION_CLOSED":

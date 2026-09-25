@@ -150,6 +150,12 @@ class MT5Executor:
         # Gestione sicura del TP se è None (Fase Rapida)
         tp_primary = float(tp_value) if tp_value is not None else 0.0
 
+        # Ingresso nella zona: se il prezzo non è ancora arrivato al livello
+        # previsto, ordine limite in attesa; se è già lì o migliore, a mercato.
+        limit_price = order_plan.get("limit_price")
+        if limit_price is not None and ((price > limit_price) if direction == "BUY" else (price < limit_price)):
+            return self._place_limit(order_plan, limit_price, tp_primary)
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
@@ -178,6 +184,81 @@ class MT5Executor:
             "volume": result.volume,
             "error": None,
         }
+
+    def _place_limit(self, order_plan: dict, limit_price: float, tp: float) -> dict:
+        """Ordine limite in attesa al prezzo indicato (stessa forma di risposta di execute_open)."""
+        direction = order_plan["direction"]
+        sl = order_plan["stop_loss"]
+        request = {
+            "action": mt5.TRADE_ACTION_PENDING,
+            "symbol": order_plan["symbol"],
+            "volume": order_plan["volume"],
+            "type": mt5.ORDER_TYPE_BUY_LIMIT if direction == "BUY" else mt5.ORDER_TYPE_SELL_LIMIT,
+            "price": float(limit_price),
+            "sl": float(sl) if sl is not None else 0.0,
+            "tp": float(tp),
+            "magic": 990011,
+            "comment": f"TB_{order_plan.get('ticket_id')}",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_RETURN,
+        }
+        ok, result, error = self._send("OPEN_LIMIT", request)
+        if not ok:
+            logger.error(f"❌ Errore ordine limite MT5: {error}")
+            return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": error}
+
+        logger.info(f"⏳ Ordine limite {direction} in attesa | Ticket: {result.order} | Volume: {order_plan['volume']} | Prezzo: {limit_price}")
+        return {
+            "success": True,
+            "mt5_ticket": result.order,
+            "fill_price": None,
+            "volume": order_plan["volume"],
+            "pending": True,
+            "error": None,
+        }
+
+    def _find_pending(self, ticket: int):
+        """L'ordine in attesa con questo ticket, o None. MT5UnavailableError se MT5 non risponde."""
+        orders = mt5.orders_get(ticket=ticket)
+        if orders is None:
+            code, description = mt5.last_error()
+            if code != MT5_RESULT_OK:
+                raise MT5UnavailableError(f"orders_get({ticket}) fallita: {code} {description}")
+        return orders[0] if orders else None
+
+    def pending_status(self, ticket: int) -> tuple:
+        """
+        Stato di un ordine limite: ("PENDING", None) se ancora in attesa,
+        ("FILLED", posizione) se eseguito (in MT5 la posizione ha lo stesso
+        ticket dell'ordine), ("GONE", None) se non esiste più (cancellato o
+        scaduto). Solleva MT5UnavailableError se MT5 non risponde.
+        """
+        if self.test_mode:
+            return ("FILLED", None)
+        if self._find_pending(ticket) is not None:
+            return ("PENDING", None)
+        position = self.get_open_position(ticket)
+        if position is not None:
+            return ("FILLED", position)
+        return ("GONE", None)
+
+    def cancel_order(self, ticket: int) -> bool:
+        """Cancella un ordine in attesa. True anche se non esiste più."""
+        if self.test_mode:
+            return True
+        try:
+            order = self._find_pending(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Cancellazione dell'ordine {ticket} non inviata: {e}")
+            return False
+        if order is None:
+            return True
+        ok, result, error = self._send("CANCEL", {"action": mt5.TRADE_ACTION_REMOVE, "order": ticket}, symbol=order.symbol)
+        if not ok:
+            logger.error(f"❌ Errore cancellazione ordine {ticket}: {error}")
+            return False
+        logger.info(f"🗑️ Ordine in attesa {ticket} cancellato.")
+        return True
 
     def set_sl_to_be(self, ticket: int, entry_price: float) -> bool:
         """
@@ -235,7 +316,11 @@ class MT5Executor:
             logger.error(f"❌ Chiusura del ticket {ticket} non inviata: {e}")
             return False
         if pos is None:
-            logger.info(f"ℹ️ Ticket {ticket} non presente su MT5: nessuna chiusura necessaria.")
+            # Può essere un ordine limite non ancora eseguito: va cancellato,
+            # altrimenti si riempirebbe dopo la chiusura dell'operazione.
+            if not self.cancel_order(ticket):
+                return False
+            logger.info(f"ℹ️ Ticket {ticket} non presente su MT5 come posizione: nessuna chiusura necessaria.")
             return True
 
         close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
@@ -337,6 +422,28 @@ class MT5Executor:
 
         # Se la lista TP contiene valori, prendiamo il primo (TP1)
         tp_price = take_profit[0] if take_profit else 0.0
+
+        # Ordine limite non ancora eseguito: si modificano SL/TP dell'ordine
+        try:
+            pending = self._find_pending(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Modifica del ticket {ticket} non inviata: {e}")
+            return False
+        if pending is not None:
+            request = {
+                "action": mt5.TRADE_ACTION_MODIFY,
+                "order": ticket,
+                "price": pending.price_open,
+                "sl": float(stop_loss) if stop_loss else 0.0,
+                "tp": float(tp_price),
+                "type_time": mt5.ORDER_TIME_GTC,
+            }
+            ok, result, error = self._send("MODIFY_PENDING", request, symbol=pending.symbol)
+            if not ok:
+                logger.error(f"❌ Errore modifica ordine in attesa {ticket}: {error}")
+                return False
+            logger.info(f"✅ Ordine in attesa {ticket} aggiornato | SL: {stop_loss} | TP: {tp_price}")
+            return True
 
         request = {
             "action": mt5.TRADE_ACTION_SLTP,  # Dice a MT5 che vogliamo solo modificare SL/TP

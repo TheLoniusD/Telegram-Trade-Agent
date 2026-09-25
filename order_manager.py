@@ -141,6 +141,10 @@ class OrderManager:
                 mt5_ticket = tp_config.get("mt5_ticket")
                 if not mt5_ticket or tp_config.get("closed"):
                     continue
+                # Ordine limite non ancora eseguito: non è una posizione, il suo
+                # stato lo segue il listener (riempimento, scadenza, cancellazione)
+                if tp_config.get("pending"):
+                    continue
 
                 state = position_lookup(mt5_ticket)
 

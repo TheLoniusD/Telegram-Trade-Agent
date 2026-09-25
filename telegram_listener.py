@@ -89,8 +89,21 @@ PARTIAL_CLOSE_REPEAT_WINDOW_SECONDS = 15 * 60
 # dalla sua zona di ingresso, che è più favorevole del nostro ingresso a
 # mercato, quindi quando scrive "BE+" noi siamo spesso appena in pari. Finché
 # la posizione non ha questo margine il BE resta in attesa e lo SL originale
-# continua a proteggerla. 0 = comportamento precedente.
-BE_MIN_PROFIT = float(os.getenv("BE_MIN_PROFIT", "3.0"))
+# continua a proteggerla. 0 = BE appena il broker lo accetta.
+# Default 0: il 25/09, con 3$, 22 BE sono rimasti in attesa e diverse posizioni
+# sono finite a stop loss pieno invece che al BE (-638 nella giornata).
+BE_MIN_PROFIT = float(os.getenv("BE_MIN_PROFIT", "0"))
+
+# Correzioni di vecchi messaggi: il 25/09 alle 09:49 il trader ha corretto un
+# messaggio delle 06:44 ("Lets closed hold now" -> "Lets closed half now") e il
+# bot l'ha eseguito come comando nuovo, chiudendo metà dell'operazione aperta
+# in quel momento, che non c'entrava. L'edit di un messaggio più vecchio di
+# così, che non sia un segnale ancora aperto, viene registrato ma non esegue nulla.
+EDIT_MAX_AGE_SECONDS = 10 * 60
+
+# Ordini limite nella zona non ancora eseguiti dopo questo tempo vengono
+# cancellati: il prezzo è partito senza tornare nella zona del trader.
+ENTRY_ORDER_EXPIRY_SECONDS = int(os.getenv("ENTRY_ORDER_EXPIRY_MINUTES", "30")) * 60
 
 # Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
 # cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
@@ -170,6 +183,13 @@ def execute_partial_close(trades: list, percentage: float) -> None:
         journal.record("PARTIAL_CLOSE_REPEATED", minutes_since_last=minutes, percentage=percentage)
         return
 
+    # Gli ordini limite non eseguiti non sono a mercato: una chiusura parziale
+    # li cancella e la percentuale si calcola solo su ciò che è davvero aperto.
+    for trade in trades:
+        for t in trade.get("tickets", {}).values():
+            if t.get("pending") and not t.get("closed"):
+                cancel_pending_ticket(t, "chiusura parziale richiesta dal trader")
+
     open_tickets = [(trade, t) for trade in trades for t in trade.get("tickets", {}).values()
                     if t.get("mt5_ticket") and not t.get("closed")]
     if not open_tickets:
@@ -220,9 +240,60 @@ def execute_partial_close(trades: list, percentage: float) -> None:
         mark_closed_if_complete(trade)
 
 
+def cancel_pending_ticket(tp_config: dict, reason: str) -> None:
+    """Cancella un ordine limite non ancora eseguito e lo toglie dall'operazione."""
+    mt5_ticket = tp_config.get("mt5_ticket")
+    if mt5_agent.cancel_order(mt5_ticket):
+        tp_config["pending"] = False
+        tp_config["closed"] = True
+        logger.info(f"🗑️ Ordine in attesa {mt5_ticket} cancellato: {reason}.")
+        journal.record("PENDING_CANCELLED", mt5_ticket=mt5_ticket, reason=reason)
+
+
+def sync_pending_entries() -> None:
+    """
+    Segue gli ordini limite in attesa: se eseguiti registra prezzo e volume
+    reali, se scaduti (ENTRY_ORDER_EXPIRY_MINUTES) li cancella, se spariti
+    (cancellati sul broker) li chiude in memoria.
+    """
+    changed = False
+    for trade in manager.active_trades.values():
+        if trade.get("status") not in CLOSABLE_STATUSES:
+            continue
+        for tp_config in trade.get("tickets", {}).values():
+            if not tp_config.get("pending") or tp_config.get("closed"):
+                continue
+            mt5_ticket = tp_config.get("mt5_ticket")
+            token = journal.set_current_message(trade.get("msg_id"))
+            try:
+                status, position = mt5_agent.pending_status(mt5_ticket)
+                if status == "FILLED":
+                    tp_config["pending"] = False
+                    if position:
+                        tp_config["entry_price"] = position["price_open"]
+                        tp_config["volume"] = position["volume"]
+                    logger.info(f"✅ Ordine limite {mt5_ticket} eseguito a {tp_config.get('entry_price')}.")
+                    journal.record("PENDING_FILLED", mt5_ticket=mt5_ticket, price=tp_config.get("entry_price"),
+                                   volume=tp_config.get("volume"))
+                    changed = True
+                elif status == "GONE":
+                    tp_config["pending"] = False
+                    tp_config["closed"] = True
+                    journal.record("PENDING_CANCELLED", mt5_ticket=mt5_ticket, reason="non più presente sul broker")
+                    changed = True
+                elif time.time() - (tp_config.get("pending_since") or time.time()) > ENTRY_ORDER_EXPIRY_SECONDS:
+                    cancel_pending_ticket(tp_config, f"non eseguito entro {ENTRY_ORDER_EXPIRY_SECONDS // 60} minuti")
+                    changed = True
+            finally:
+                journal.clear_current_message(token)
+        mark_closed_if_complete(trade)
+    if changed:
+        manager.save_state_to_file()
+
+
 def trade_summary(trade: dict) -> dict:
     """Istantanea compatta di un'operazione per il diario."""
-    fields = ("mt5_ticket", "direction", "volume", "entry_price", "stop_loss", "take_profit", "closed", "be_active")
+    fields = ("mt5_ticket", "direction", "volume", "entry_price", "stop_loss", "take_profit", "closed", "be_active", "pending")
     return {
         "ticket_id": trade.get("ticket_id"),
         "trade_msg_id": trade.get("msg_id"),
@@ -265,6 +336,9 @@ def sync_ticket_with_broker(tp_config: dict, mt5_ticket: int) -> None:
     rifiutata: se la posizione non esiste più viene segnata chiusa, altrimenti
     SL/TP in memoria tornano ai valori effettivamente attivi sul broker.
     """
+    if tp_config.get("pending"):
+        # Ordine limite non eseguito: non è una posizione, niente da riallineare
+        return
     try:
         state = mt5_agent.get_open_position(mt5_ticket)
     except MT5UnavailableError as e:
@@ -332,6 +406,14 @@ def handle_message(event, is_edit: bool):
     if is_edit and _last_text_by_msg.get(msg_id) == text:
         logger.info(f"⏭️ Edit del messaggio {msg_id} scartato: il testo non è cambiato.")
         journal.record("MESSAGE_SKIPPED", reason="edit senza modifiche al testo")
+        return
+
+    # event.date è la data di invio ORIGINALE del messaggio, anche per gli edit
+    message_age = time.time() - timestamp if timestamp else 0
+    if is_edit and msg_id not in manager.active_trades and message_age > EDIT_MAX_AGE_SECONDS:
+        logger.info(f"⏭️ Edit del messaggio {msg_id} scartato: corregge un messaggio di {int(message_age / 60)} minuti fa "
+                    f"che non è un segnale aperto, non va eseguito come comando nuovo.")
+        journal.record("MESSAGE_SKIPPED", reason="correzione di un messaggio vecchio")
         return
 
     if is_forwarded and IGNORE_FORWARDED_MESSAGES:
@@ -404,6 +486,13 @@ def handle_message(event, is_edit: bool):
                         fill_price = exec_result.get("fill_price")
                         if fill_price:
                             ticket_data["entry_price"] = fill_price
+                        elif exec_result.get("pending"):
+                            # Ordine limite in attesa: il prezzo previsto è il livello limite
+                            ticket_data["entry_price"] = order_config.get("limit_price")
+                            ticket_data["pending"] = True
+                            ticket_data["pending_since"] = time.time()
+                            journal.record("ENTRY_PENDING", mt5_ticket=ticket_data["mt5_ticket"], key=target_key,
+                                           limit_price=order_config.get("limit_price"), volume=ticket_data["volume"])
 
                         # Lo SL inviato a MT5 (anche quello temporaneo della fase
                         # rapida) va in memoria: altrimenti resta None e un update
@@ -457,6 +546,11 @@ def handle_message(event, is_edit: bool):
                 parent_trade = candidate["trade"]
                 tp_config = candidate["ticket"]
                 if tp_config.get("closed"):
+                    continue
+                if tp_config.get("pending"):
+                    # Il trader protegge un'operazione in cui questo ordine non è
+                    # mai entrato: il prezzo è andato senza di noi, lo cancelliamo.
+                    cancel_pending_ticket(tp_config, "il trader ha chiesto il BE prima che l'ordine venisse eseguito")
                     continue
                 real_mt5_ticket = tp_config.get("mt5_ticket")
                 entry_price = breakeven_price(tp_config)
@@ -548,6 +642,11 @@ def handle_message(event, is_edit: bool):
                     # Niente ticket (mai aperto) o già chiuso: nulla da fare
                     if not real_mt5_ticket or tp_config.get("closed"):
                         continue
+                    if tp_config.get("pending"):
+                        cancel_pending_ticket(tp_config, "chiusura richiesta dal trader")
+                        if not tp_config.get("closed"):
+                            all_closed = False
+                        continue
 
                     if mt5_agent.close_position(ticket=real_mt5_ticket, symbol=tp_config.get("symbol")):
                         tp_config["closed"] = True
@@ -580,7 +679,8 @@ def retry_pending_breakeven() -> None:
         if trade.get("status") != "ACTIVE":
             continue
         for tp_config in trade.get("tickets", {}).values():
-            if not tp_config.get("be_pending") or tp_config.get("closed") or tp_config.get("be_active"):
+            if (not tp_config.get("be_pending") or tp_config.get("closed") or tp_config.get("be_active")
+                    or tp_config.get("pending")):
                 continue
             mt5_ticket = tp_config.get("mt5_ticket")
             entry_price = breakeven_price(tp_config)
@@ -640,6 +740,7 @@ async def monitor_loop():
                 journal.record("MT5_CONNECTION", ok=ok, reason=reason)
 
             if ok and not mt5_agent.test_mode:
+                sync_pending_entries()
                 manager.reconcile_with_broker(broker_position_lookup)
                 retry_pending_breakeven()
 
