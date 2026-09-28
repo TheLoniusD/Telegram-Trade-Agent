@@ -642,11 +642,15 @@ def handle_message(event, is_edit: bool):
                 for trade in trades:
                     # Letto una volta sola: in caso di rifiuto lo SL radice viene
                     # riallineato al broker e non deve contaminare il ticket successivo.
-                    new_sl = trade.get("stop_loss")
+                    trade_sl = trade.get("stop_loss")
                     for tp_key, tp_config in trade.get("tickets", {}).items():
                         real_mt5_ticket = tp_config.get("mt5_ticket")
                         if not real_mt5_ticket or tp_config.get("closed"):
                             continue
+                        # Solo un nuovo SL del trader vale per tutti i ticket; se il
+                        # messaggio cambia solo i TP ognuno tiene il suo SL (dopo il
+                        # BE a metà zona i ticket hanno SL diversi fra loro).
+                        new_sl = trade_sl if manager_result.get("sl_changed", True) else tp_config.get("stop_loss")
 
                         new_tp = tp_config.get("take_profit")
 
@@ -669,7 +673,7 @@ def handle_message(event, is_edit: bool):
                             # realmente attivi sul broker, non a quelli del messaggio.
                             sync_ticket_with_broker(tp_config, real_mt5_ticket)
                             trade["stop_loss"] = tp_config.get("stop_loss")
-                        else:
+                        elif manager_result.get("sl_changed", True):
                             # Un nuovo SL esplicito del trader sostituisce un BE
                             # ancora in attesa: non va sovrascritto più tardi.
                             tp_config["be_pending"] = False
