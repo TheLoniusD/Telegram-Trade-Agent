@@ -2,7 +2,7 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 from logger_config import setup_logger
@@ -18,11 +18,12 @@ CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 # stato vivo e finisce nell'archivio giornaliero.
 TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 
-# Un NEW_SIGNAL con stessa direzione e stesso prezzo (entro questa tolleranza
-# in $) dell'operazione ancora aperta è un secondo ingresso dello stesso setup
-# (23/09: "Gold sell 4285" alle 04:20 e di nuovo alle 04:25), non un segnale
-# nuovo: viene collegato al primo, così una chiusura li prende entrambi.
-SAME_SETUP_PRICE_TOLERANCE = 1.0
+# Re-entry ("Try buy again", "Lets try sell again"): non ha prezzo né livelli
+# e il trader non lo corregge mai con SL/TP, quindi eredita tutto dall'ultima
+# operazione classica nella stessa direzione. Di solito è ancora aperta; se nel
+# frattempo si è chiusa (es. dopo un "Hit risk") la cerchiamo nello storico, ma
+# solo se chiusa da non più di queste ore.
+REENTRY_PARENT_MAX_AGE_SECONDS = 6 * 3600
 
 
 class OrderManager:
@@ -180,6 +181,39 @@ class OrderManager:
         return None
 
 
+    def _find_reentry_parent(self, symbol: Optional[str], direction: Optional[str]) -> Optional[dict]:
+        """
+        Operazione da cui un re-entry eredita i valori: la più recente con la
+        stessa direzione (e simbolo, se indicato), prima fra quelle ancora in
+        memoria, poi nello storico di oggi e di ieri se chiusa da poco.
+        """
+        def matches(trade):
+            ticket = trade.get("tickets", {}).get("tp1", {})
+            return ((direction is None or ticket.get("direction") == direction)
+                    and (symbol is None or ticket.get("symbol") == symbol))
+
+        live = [t for t in self.active_trades.values() if t.get("status") in CLOSABLE_STATUSES and matches(t)]
+        if live:
+            return max(live, key=lambda t: t.get("created_at") or 0)
+
+        archived = []
+        now = time.time()
+        for day in (datetime.now(), datetime.now() - timedelta(days=1)):
+            path = os.path.join(self.archive_dir, f"trades_{day.strftime('%Y-%m-%d')}.jsonl")
+            if not os.path.exists(path):
+                continue
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        trade = json.loads(line)
+                    except ValueError:
+                        continue
+                    if (trade.get("status") == "CLOSED" and matches(trade)
+                            and now - (trade.get("created_at") or 0) <= REENTRY_PARENT_MAX_AGE_SECONDS):
+                        archived.append(trade)
+        return max(archived, key=lambda t: t.get("created_at") or 0) if archived else None
+
+
     def _get_trades_by_group(self, target_msg_id: int) -> list[dict]:
         """Restituisce tutte le operazioni attive collegate allo stesso root_msg_id o symbol/direction."""
         # Trova prima il trade target
@@ -219,10 +253,17 @@ class OrderManager:
         il chiamante ricade sull'ultima operazione aperta: prima anche l'edit
         con SL/TP di un segnale più vecchio finiva sull'ultimo aperto.
         """
-        if reply_to and reply_to in self.active_trades:
-            return reply_to
-        if msg_id in self.active_trades:
-            return msg_id
+        for ref in (reply_to, msg_id):
+            if not ref:
+                continue
+            if ref in self.active_trades:
+                return ref
+            # Il segnale padre è già chiuso e archiviato ma un suo re-entry è
+            # ancora aperto: "Trade Active", "HIT TP" ecc. rispondono sempre al
+            # messaggio classico, e valgono per tutta la sua catena.
+            for trade in reversed(list(self.active_trades.values())):
+                if trade.get("root_msg_id") == ref:
+                    return trade["msg_id"]
         return None
 
 
@@ -278,45 +319,32 @@ class OrderManager:
 
             ticket_id = str(uuid.uuid4())[:8].upper()
 
-            # Recuperiamo il riferimento all'ultima operazione attiva (se presente)
-            latest_trade = self._get_latest_trade()
-            has_active_trade = latest_trade is not None and latest_trade.get("status") == "ACTIVE"
+            # RE-ENTRY: solo i messaggi "again" senza prezzo, segnalati dall'agente
+            # con is_reentry. Un segnale con un prezzo ("Gold sell 4179") è SEMPRE
+            # un'operazione nuova e indipendente, anche se vicino a una aperta: il
+            # 28/09 veniva collegato al sell 4180 ed ereditava il suo stop, appena
+            # spostato a pareggio (4179,5), cioè a 50 centesimi dall'ingresso.
+            is_reentry = bool(data.get("is_reentry")) and data.get("entry_min") is None
+            source_trade = self._find_reentry_parent(data.get("symbol"), data.get("direction")) if is_reentry else None
+            root_msg_id = source_trade.get("root_msg_id", source_trade["msg_id"]) if source_trade else msg_id
+            if is_reentry:
+                logger.info(f"🔁 [RE-ENTRY] Collegato all'operazione {source_trade.get('ticket_id') if source_trade else 'nessuna'}"
+                            f" (root {root_msg_id}).")
 
-            # CONDIZIONI RE-ENTRY (secondo ingresso collegato all'operazione aperta):
-            #  - manca il simbolo ("Try sell again"), oppure
-            #  - stesso simbolo e manca il prezzo di ingresso, oppure
-            #  - stesso simbolo, stessa direzione e stesso prezzo di ingresso.
-            # Simbolo e direzione vanno letti dai ticket (_get_param): alla radice
-            # del trade non esistono, e il confronto risultava sempre falso.
-            # NON basta che manchi lo SL: ogni fase rapida non ha SL, e segnali
-            # diversi (es. SELL 4286 e poi SELL 4284) finirebbero incatenati, con
-            # gli edit dell'uno applicati anche all'altro.
-            missing_symbol = data.get("symbol") is None
-            missing_entry = data.get("entry_min") is None
-
-            same_symbol = has_active_trade and data.get("symbol") == self._get_param(latest_trade, "symbol")
-            latest_entry = latest_trade.get("entry_min") if has_active_trade else None
-            same_setup = (
-                same_symbol
-                and data.get("direction") == self._get_param(latest_trade, "direction")
-                and not missing_entry and latest_entry is not None
-                and abs(data["entry_min"] - latest_entry) <= SAME_SETUP_PRICE_TOLERANCE
-            )
-
-            is_reentry = has_active_trade and (missing_symbol or (same_symbol and missing_entry) or same_setup)
-
-            # Se è re-entry ereditiamo da latest_trade, altrimenti disattiviamo l'ereditarietà (source_trade = None)
-            source_trade = latest_trade if is_reentry else None
-            root_msg_id = latest_trade.get("root_msg_id", latest_trade["msg_id"]) if is_reentry else msg_id
-
-            # Ereditarietà dinamica dei dati (solo se source_trade non è None)
+            # Ereditarietà dei dati (solo se source_trade non è None)
             symbol = data.get("symbol") or self._get_param(source_trade, "symbol") or "XAUUSD"
             direction = data.get("direction") or self._get_param(source_trade, "direction")
 
-            entry_min = data.get("entry_min") if data.get("entry_min") is not None else self._get_param(source_trade, "entry_min", "entry_price")
-            entry_max = data.get("entry_max") if data.get("entry_max") is not None else self._get_param(source_trade, "entry_max")
+            # Il re-entry entra a mercato ("try again" = adesso): la zona del padre
+            # è già stata superata, ordini limite lì resterebbero ineseguiti.
+            entry_min = data.get("entry_min")
+            entry_max = data.get("entry_max")
 
-            stop_loss = data.get("stop_loss") if data.get("stop_loss") is not None else self._get_param(source_trade, "stop_loss")
+            # Lo stop ereditato è quello scritto dal TRADER per il padre, mai
+            # quello attuale del ticket (che dopo il BE è il prezzo d'ingresso).
+            # Se nel frattempo è stato superato dal prezzo, il Risk Manager lo
+            # sostituisce con quello provvisorio.
+            stop_loss = data.get("stop_loss") if data.get("stop_loss") is not None else (source_trade or {}).get("signal_stop_loss")
 
             # Gestione Take Profit (da lista se fornita, altrimenti ereditati)
             tp_list = data.get("take_profit", [])
@@ -335,6 +363,8 @@ class OrderManager:
                 "root_msg_id": root_msg_id,
                 "entry_min": entry_min,
                 "entry_max": entry_max,
+                "signal_stop_loss": stop_loss,
+                "reentry": is_reentry,
                 "status": "ACTIVE",
                 "created_at": time.time(),
                 "tickets": {
@@ -421,6 +451,7 @@ class OrderManager:
                 # B. Aggiornamento Stop Loss a livello radice (es. invalidation/cut loss)
                 if new_sl is not None:
                     trade["stop_loss"] = new_sl
+                    trade["signal_stop_loss"] = new_sl
                     modified = True
                     for tp_config in trade.get("tickets", {}).values():
                         tp_config["stop_loss"] = new_sl
