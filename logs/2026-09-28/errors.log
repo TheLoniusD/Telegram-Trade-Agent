@@ -1,0 +1,5 @@
+2026-09-28 08:17:13 | ERROR    | mt5_executor | ❌ Errore ordine limite MT5: Invalid stops (retcode 10016)
+2026-09-28 08:17:13 | WARNING  | telegram_listener | ⚠️ Apertura tp2 non riuscita: Invalid stops (retcode 10016)
+2026-09-28 08:17:13 | WARNING  | telegram_listener | ⚠️ Apertura PARZIALE: 1/2 ticket a mercato, l'operazione resta gestita.
+2026-09-28 13:33:19 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58653218459: Invalid stops (retcode 10016)
+2026-09-28 13:33:19 | WARNING  | telegram_listener | 🔄 Ticket MT5 58653218459 ancora aperto: memoria riallineata al broker (SL 4163.0, TP 4143.0).

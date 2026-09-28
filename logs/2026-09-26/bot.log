@@ -1,0 +1,40 @@
+2026-09-26 00:05:43 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 01:05:45 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 01:09:15 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-09-26 01:09:45 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-09-26 02:05:47 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 03:05:50 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 03:15:14 | INFO     | telegram_listener | 🆕 NUOVO MESSAGGIO | ID: 58000 | Reply-To: None | Mittente: -1001222394814 | Testo: 'Happy Weekend | Day 269\n\nMarket opens Monday\n\nOpportunities Never End\n\n🌐 BullMaestro'
+2026-09-26 03:15:14 | INFO     | telegram_listener | ⏭️ Messaggio 58000 scartato: nessuna parola operativa (emoji, celebrazione, avviso).
+2026-09-26 03:16:14 | INFO     | telegram_listener | ✏️ EDIT MESSAGGIO | ID: 58000 | Reply-To: None | Mittente: -1001222394814 | Testo: 'Happy Weekend | Day 269\n\nMarket opens Monday\n\nOpportunities Never End\n\n🌐 BullMaestro'
+2026-09-26 03:16:14 | INFO     | telegram_listener | ⏭️ Messaggio 58000 scartato: nessuna parola operativa (emoji, celebrazione, avviso).
+2026-09-26 04:05:52 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 04:20:23 | INFO     | telegram_listener | 🆕 NUOVO MESSAGGIO | ID: 58002 | Reply-To: None | Mittente: -1001222394814 | Testo: "YESTERDAY SUMMARY\n\n25th September 2026\n\n✔️GOLD Buy : 45 PIPS\n✔️GOLD Buy : 60 PIPS\n✔️GOLD Sell : 75 PIPS\n✔️GOLD Sell : 100 PIPS\n✔️GOLD Sell : 50 PIPS\n✔️GOLD Buy : 55 PIPS\n✔️GOLD Buy : 410 PIPS(TP)\n❌GOLD Buy : SL\n✔️GOLD Buy : 45 PIPS\n✔️GOLD Buy : 115 PIPS\n✔️GOLD Buy : 45 PIPS\n✔️GOLD Buy : 65 PIPS\n\n\nSignal             : 12 Total\nNet Pips         : 1065 PIPS\nWin Rate        : 11/12\n\n\n🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤\n\n11 Wins 1 Loss. A great way to wrap up the trading week with another profitable result.🥸\nThe week closes on a positive note, with profits secured.💥\n\nHave a great weekend, and we'll see you next week 🚀\n\nCongrats to Those Following🍾\n\nEnjoy ur Profits💰\n\nHere’s to Greater Results Today🤝\n\n💠REGISTER TRADING ACCOUNT\n\n#tradelikeMaestro #MaestroPayout"
+2026-09-26 04:20:23 | INFO     | telegram_listener | ⏸️ Messaggio scartato senza classificarlo: weekend (sabato)
+2026-09-26 04:20:29 | INFO     | telegram_listener | ✏️ EDIT MESSAGGIO | ID: 58002 | Reply-To: None | Mittente: -1001222394814 | Testo: "YESTERDAY SUMMARY\n\n25th September 2026\n\n✔️GOLD Buy : 45 PIPS\n✔️GOLD Buy : 60 PIPS\n✔️GOLD Sell : 75 PIPS\n✔️GOLD Sell : 100 PIPS\n✔️GOLD Sell : 50 PIPS\n✔️GOLD Buy : 55 PIPS\n✔️GOLD Buy : 410 PIPS(TP)\n❌GOLD Buy : SL\n✔️GOLD Buy : 45 PIPS\n✔️GOLD Buy : 115 PIPS\n✔️GOLD Buy : 45 PIPS\n✔️GOLD Buy : 65 PIPS\n\n\nSignal             : 12 Total\nNet Pips         : 1065 PIPS\nWin Rate        : 11/12\n\n\n🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤🔤\n\n11 Wins 1 Loss. A great way to wrap up the trading week with another profitable result.🥸\nThe week closes on a positive note, with profits secured.💥\n\nHave a great weekend, and we'll see you next week 🚀\n\nCongrats to Those Following🍾\n\nEnjoy ur Profits💰\n\nHere’s to Greater Results Today🤝\n\n💠REGISTER TRADING ACCOUNT\n\n#tradelikeMaestro #MaestroPayout"
+2026-09-26 04:20:29 | INFO     | telegram_listener | ⏸️ Messaggio scartato senza classificarlo: weekend (sabato)
+2026-09-26 05:05:16 | INFO     | telegram_listener | 🆕 NUOVO MESSAGGIO | ID: 58003 | Reply-To: None | Mittente: -1001222394814 | Testo: 'Update: 113k profit'
+2026-09-26 05:05:16 | INFO     | telegram_listener | ⏭️ Messaggio 58003 scartato: inoltrato (testimonianza, non un segnale del trader).
+2026-09-26 05:05:55 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 05:06:17 | INFO     | telegram_listener | ✏️ EDIT MESSAGGIO | ID: 58003 | Reply-To: None | Mittente: -1001222394814 | Testo: 'Update: 113k profit'
+2026-09-26 05:06:17 | INFO     | telegram_listener | ⏭️ Messaggio 58003 scartato: inoltrato (testimonianza, non un segnale del trader).
+2026-09-26 06:05:58 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 07:06:01 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 08:06:03 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 09:06:06 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 10:06:09 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 11:06:12 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 12:06:15 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 13:06:18 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 14:06:21 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 15:06:24 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 16:06:27 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 17:06:29 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 18:06:31 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 19:06:33 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 20:06:35 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 20:10:35 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-09-26 20:18:36 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-09-26 21:06:37 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 22:06:40 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
+2026-09-26 23:06:42 | INFO     | telegram_listener | 💓 Bot attivo | MT5: MT5 operativo | operazioni vive: 0 | saldo: 7461.58 | equity: 7461.58 | posizioni aperte sul conto: 0
