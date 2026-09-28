@@ -5,11 +5,15 @@ Sostituisce i print sparsi nei moduli: quando il bot gira da solo servono log
 persistenti per ricostruire cosa è successo, soprattutto in caso di errore.
 
 Scrive contemporaneamente su:
-  - console (come prima, per seguire il bot durante i test)
+  - console: il racconto, più eventuali errori
   - una cartella per giorno, logs/AAAA-MM-GG/, con dentro:
-      bot.log        tutto
-      errors.log     solo avvisi ed errori, per trovare subito cosa è andato storto
-      journal.jsonl  il diario strutturato delle operazioni (vedi journal.py)
+      bot.log         il racconto: una riga breve in italiano per ogni fatto
+                      (vedi narrative.py), da leggere per seguire la giornata
+      operazioni.txt  una scheda per ogni segnale, con esiti e risultato
+      dettagli.log    tutte le righe tecniche dei moduli (JSON dell'agente,
+                      memoria, richieste MT5), per le indagini
+      errors.log      solo avvisi ed errori, per trovare subito cosa è andato storto
+      journal.jsonl   il diario strutturato delle operazioni (vedi journal.py)
     Le cartelle più vecchie di LOG_RETENTION_DAYS giorni vengono cancellate.
 
 Tutti gli orari (righe di log, diario, cambio di cartella a mezzanotte) sono
@@ -27,12 +31,15 @@ from zoneinfo import ZoneInfo
 
 LOG_DIR = "logs"
 LOG_FILE = "bot.log"
+DETAILS_LOG_FILE = "dettagli.log"
 ERROR_LOG_FILE = "errors.log"
 LOG_RETENTION_DAYS = 30
 
 # Logger padre condiviso: i moduli ne ottengono un figlio (trade_bot.<modulo>)
 # che propaga qui. Gli handler su file esistono così una volta sola.
 ROOT_LOGGER_NAME = "trade_bot"
+# Logger del racconto (narrative.py): l'unico che scrive in bot.log
+STORY_LOGGER_NAME = f"{ROOT_LOGGER_NAME}.racconto"
 
 LOG_TIMEZONE_NAME = os.getenv("LOG_TIMEZONE", "Europe/Rome")
 try:
@@ -89,8 +96,10 @@ class DailyFolderFileHandler(logging.Handler):
     funziona anche su Windows, dove rinominare un file aperto fallisce.
     """
 
-    def __init__(self, filename: str, level: int, formatter: logging.Formatter):
+    def __init__(self, filename: str, level: int, formatter: logging.Formatter, record_filter=None):
         super().__init__(level)
+        if record_filter:
+            self.addFilter(record_filter)
         self.filename = filename
         self.setFormatter(formatter)
         self._day = None
@@ -131,17 +140,24 @@ def _configure_root_logger() -> logging.Logger:
 
     # %(module)s mostra il nome del file (es. telegram_listener anche quando è
     # avviato come script, dove il nome del logger sarebbe __main__)
-    formatter = LocalTimeFormatter(
+    technical = LocalTimeFormatter(
         fmt="%(asctime)s | %(levelname)-8s | %(module)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # Il racconto: solo l'ora (il giorno è già nel nome della cartella)
+    story = LocalTimeFormatter(fmt="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+
+    def is_story(record):
+        return record.name == STORY_LOGGER_NAME
 
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(story)
+    console_handler.addFilter(lambda r: is_story(r) or r.levelno >= logging.ERROR)
     root.addHandler(console_handler)
 
-    root.addHandler(DailyFolderFileHandler(LOG_FILE, logging.INFO, formatter))
-    root.addHandler(DailyFolderFileHandler(ERROR_LOG_FILE, logging.WARNING, formatter))
+    root.addHandler(DailyFolderFileHandler(LOG_FILE, logging.INFO, story, is_story))
+    root.addHandler(DailyFolderFileHandler(DETAILS_LOG_FILE, logging.INFO, technical, lambda r: not is_story(r)))
+    root.addHandler(DailyFolderFileHandler(ERROR_LOG_FILE, logging.WARNING, technical))
 
     return root
 
