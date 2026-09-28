@@ -91,10 +91,14 @@ def short_reason(reason) -> str:
     return "cancellato"
 
 
-def label_for(direction, entry_min, reentry=False) -> str:
+def label_for(direction, entry_min, reentry=False, entry_max=None) -> str:
+    """Etichetta del segnale: direzione e prezzo del segnale (il bordo della zona da cui parte il trader)."""
     if reentry:
         return f"{direction} re-entry"
-    return f"{direction} {level(entry_min)}".strip()
+    price = entry_min
+    if entry_min is not None and entry_max is not None:
+        price = max(entry_min, entry_max) if direction == "BUY" else min(entry_min, entry_max)
+    return f"{direction} {level(price)}".strip()
 
 
 def describe_classification(entry: dict) -> str:
@@ -163,7 +167,7 @@ class Narrator:
         data = self.classified.get(msg_id) or {}
         if not data.get("direction"):
             return ""
-        return f"[{label_for(data['direction'], data.get('entry_min'), data.get('is_reentry'))}] "
+        return f"[{label_for(data['direction'], data.get('entry_min'), data.get('is_reentry'), data.get('entry_max'))}] "
 
     # -- caricamento iniziale ------------------------------------------------
 
@@ -230,11 +234,11 @@ class Narrator:
         first = trade is None
         if first:
             any_ticket = next(iter(tickets.values()), {})
-            entry_min = e.get("entry_min")
-            if entry_min is None:
-                entry_min = (self.classified.get(e.get("trade_msg_id")) or {}).get("entry_min")
+            signal = self.classified.get(e.get("trade_msg_id")) or {}
+            entry_min = e.get("entry_min") if e.get("entry_min") is not None else signal.get("entry_min")
+            entry_max = e.get("entry_max") if e.get("entry_max") is not None else signal.get("entry_max")
             trade = self.trades[tid] = {
-                "label": label_for(any_ticket.get("direction"), entry_min, e.get("reentry")),
+                "label": label_for(any_ticket.get("direction"), entry_min, e.get("reentry"), entry_max),
                 "snapshot": {}, "alive": set(), "profit": 0.0,
             }
         for key, t in tickets.items():
@@ -486,9 +490,10 @@ def build_sheets(day: str) -> str:
         any_ticket = next(iter(tickets.values()), {})
         known = signal_data.get(root, {})
         entry_min = first.get("entry_min") if first.get("entry_min") is not None else known.get("entry_min")
+        entry_max = first.get("entry_max") if first.get("entry_min") is not None else known.get("entry_max")
         zone_min = last.get("entry_min") if last.get("entry_min") is not None else known.get("entry_min")
         zone_max = last.get("entry_max") if last.get("entry_max") is not None else known.get("entry_max")
-        label = label_for(any_ticket.get("direction"), entry_min, first.get("reentry"))
+        label = label_for(any_ticket.get("direction"), entry_min, first.get("reentry"), entry_max)
 
         profit = sum(c.get("profit") or 0 for c in trade["closes"].values())
         alive = [k for k, t in tickets.items() if t.get("mt5_ticket") and k not in trade["closes"] and k not in trade["cancels"]]
