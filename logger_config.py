@@ -10,8 +10,9 @@ Scrive contemporaneamente su:
       bot.log         il racconto: una riga breve in italiano per ogni fatto
                       (vedi narrative.py), da leggere per seguire la giornata
       operazioni.txt  una scheda per ogni segnale, con esiti e risultato
-      dettagli.log    tutte le righe tecniche dei moduli (JSON dell'agente,
-                      memoria, richieste MT5), per le indagini
+      dettagli.log    avvisi e informazioni tecniche non presenti nel diario;
+                      con LOG_DETAILS_LEVEL=DEBUG anche tutte le righe tecniche
+                      (JSON dell'agente, memoria, richieste MT5)
       errors.log      solo avvisi ed errori, per trovare subito cosa è andato storto
       journal.jsonl   il diario strutturato delle operazioni (vedi journal.py)
     Le cartelle più vecchie di LOG_RETENTION_DAYS giorni vengono cancellate.
@@ -40,6 +41,12 @@ LOG_RETENTION_DAYS = 30
 ROOT_LOGGER_NAME = "trade_bot"
 # Logger del racconto (narrative.py): l'unico che scrive in bot.log
 STORY_LOGGER_NAME = f"{ROOT_LOGGER_NAME}.racconto"
+
+# Livello di dettagli.log. INFO (default): solo avvisi, errori e le poche
+# informazioni che il diario non registra (avvio, connessioni, memoria).
+# DEBUG: anche le righe tecniche che ripetono i fatti già nel diario (messaggi,
+# JSON dell'agente, esiti dell'Order Manager, ordini MT5), per un'indagine.
+LOG_DETAILS_LEVEL = logging.DEBUG if os.getenv("LOG_DETAILS_LEVEL", "INFO").upper() == "DEBUG" else logging.INFO
 
 LOG_TIMEZONE_NAME = os.getenv("LOG_TIMEZONE", "Europe/Rome")
 try:
@@ -134,7 +141,7 @@ def _configure_root_logger() -> logging.Logger:
     if root.handlers:
         return root
 
-    root.setLevel(logging.INFO)
+    root.setLevel(LOG_DETAILS_LEVEL)
     # Evita che i messaggi risalgano al root logger di Python e vengano stampati due volte
     root.propagate = False
 
@@ -151,12 +158,13 @@ def _configure_root_logger() -> logging.Logger:
         return record.name == STORY_LOGGER_NAME
 
     console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(story)
     console_handler.addFilter(lambda r: is_story(r) or r.levelno >= logging.ERROR)
     root.addHandler(console_handler)
 
     root.addHandler(DailyFolderFileHandler(LOG_FILE, logging.INFO, story, is_story))
-    root.addHandler(DailyFolderFileHandler(DETAILS_LOG_FILE, logging.INFO, technical, lambda r: not is_story(r)))
+    root.addHandler(DailyFolderFileHandler(DETAILS_LOG_FILE, LOG_DETAILS_LEVEL, technical, lambda r: not is_story(r)))
     root.addHandler(DailyFolderFileHandler(ERROR_LOG_FILE, logging.WARNING, technical))
 
     return root
