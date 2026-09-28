@@ -13,6 +13,12 @@ import journal
 # dopo l'edit con i livelli definitivi.
 DEFAULT_SL_DIST_GOLD = 10.0
 
+# Distanza minima accettata tra ingresso e SL. Sotto questa soglia lo SL è
+# certamente un errore (il 28/09 uno stop già spostato a pareggio, a 0,5$
+# dall'ingresso, aveva prodotto lotti 10 volte più grandi) e si usa quello
+# provvisorio a DEFAULT_SL_DIST_GOLD.
+MIN_SL_DIST_GOLD = 3.0
+
 # Quota massima del margine libero impegnabile da un singolo segnale (2 ticket)
 MARGIN_USAGE_LIMIT = 0.5
 
@@ -77,16 +83,27 @@ class RiskManager:
         current_price = symbol_info.ask if direction == "BUY" else symbol_info.bid
         entry_price = entry_min if entry_min is not None else current_price
 
-        # 2. Gestione Stop Loss Mancante (Segnale Rapido)
+        # 2. Prezzi di ingresso dei due ticket (vedi ENTRY_MODE)
+        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"))
+
+        # Prezzo di ingresso più sfavorevole allo SL tra quelli possibili
+        # (mercato o livelli limite): lo SL deve stare oltre tutti.
+        refs = [current_price] + [lvl for lvl in entry_levels.values() if lvl is not None]
+        worst_entry = min(refs) if direction == "BUY" else max(refs)
+
+        # 3. Stop Loss: quello del segnale (o ereditato dal re-entry) se è dalla
+        # parte giusta e ad almeno MIN_SL_DIST_GOLD, altrimenti quello provvisorio.
+        stop_loss_source = "segnale"
         if not stop_loss:
-            # Calcolo di uno SL temporaneo per entrare subito a mercato in sicurezza
+            stop_loss_source = "provvisorio (segnale senza SL)"
+        elif (worst_entry - stop_loss if direction == "BUY" else stop_loss - worst_entry) < MIN_SL_DIST_GOLD:
+            stop_loss_source = f"provvisorio (SL {stop_loss} dalla parte sbagliata o a meno di {MIN_SL_DIST_GOLD}$)"
+            stop_loss = None
+        if not stop_loss:
             if direction == "BUY":
                 stop_loss = entry_price - DEFAULT_SL_DIST_GOLD
             else:
                 stop_loss = entry_price + DEFAULT_SL_DIST_GOLD
-
-        # 3. Prezzi di ingresso dei due ticket (vedi ENTRY_MODE)
-        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"))
 
         # 4. Lottaggio: metà del rischio per ticket, misurata dal prezzo a cui
         # quel ticket entrerà (il livello limite, o il prezzo corrente se a
@@ -104,7 +121,8 @@ class RiskManager:
         lots = {k: round(math.floor(v * scale / step_lot) * step_lot, 2) for k, v in lots.items()}
 
         journal.record("RISK_CALC", ticket_id=trade_data.get("ticket_id"), direction=direction,
-                       price=current_price, stop_loss=stop_loss, risk_percent=self.risk_percent,
+                       price=current_price, stop_loss=stop_loss, stop_loss_source=stop_loss_source,
+                       reentry=bool(trade_data.get("reentry")), risk_percent=self.risk_percent,
                        entry_levels=entry_levels, lots=lots, lots_by_margin=round(margin_lots, 2),
                        lots_total=round(sum(lots.values()), 2))
 
@@ -115,13 +133,19 @@ class RiskManager:
         # (None in fase rapida, in attesa degli update successivi)
         orders_to_execute = {}
         for key in ("tp1", "tp2"):
+            take_profit = tickets.get(key, {}).get("take_profit")
+            # TP già superato dal prezzo (es. ereditato da un re-entry dopo che il
+            # padre lo aveva preso): MT5 rifiuterebbe l'ordine, si apre senza TP.
+            level = entry_levels[key] if entry_levels[key] is not None else current_price
+            if take_profit is not None and not (take_profit > level if direction == "BUY" else take_profit < level):
+                take_profit = None
             orders_to_execute[key] = {
                 "symbol": symbol,
                 "direction": direction,
                 "entry_price": entry_levels[key] if entry_levels[key] is not None else entry_price,
                 "limit_price": entry_levels[key],
                 "stop_loss": stop_loss,
-                "take_profit": tickets.get(key, {}).get("take_profit"),
+                "take_profit": take_profit,
                 "volume": lots[key],
                 "ticket_id": trade_data.get("ticket_id"),
             }

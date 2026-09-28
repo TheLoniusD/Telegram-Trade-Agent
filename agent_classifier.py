@@ -110,10 +110,15 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
      -> symbol assente: null (l'Order Manager erediterà l'ultimo simbolo attivo).
      -> entry_price assente: null (ordine a mercato).
      -> SL/TP assenti: null / [] (il Risk Manager applicherà i default).
+     -> is_reentry: false.
 
-  b) Re-entry imperativo: "Try buy again", "Lets sell again", "Sell again M15 DBD zone",
-     "Try buy again, M15,M30,H1 got bullish engulfing".
-     -> intent: 'NEW_SIGNAL', is_actionable: true, anche se simbolo/prezzo mancano (verranno ereditati).
+  b) Re-entry: "Try buy again", "Try sell again", "Lets try buy again", "Lets sell again",
+     "Sell again M15 DBD zone", "Try buy again, M15,M30,H1 got bullish engulfing".
+     Riconoscibile dalla parola "again" (o "re-entry") insieme a una direzione, SENZA prezzo: il trader
+     rientra nello stesso setup dell'operazione precedente, di cui valgono SL e TP (non li riscrive mai).
+     -> intent: 'NEW_SIGNAL', is_actionable: true, is_reentry: true, entry_min/entry_max null.
+     Un segnale con un prezzo ("Gold sell 4179") NON è mai un re-entry, anche se il prezzo è vicino a quello di
+     un segnale precedente: è sempre is_reentry: false.
 
 ── 4. IGNORE (default quando nessuna delle regole sopra si applica) ──
 
@@ -137,6 +142,8 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
   - Prezzo singolo (es. "GOLD SELL 4307"): entry_min: 4307.0, entry_max: null.
   - Zona/range (es. "4300 - 4305"): entry_min: 4300.0, entry_max: 4305.0.
   - Prezzo assente (mercato immediato, re-entry): entry_min e entry_max entrambi null.
+- 'is_reentry': true SOLO per il re-entry del punto 3b (messaggio "again" senza prezzo); false in tutti gli
+  altri casi, compresi UPDATE_SIGNAL, CLOSE_SIGNAL e IGNORE.
 - 'stop_loss': valore numerico diretto (sia per SL espliciti che per invalidation/cut loss). Assente -> null.
 - 'take_profit': array dei target estratti. Assenti -> [].
 - 'update_details.move_sl_to_be': true se il testo contiene "BE+", "BE", "B/E", "break even", "breakeven",
@@ -164,7 +171,8 @@ reply al messaggio del segnale.
 4. "GOLD SELL NOW\n\nSELL @ 4314 - 4319\n\nSL🔴4324\nTP✅4304\nTP✅4294" (is_telegram_edit=true)
    -> UPDATE_SIGNAL, direction SELL, entry_min 4314.0, entry_max 4319.0, stop_loss 4324.0, take_profit [4304.0, 4294.0].
 5. "M5 double top,lets sell it"
-   -> NEW_SIGNAL, direction SELL, prezzo assente (entry_min null): imperativo operativo con direzione.
+   -> NEW_SIGNAL, direction SELL, prezzo assente (entry_min null): imperativo operativo con direzione,
+      is_reentry false (non dice "again": è un nuovo ingresso a mercato, non un rientro).
 6. "Lets close half now"
    -> UPDATE_SIGNAL, close_percentage 50.0, move_sl_to_be false.
 7. "Running 65 pips, close half set your BE"
@@ -180,6 +188,7 @@ reply al messaggio del segnale.
 13. "Gold has successfully broken below the H1 support level, showing bearish momentum" -> IGNORE (analisi senza
     imperativo operativo).
 14. "Bad entry" -> IGNORE (commento, nessun comando: non chiudere né modificare nulla).
+15. "Lets try buy again" -> NEW_SIGNAL, direction BUY, entry_min null, is_reentry true (rientro nel setup precedente).
 
 Chiama SEMPRE ed ESCLUSIVAMENTE lo strumento 'classify_signal' con i campi compilati secondo queste regole.
 Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, chiusura totale"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""
@@ -204,6 +213,7 @@ CLASSIFY_SIGNAL_TOOL = {
                     "entry_max": {"type": ["number", "null"]},
                     "stop_loss": {"type": ["number", "null"]},
                     "take_profit": {"type": "array", "items": {"type": "number"}},
+                    "is_reentry": {"type": "boolean"},
                     "update_details": {
                         "type": "object",
                         "properties": {
@@ -215,7 +225,7 @@ CLASSIFY_SIGNAL_TOOL = {
                         "additionalProperties": False
                     }
                 },
-                "required": ["symbol", "direction", "entry_min", "entry_max", "stop_loss", "take_profit", "update_details"],
+                "required": ["symbol", "direction", "entry_min", "entry_max", "stop_loss", "take_profit", "is_reentry", "update_details"],
                 "additionalProperties": False
             },
             "raw_reasoning": {"type": "string"}

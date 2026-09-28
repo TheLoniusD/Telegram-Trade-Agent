@@ -250,6 +250,15 @@ def cancel_pending_ticket(tp_config: dict, reason: str) -> None:
         journal.record("PENDING_CANCELLED", mt5_ticket=mt5_ticket, reason=reason)
 
 
+def filled_and_closed(mt5_ticket: int) -> bool:
+    """True se un ordine sparito dal broker ha uno storico di chiusura (quindi era stato eseguito)."""
+    try:
+        return bool(mt5_agent.get_close_info(mt5_ticket))
+    except Exception as e:
+        logger.warning(f"⚠️ Storico dell'ordine {mt5_ticket} non disponibile: {e}")
+        return False
+
+
 def sync_pending_entries() -> None:
     """
     Segue gli ordini limite in attesa: se eseguiti registra prezzo e volume
@@ -279,7 +288,16 @@ def sync_pending_entries() -> None:
                 elif status == "GONE":
                     tp_config["pending"] = False
                     tp_config["closed"] = True
-                    journal.record("PENDING_CANCELLED", mt5_ticket=mt5_ticket, reason="non più presente sul broker")
+                    if filled_and_closed(mt5_ticket):
+                        # Eseguito e già chiuso tra due controlli (il 28/09 in 38
+                        # secondi): prima veniva registrato come cancellato e la
+                        # perdita non compariva da nessuna parte.
+                        logger.warning(f"⚠️ Ordine limite {mt5_ticket} eseguito e già chiuso prima del controllo.")
+                        journal.record("PENDING_FILLED", mt5_ticket=mt5_ticket, price=tp_config.get("entry_price"),
+                                       volume=tp_config.get("volume"), note="eseguito e chiuso tra due controlli")
+                        record_position_closed(mt5_ticket, closed_by="RILEVATA_SU_MT5", trade=trade)
+                    else:
+                        journal.record("PENDING_CANCELLED", mt5_ticket=mt5_ticket, reason="non più presente sul broker")
                     changed = True
                 elif time.time() - (tp_config.get("pending_since") or time.time()) > ENTRY_ORDER_EXPIRY_SECONDS:
                     cancel_pending_ticket(tp_config, f"non eseguito entro {ENTRY_ORDER_EXPIRY_SECONDS // 60} minuti")
