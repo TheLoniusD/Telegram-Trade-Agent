@@ -93,7 +93,7 @@ class OrderManager:
         for msg_id, _ in terminali:
             del self.active_trades[msg_id]
 
-        logger.info(f"🗄️ Archiviate {len(terminali)} operazioni concluse in {percorso}")
+        logger.debug(f"🗄️ Archiviate {len(terminali)} operazioni concluse in {percorso}")
         return len(terminali)
 
     def save_state_to_file(self, filepath: Optional[str] = None) -> None:
@@ -172,7 +172,7 @@ class OrderManager:
                 if state is None:
                     tp_config["closed"] = True
                     corrections += 1
-                    logger.info(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
+                    logger.debug(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
                     continue
 
                 # La posizione esiste ancora: i valori del broker vincono sempre
@@ -186,7 +186,7 @@ class OrderManager:
             # Se tutti i ticket sono chiusi, lo è anche l'operazione
             if tickets and all(t.get("closed") for t in tickets.values()):
                 trade["status"] = "CLOSED"
-                logger.info(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
+                logger.debug(f"🔄 [RICONCILIAZIONE] Operazione {trade.get('ticket_id')} risulta chiusa su MT5.")
 
         if corrections:
             self.save_state_to_file()
@@ -349,7 +349,7 @@ class OrderManager:
             source_trade = self._find_reentry_parent(data.get("symbol"), data.get("direction")) if is_reentry else None
             root_msg_id = source_trade.get("root_msg_id", source_trade["msg_id"]) if source_trade else msg_id
             if is_reentry:
-                logger.info(f"🔁 [RE-ENTRY] Collegato all'operazione {source_trade.get('ticket_id') if source_trade else 'nessuna'}"
+                logger.debug(f"🔁 [RE-ENTRY] Collegato all'operazione {source_trade.get('ticket_id') if source_trade else 'nessuna'}"
                             f" (root {root_msg_id}).")
 
             # Ereditarietà dei dati (solo se source_trade non è None)
@@ -506,7 +506,7 @@ class OrderManager:
 
             if updated_trades or be_candidates or partial_close:
                 self.save_state_to_file()
-                logger.info(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
+                logger.debug(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
                 return {
                     "action": "UPDATE",
                     "trades": trades_to_update,
@@ -550,7 +550,7 @@ class OrderManager:
                 return {"action": "IGNORE", "reason": "Nessuna operazione a mercato da chiudere."}
 
             self.save_state_to_file()
-            logger.info(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: {len(closing_chain)} operazioni da chiudere (Originale + Re-entry).")
+            logger.debug(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: {len(closing_chain)} operazioni da chiudere (Originale + Re-entry).")
 
             return {
                 "action": "CLOSE",

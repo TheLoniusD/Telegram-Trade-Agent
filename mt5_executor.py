@@ -176,7 +176,7 @@ class MT5Executor:
             logger.error(f"❌ Errore apertura ordine MT5: {error}")
             return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": error}
 
-        logger.info(f"✅ Ordine eseguito su MT5 | Ticket: {result.order} | Volume: {result.volume} | Prezzo: {result.price}")
+        logger.debug(f"✅ Ordine eseguito su MT5 | Ticket: {result.order} | Volume: {result.volume} | Prezzo: {result.price}")
         return {
             "success": True,
             "mt5_ticket": result.order,
@@ -207,7 +207,7 @@ class MT5Executor:
             logger.error(f"❌ Errore ordine limite MT5: {error}")
             return {"success": False, "mt5_ticket": None, "fill_price": None, "volume": None, "error": error}
 
-        logger.info(f"⏳ Ordine limite {direction} in attesa | Ticket: {result.order} | Volume: {order_plan['volume']} | Prezzo: {limit_price}")
+        logger.debug(f"⏳ Ordine limite {direction} in attesa | Ticket: {result.order} | Volume: {order_plan['volume']} | Prezzo: {limit_price}")
         return {
             "success": True,
             "mt5_ticket": result.order,
@@ -257,7 +257,7 @@ class MT5Executor:
         if not ok:
             logger.error(f"❌ Errore cancellazione ordine {ticket}: {error}")
             return False
-        logger.info(f"🗑️ Ordine in attesa {ticket} cancellato.")
+        logger.debug(f"🗑️ Ordine in attesa {ticket} cancellato.")
         return True
 
     def set_sl_to_be(self, ticket: int, entry_price: float) -> bool:
@@ -281,7 +281,7 @@ class MT5Executor:
             logger.error(f"❌ BE non applicato al ticket {ticket}: {e}")
             return False
         if pos is None:
-            logger.info(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
+            logger.debug(f"ℹ️ Ticket {ticket} non più aperto su MT5 (probabilmente TP già raggiunto).")
             return False
 
         request = {
@@ -292,7 +292,7 @@ class MT5Executor:
         }
         ok, result, error = self._send("BREAKEVEN", request, symbol=pos.symbol)
         if ok:
-            logger.info(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
+            logger.debug(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
             return True
 
         logger.error(f"❌ Errore spostamento BE posizione #{pos.ticket}: {error}")
@@ -320,7 +320,7 @@ class MT5Executor:
             # altrimenti si riempirebbe dopo la chiusura dell'operazione.
             if not self.cancel_order(ticket):
                 return False
-            logger.info(f"ℹ️ Ticket {ticket} non presente su MT5 come posizione: nessuna chiusura necessaria.")
+            logger.debug(f"ℹ️ Ticket {ticket} non presente su MT5 come posizione: nessuna chiusura necessaria.")
             return True
 
         close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
@@ -351,7 +351,7 @@ class MT5Executor:
             logger.error(f"❌ Errore chiusura posizione {pos.ticket}: {error}")
             return False
 
-        logger.info(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
+        logger.debug(f"🔒 Posizione {pos.ticket} chiusa correttamente su MT5.")
         return True
 
     def partial_close_position(self, ticket: int, volume: float) -> Optional[float]:
@@ -372,7 +372,7 @@ class MT5Executor:
             logger.error(f"❌ Chiusura parziale del ticket {ticket} non inviata: {e}")
             return None
         if pos is None:
-            logger.info(f"ℹ️ Ticket {ticket} non presente su MT5: chiusura parziale non necessaria.")
+            logger.debug(f"ℹ️ Ticket {ticket} non presente su MT5: chiusura parziale non necessaria.")
             return None
 
         info = mt5.symbol_info(pos.symbol)
@@ -409,7 +409,7 @@ class MT5Executor:
             logger.error(f"❌ Errore chiusura parziale posizione {pos.ticket}: {error}")
             return None
 
-        logger.info(f"✂️ Chiusi {volume} lotti su {pos.volume} della posizione {pos.ticket}.")
+        logger.debug(f"✂️ Chiusi {volume} lotti su {pos.volume} della posizione {pos.ticket}.")
         return volume
 
     def modify_order_levels(self, ticket: int, stop_loss: float, take_profit: list) -> bool:
@@ -442,7 +442,7 @@ class MT5Executor:
             if not ok:
                 logger.error(f"❌ Errore modifica ordine in attesa {ticket}: {error}")
                 return False
-            logger.info(f"✅ Ordine in attesa {ticket} aggiornato | SL: {stop_loss} | TP: {tp_price}")
+            logger.debug(f"✅ Ordine in attesa {ticket} aggiornato | SL: {stop_loss} | TP: {tp_price}")
             return True
 
         request = {
@@ -457,7 +457,7 @@ class MT5Executor:
             logger.error(f"❌ Errore modifica ordine {ticket}: {error}")
             return False
 
-        logger.info(f"✅ Ordine {ticket} aggiornato con successo | SL: {stop_loss} | TP: {tp_price}")
+        logger.debug(f"✅ Ordine {ticket} aggiornato con successo | SL: {stop_loss} | TP: {tp_price}")
         return True
 
     def get_open_position(self, ticket: int) -> Optional[dict]:

@@ -178,7 +178,7 @@ def be_margin_reached(mt5_ticket: int, quiet: bool = False) -> bool:
     if move is None or move >= BE_MIN_PROFIT:
         return True
     if not quiet:
-        logger.info(f"⏳ BE del ticket {mt5_ticket} in attesa: guadagno attuale {move:+.2f}$, "
+        logger.debug(f"⏳ BE del ticket {mt5_ticket} in attesa: guadagno attuale {move:+.2f}$, "
                     f"minimo richiesto {BE_MIN_PROFIT}$. Lo SL originale resta attivo.")
     return False
 
@@ -204,7 +204,7 @@ def execute_partial_close(trades: list, percentage: float) -> None:
     last_partial = max((t.get("partial_close_at") or 0 for t in trades), default=0)
     if now - last_partial < PARTIAL_CLOSE_REPEAT_WINDOW_SECONDS:
         minutes = int((now - last_partial) / 60)
-        logger.info(f"ℹ️ Chiusura parziale già eseguita {minutes} minuti fa su questa operazione: "
+        logger.debug(f"ℹ️ Chiusura parziale già eseguita {minutes} minuti fa su questa operazione: "
                     f"considerata una ripetizione dello stesso comando, nessun altro volume chiuso.")
         journal.record("PARTIAL_CLOSE_REPEATED", minutes_since_last=minutes, percentage=percentage)
         return
@@ -219,7 +219,7 @@ def execute_partial_close(trades: list, percentage: float) -> None:
     open_tickets = [(trade, t) for trade in trades for t in trade.get("tickets", {}).values()
                     if t.get("mt5_ticket") and not t.get("closed")]
     if not open_tickets:
-        logger.info("ℹ️ Chiusura parziale richiesta ma nessuna posizione aperta.")
+        logger.debug("ℹ️ Chiusura parziale richiesta ma nessuna posizione aperta.")
         return
     for trade in trades:
         trade["partial_close_at"] = now
@@ -233,7 +233,7 @@ def execute_partial_close(trades: list, percentage: float) -> None:
     open_tickets.sort(key=tp_distance, reverse=True)
     open_volume = sum(t.get("volume") or 0 for _, t in open_tickets)
     to_close = open_volume * percentage / 100
-    logger.info(f"✂️ Chiusura parziale {percentage:g}%: {to_close:.3f} lotti su {open_volume:.2f} aperti "
+    logger.debug(f"✂️ Chiusura parziale {percentage:g}%: {to_close:.3f} lotti su {open_volume:.2f} aperti "
                 f"(arrotondati per difetto allo step del broker).")
     journal.record("PARTIAL_CLOSE_PLAN", percentage=percentage, open_volume=round(open_volume, 2),
                    target_volume=round(to_close, 3))
@@ -272,7 +272,7 @@ def cancel_pending_ticket(tp_config: dict, reason: str) -> None:
     if mt5_agent.cancel_order(mt5_ticket):
         tp_config["pending"] = False
         tp_config["closed"] = True
-        logger.info(f"🗑️ Ordine in attesa {mt5_ticket} cancellato: {reason}.")
+        logger.debug(f"🗑️ Ordine in attesa {mt5_ticket} cancellato: {reason}.")
         journal.record("PENDING_CANCELLED", mt5_ticket=mt5_ticket, reason=reason)
 
 
@@ -307,7 +307,7 @@ def sync_pending_entries() -> None:
                     if position:
                         tp_config["entry_price"] = position["price_open"]
                         tp_config["volume"] = position["volume"]
-                    logger.info(f"✅ Ordine limite {mt5_ticket} eseguito a {tp_config.get('entry_price')}.")
+                    logger.debug(f"✅ Ordine limite {mt5_ticket} eseguito a {tp_config.get('entry_price')}.")
                     journal.record("PENDING_FILLED", mt5_ticket=mt5_ticket, price=tp_config.get("entry_price"),
                                    volume=tp_config.get("volume"))
                     changed = True
@@ -360,7 +360,7 @@ def record_position_closed(mt5_ticket: int, closed_by: str, trade: dict = None) 
     except Exception as e:
         logger.warning(f"⚠️ Esito della chiusura di {mt5_ticket} non disponibile: {e}")
         info = {}
-    logger.info(f"🏁 Posizione {mt5_ticket} chiusa ({closed_by}) | motivo: {info.get('close_reason', 'n/d')} "
+    logger.debug(f"🏁 Posizione {mt5_ticket} chiusa ({closed_by}) | motivo: {info.get('close_reason', 'n/d')} "
                 f"| prezzo: {info.get('close_price', 'n/d')} | profitto: {info.get('profit', 'n/d')}")
     journal.record("POSITION_CLOSED", mt5_ticket=mt5_ticket, closed_by=closed_by,
                    ticket_id=trade.get("ticket_id") if trade else None, **info)
@@ -397,7 +397,7 @@ def sync_ticket_with_broker(tp_config: dict, mt5_ticket: int) -> None:
 
     if state is None:
         tp_config["closed"] = True
-        logger.info(f"ℹ️ Ticket MT5 {mt5_ticket} non più aperto (TP/SL già raggiunto): segnato come chiuso.")
+        logger.debug(f"ℹ️ Ticket MT5 {mt5_ticket} non più aperto (TP/SL già raggiunto): segnato come chiuso.")
         record_position_closed(mt5_ticket, closed_by="RILEVATA_SU_MT5")
         return
 
@@ -429,7 +429,7 @@ def handle_message(event, is_edit: bool):
 
     # Filtro mittenti (nessuna chiamata AI per i messaggi scartati)
     if ALLOWED_SENDER_IDS and sender_id not in ALLOWED_SENDER_IDS:
-        logger.info(f"🚫 Messaggio {event.id} scartato: mittente {sender_id} non autorizzato.")
+        logger.debug(f"🚫 Messaggio {event.id} scartato: mittente {sender_id} non autorizzato.")
         journal.record("MESSAGE_SKIPPED", reason="mittente non autorizzato", sender_id=sender_id, text=text)
         return
 
@@ -446,31 +446,31 @@ def handle_message(event, is_edit: bool):
     # Firma dell'autore, presente solo nei canali con "firma i messaggi" attiva
     post_author = getattr(event, 'post_author', None)
 
-    logger.info(f"{'✏️ EDIT' if is_edit else '🆕 NUOVO'} MESSAGGIO | ID: {msg_id} | Reply-To: {reply_to} "
+    logger.debug(f"{'✏️ EDIT' if is_edit else '🆕 NUOVO'} MESSAGGIO | ID: {msg_id} | Reply-To: {reply_to} "
                 f"| Mittente: {sender_id}{f' ({post_author})' if post_author else ''} | Testo: {text!r}")
     journal.record("MESSAGE", is_edit=is_edit, reply_to=reply_to, sender_id=sender_id, post_author=post_author,
                    has_media=has_media, is_forwarded=is_forwarded, text=text)
 
     if is_edit and _last_text_by_msg.get(msg_id) == text:
-        logger.info(f"⏭️ Edit del messaggio {msg_id} scartato: il testo non è cambiato.")
+        logger.debug(f"⏭️ Edit del messaggio {msg_id} scartato: il testo non è cambiato.")
         journal.record("MESSAGE_SKIPPED", reason="edit senza modifiche al testo")
         return
 
     # event.date è la data di invio ORIGINALE del messaggio, anche per gli edit
     message_age = time.time() - timestamp if timestamp else 0
     if is_edit and msg_id not in manager.active_trades and message_age > EDIT_MAX_AGE_SECONDS:
-        logger.info(f"⏭️ Edit del messaggio {msg_id} scartato: corregge un messaggio di {int(message_age / 60)} minuti fa "
+        logger.debug(f"⏭️ Edit del messaggio {msg_id} scartato: corregge un messaggio di {int(message_age / 60)} minuti fa "
                     f"che non è un segnale aperto, non va eseguito come comando nuovo.")
         journal.record("MESSAGE_SKIPPED", reason="correzione di un messaggio vecchio")
         return
 
     if is_forwarded and IGNORE_FORWARDED_MESSAGES:
-        logger.info(f"⏭️ Messaggio {msg_id} scartato: inoltrato (testimonianza, non un segnale del trader).")
+        logger.debug(f"⏭️ Messaggio {msg_id} scartato: inoltrato (testimonianza, non un segnale del trader).")
         journal.record("MESSAGE_SKIPPED", reason="messaggio inoltrato")
         return
 
     if not OPERATIVE_KEYWORDS.search(text):
-        logger.info(f"⏭️ Messaggio {msg_id} scartato: nessuna parola operativa (emoji, celebrazione, avviso).")
+        logger.debug(f"⏭️ Messaggio {msg_id} scartato: nessuna parola operativa (emoji, celebrazione, avviso).")
         journal.record("MESSAGE_SKIPPED", reason="nessuna parola operativa")
         return
 
@@ -482,14 +482,14 @@ def handle_message(event, is_edit: bool):
         market_open, market_reason = mt5_agent.is_symbol_tradable(TRADED_SYMBOL)
 
     if not market_open:
-        logger.info(f"⏸️ Messaggio scartato senza classificarlo: {market_reason}")
+        logger.debug(f"⏸️ Messaggio scartato senza classificarlo: {market_reason}")
         journal.record("MESSAGE_SKIPPED", reason=market_reason)
         return
 
     # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
     ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
 
-    logger.info(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
+    logger.debug(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
 
     # Memorizzato solo dopo una classificazione riuscita: se l'agente fallisce,
     # un edit successivo con lo stesso testo avrà un'altra possibilità.
@@ -568,7 +568,7 @@ def handle_message(event, is_edit: bool):
                 # contiene ancora mt5_ticket a null. Se il bot si riavviasse
                 # ora, perderebbe il riferimento a posizioni già a mercato.
                 manager.save_state_to_file()
-                logger.info(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
+                logger.debug(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
 
             else:
                 logger.warning(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
@@ -623,7 +623,7 @@ def handle_message(event, is_edit: bool):
                     # Risincronizziamo anche lo stop_loss a livello radice del trade,
                     # altrimenti resta al valore pre-BE (usato per ereditarietà re-entry).
                     parent_trade["stop_loss"] = entry_price
-                    logger.info(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
+                    logger.debug(f"🎯 BE applicato al ticket MT5 {real_mt5_ticket}")
                 else:
                     # BE non applicato: o la posizione non esiste più (TP già
                     # scattato) o il broker ha rifiutato il nuovo SL (es. prezzo
@@ -637,7 +637,7 @@ def handle_message(event, is_edit: bool):
                         # dal fondo della zona). Resta in attesa: il controllo
                         # periodico lo applica appena MT5 lo accetta.
                         tp_config["be_pending"] = True
-                        logger.info(f"⏳ BE del ticket {real_mt5_ticket} in attesa: verrà applicato appena il prezzo lo consente.")
+                        logger.debug(f"⏳ BE del ticket {real_mt5_ticket} in attesa: verrà applicato appena il prezzo lo consente.")
                         journal.record("BE_PENDING", mt5_ticket=real_mt5_ticket, entry_price=entry_price)
 
             # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
@@ -721,8 +721,8 @@ def handle_message(event, is_edit: bool):
 
             manager.save_state_to_file()
 
-    logger.info(f"📦 ESITO ORDER MANAGER: {json.dumps(manager_result, default=str, ensure_ascii=False)}")
-    logger.info(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
+    logger.debug(f"📦 ESITO ORDER MANAGER: {json.dumps(manager_result, default=str, ensure_ascii=False)}")
+    logger.debug(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
 
 
 def retry_pending_breakeven() -> None:
@@ -750,7 +750,7 @@ def retry_pending_breakeven() -> None:
                 if mt5_agent.set_sl_to_be(ticket=mt5_ticket, entry_price=entry_price):
                     tp_config.update(be_active=True, be_pending=False, stop_loss=entry_price)
                     trade["stop_loss"] = entry_price
-                    logger.info(f"🎯 BE in attesa applicato al ticket MT5 {mt5_ticket}")
+                    logger.debug(f"🎯 BE in attesa applicato al ticket MT5 {mt5_ticket}")
                     journal.record("BE_PENDING_APPLIED", mt5_ticket=mt5_ticket, entry_price=entry_price)
                     changed = True
             finally:
@@ -764,7 +764,7 @@ def write_heartbeat(mt5_ok: bool, mt5_reason: str) -> None:
     """Battito periodico: conferma nel log che il bot è vivo e fotografa il conto."""
     account = mt5_agent.account_snapshot()
     live_trades = [t for t in manager.active_trades.values() if t.get("status") in CLOSABLE_STATUSES]
-    logger.info(f"💓 Bot attivo | MT5: {mt5_reason} | operazioni vive: {len(live_trades)} "
+    logger.debug(f"💓 Bot attivo | MT5: {mt5_reason} | operazioni vive: {len(live_trades)} "
                 f"| saldo: {account.get('balance')} | equity: {account.get('equity')} "
                 f"| posizioni aperte sul conto: {account.get('open_positions')}")
     journal.record("HEARTBEAT", mt5_ok=mt5_ok, mt5_reason=mt5_reason, live_trades=len(live_trades), **account)
