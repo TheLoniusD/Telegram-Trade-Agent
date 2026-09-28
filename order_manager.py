@@ -512,6 +512,7 @@ class OrderManager:
                     "trades": trades_to_update,
                     "be_candidates": be_candidates,
                     "sl_tp_changed": bool(new_sl is not None or (new_tp_list and isinstance(new_tp_list, list))),
+                    "sl_changed": new_sl is not None,
                     "close_percentage": close_percentage if partial_close else None,
                 }
 
