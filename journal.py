@@ -1,7 +1,9 @@
 """
 Diario strutturato delle operazioni: logs/AAAA-MM-GG/journal.jsonl
 
-Mentre bot.log è pensato per essere letto a occhio, il diario registra ogni
+Il diario è la fonte di tutto: ogni evento diventa anche una riga del racconto
+in bot.log e aggiorna le schede di operazioni.txt (vedi narrative.py). Il
+diario registra ogni
 evento rilevante come una riga JSON (un evento per riga, in append), così lo
 storico di una giornata si può ricostruire e analizzare anche a posteriori,
 quando il bot ha girato senza nessuno davanti al PC (vedi report.py).
@@ -41,6 +43,7 @@ Tipi di evento principali:
 import contextvars
 import json
 import os
+import narrative
 from logger_config import day_folder, now_local, setup_logger
 
 logger = setup_logger(__name__)
@@ -76,9 +79,23 @@ def record(event: str, **fields) -> None:
     if msg_id is not None and "msg_id" not in fields:
         entry["msg_id"] = msg_id
     entry.update(fields)
+    entry = json.loads(json.dumps(entry, default=str, ensure_ascii=False))
+
+    # Racconto leggibile in bot.log (prima di scrivere: all'avvio il racconto
+    # ricarica il diario e non deve trovarci già questo evento)
+    try:
+        narrative.narrate(entry)
+    except Exception:
+        logger.exception(f"⚠️ Racconto dell'evento {event} non riuscito")
 
     try:
         with open(journal_path(now.strftime("%Y-%m-%d")), "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         logger.exception(f"⚠️ Impossibile scrivere l'evento {event} nel diario")
+
+    # Schede delle operazioni (operazioni.txt), rilette dal diario appena scritto
+    try:
+        narrative.refresh_sheets(entry)
+    except Exception:
+        logger.exception("⚠️ Aggiornamento di operazioni.txt non riuscito")

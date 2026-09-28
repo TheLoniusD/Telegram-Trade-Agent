@@ -49,7 +49,7 @@ TRADED_SYMBOL = "XAUUSD"
 # (TP/SL scattati, chiusure manuali), stato della connessione a MT5 e un
 # battito di vita nel log per capire, a posteriori, se il bot era attivo.
 MONITOR_INTERVAL_SECONDS = 30
-HEARTBEAT_INTERVAL_SECONDS = 3600
+HEARTBEAT_INTERVAL_SECONDS = 4 * 3600
 
 # I messaggi inoltrati nel canale sono testimonianze dei follower ("Thanks sir",
 # "Got it..continue sell👍"), mai segnali del trader: il 23/09 lo erano tutti.
@@ -340,6 +340,10 @@ def trade_summary(trade: dict) -> dict:
     fields = ("mt5_ticket", "direction", "volume", "entry_price", "stop_loss", "take_profit", "closed", "be_active", "pending")
     return {
         "ticket_id": trade.get("ticket_id"),
+        "entry_min": trade.get("entry_min"),
+        "entry_max": trade.get("entry_max"),
+        "signal_stop_loss": trade.get("signal_stop_loss"),
+        "reentry": bool(trade.get("reentry")),
         "trade_msg_id": trade.get("msg_id"),
         "root_msg_id": trade.get("root_msg_id"),
         "status": trade.get("status"),
