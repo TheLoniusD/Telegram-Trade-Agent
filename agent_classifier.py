@@ -43,17 +43,16 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
 
 ── 1. CLOSE_SIGNAL (verifica SEMPRE per prima: ha priorità assoluta su UPDATE_SIGNAL) ──
 
-  a) STANDARD "HIT TP MAX": il messaggio contiene il target massimo/finale -
-     "HIT TP MAX", "TP MAX", "FINAL TP HIT", "ALL TP HIT", "LAST TP HIT", "Collect ALL" (senza alternative),
-     "Collect all or half" ABBINATO a MAX/FINAL/ALL/LAST, oppure "Close all".
+  a) Comando ESPLICITO di chiusura totale rivolto a chi è in posizione: "Close all", "Close all now",
+     "Close now", "Collect ALL" (da solo, senza alternative).
      -> intent: 'CLOSE_SIGNAL', is_actionable: true, update_details.move_sl_to_be: false
-     (l'intera posizione si chiude: eventuali "BE+"/"BE" nello stesso messaggio NON vanno applicati, non resta nulla da proteggere).
-     ECCEZIONE CRITICA: "HIT TP" SENZA "MAX/FINAL/ALL/LAST" NON è mai CLOSE_SIGNAL (vedi UPDATE_SIGNAL, punto b),
-     nemmeno se accompagnato da "Collect all or half" o incoraggiamenti simili rivolti agli utenti umani.
      Scelta di default conservativa: davanti a opzioni ambigue del trader ("Close all OR half"), interpreta sempre
      come chiusura totale al 100% (close_percentage: 100.0).
+     ATTENZIONE: "HIT TP MAX", "TP MAX", "FINAL TP HIT", "ALL TP HIT", "LAST TP HIT" NON sono CLOSE_SIGNAL.
+     Sono il tabellone dei risultati della serie di segnali (una riga "Gold Sell 415+ Pips ✔️" per ogni segnale),
+     pubblicato più volte mentre il prezzo continua a correre: vedi UPDATE_SIGNAL, punto b.
 
-  b) NON STANDARD: comandi diretti di chiusura totale o taglio perdite, anche senza il template "HIT TP MAX":
+  b) NON STANDARD: comandi diretti di chiusura totale o taglio perdite:
      "Close GOLD now", "Exit all entries at market", "Out of Gold", "Setup invalidated, cut trade",
      "Abort buy setup", "Close with small loss", "Close all open trades before news".
      -> intent: 'CLOSE_SIGNAL', is_actionable: true
@@ -64,15 +63,17 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
      viene modificato dal trader per aggiungere i parametri definitivi (SL e TP).
      -> intent: 'UPDATE_SIGNAL', is_actionable: true. Estrai entry/SL/TP completi.
 
-  b) STANDARD "HIT TP" (target PARZIALE, SENZA le parole MAX/FINAL/ALL/LAST): es. "HIT TP⚡️⚡️", "TP1 hit".
-     Segnala che uno dei livelli di take_profit è stato raggiunto, non l'ultimo.
+  b) STANDARD "HIT TP" (es. "HIT TP⚡️⚡️", "TP1 hit") e "HIT TP MAX" (anche "TP MAX", "FINAL TP HIT",
+     "ALL TP HIT", "LAST TP HIT"): resoconto dei target raggiunti dai segnali della serie.
      -> intent: 'UPDATE_SIGNAL' SEMPRE (mai IGNORE, mai CLOSE_SIGNAL).
+     -> "HIT TP MAX" e varianti: move_sl_to_be = true SEMPRE, anche senza comando di BE esplicito
+        (il bot protegge tutto a pareggio e lascia lavorare i TP), is_actionable: true, close_percentage null.
      -> Attiva BE (update_details.move_sl_to_be = true) SE nel messaggio è presente un comando di protezione
         esplicito (es. "BE+ ur entries", "secure profits & BE").
      -> is_actionable: true se è presente un comando di BE (o altro comando operativo concreto);
         is_actionable: false se "HIT TP" compare da solo, senza alcun comando (serve solo a tracciare lo storico).
-     -> Frasi generiche come "Collect all or half", "Flex ur profit", "Lets see who caught the move" senza
-        MAX/FINAL/ALL/LAST sono incoraggiamenti rivolti agli utenti umani, NON comandi: non impostare close_percentage.
+     -> Frasi generiche come "Collect all or half", "Flex ur profit", "Lets see who caught the move",
+        "Anyone still hold", anche insieme a HIT TP MAX, sono incoraggiamenti rivolti agli utenti umani, NON comandi: non impostare close_percentage.
 
   c) STANDARD "Trade Active" e STANDARD "Zero Float": template di conferma che il trade è aperto o è tornato
      in pareggio di flottante.
@@ -181,8 +182,9 @@ reply al messaggio del segnale.
    -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null (i pips indicati sono solo un resoconto).
 9. "HIT TP⚡️⚡️\n\nGold Buy 185+ Pips ✔️\n\nCollect all or half & BE+ ur entries" (reply al segnale)
    -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null ("Collect all or half" senza MAX è un invito ai follower).
-10. "HIT TP MAX⚡️⚡️\n\nGold Sell 350+ Pips ✔️\nGold Sell 310+ Pips ✔️" (reply al segnale)
-   -> CLOSE_SIGNAL, close_percentage 100.0, take_profit [] (i numeri seguiti da "Pips" sono resoconti, NON livelli di prezzo).
+10. "HIT TP MAX⚡️⚡️\n\nGold Sell 350+ Pips ✔️\nGold Sell 310+ Pips ✔️\n\nCollect all or half & BE+ ur entries" (reply al segnale)
+   -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null, take_profit [] (tabellone dei risultati, non un
+      comando di chiusura; i numeri seguiti da "Pips" sono resoconti, NON livelli di prezzo).
 11. "READY US SESSION🔔 No High Impact News for today" -> IGNORE (avviso di sessione).
 12. "Another profitable day💪", "Still running 🥰", "Progressive work!!", "😍" -> IGNORE (celebrativi).
 13. "Gold has successfully broken below the H1 support level, showing bearish momentum" -> IGNORE (analisi senza
@@ -191,7 +193,7 @@ reply al messaggio del segnale.
 15. "Lets try buy again" -> NEW_SIGNAL, direction BUY, entry_min null, is_reentry true (rientro nel setup precedente).
 
 Chiama SEMPRE ed ESCLUSIVAMENTE lo strumento 'classify_signal' con i campi compilati secondo queste regole.
-Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, chiusura totale"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""
+Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, BE su tutto"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""
 
 CLASSIFY_SIGNAL_TOOL = {
     "name": "classify_signal",

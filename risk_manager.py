@@ -27,11 +27,25 @@ MARGIN_USAGE_LIMIT = 0.5
 # posiziona al suo interno. Entrando tutto subito a mercato noi finivamo sul
 # bordo peggiore o oltre (fino a 3,4$ peggio il 25/09), e quando il trader
 # scriveva "Running 45 pips, BE+" eravamo ancora in pari o in perdita.
-# 'zone'   = TP1 con ordine limite al prezzo del segnale, TP2 a metà zona
-#            (a mercato se il prezzo è già a quel livello o migliore)
+# 'zone'   = ordini limite distribuiti nella zona, dal prezzo del segnale
+#            verso l'interno (a mercato se il prezzo è già a quel livello o migliore)
 # 'market' = tutto a mercato subito, come prima
 ENTRY_MODE = os.getenv("ENTRY_MODE", "zone")
 ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
+
+def zone_bounds(direction: str, entry_min, entry_max):
+    """
+    Zona di ingresso del trader (basso, alto), o None se il segnale non ha
+    prezzo. Senza entry_max (fase rapida) la zona si estende di
+    ENTRY_ZONE_WIDTH a favore del trader: "Gold sell 4180" -> 4180-4185.
+    """
+    if entry_min is None:
+        return None
+    low, high = entry_min, entry_max
+    if high is None:
+        low, high = (entry_min - ENTRY_ZONE_WIDTH, entry_min) if direction == "BUY" else (entry_min, entry_min + ENTRY_ZONE_WIDTH)
+    return min(low, high), max(low, high)
+
 
 class RiskManager:
     """
@@ -65,7 +79,8 @@ class RiskManager:
         # dava sempre None, quindi ogni BUY veniva aperto come SELL, sempre con
         # SL temporaneo e senza TP.
         tickets = trade_data.get("tickets", {})
-        first_ticket = tickets.get("tp1", {})
+        keys = list(tickets.keys())
+        first_ticket = next(iter(tickets.values()), {})
 
         symbol = first_ticket.get("symbol") or "XAUUSD"
         direction = first_ticket.get("direction")
@@ -84,7 +99,7 @@ class RiskManager:
         entry_price = entry_min if entry_min is not None else current_price
 
         # 2. Prezzi di ingresso dei due ticket (vedi ENTRY_MODE)
-        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"))
+        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"), keys)
 
         # Prezzo di ingresso più sfavorevole allo SL tra quelli possibili
         # (mercato o livelli limite): lo SL deve stare oltre tutti.
@@ -105,15 +120,15 @@ class RiskManager:
             else:
                 stop_loss = entry_price + DEFAULT_SL_DIST_GOLD
 
-        # 4. Lottaggio: metà del rischio per ticket, misurata dal prezzo a cui
+        # 4. Lottaggio: il rischio diviso in parti uguali tra i ticket, misurata dal prezzo a cui
         # quel ticket entrerà (il livello limite, o il prezzo corrente se a
         # mercato), poi limitata dal margine libero.
         step_lot = symbol_info.volume_step or 0.01
         lots = {}
-        for key in ("tp1", "tp2"):
+        for key in keys:
             level = entry_levels[key]
             price = level if level is not None else current_price
-            lots[key] = self._calculate_lot_size(symbol, direction, price, stop_loss) / 2
+            lots[key] = self._calculate_lot_size(symbol, direction, price, stop_loss) / len(keys)
         margin_lots = self._max_lots_by_margin(symbol, direction, current_price)
         scale = min(1.0, margin_lots / sum(lots.values())) if sum(lots.values()) > 0 else 1.0
         # Per difetto allo step del broker: per eccesso si supererebbe il rischio
@@ -127,12 +142,12 @@ class RiskManager:
                        lots_total=round(sum(lots.values()), 2))
 
         if min(lots.values()) < symbol_info.volume_min:
-            return {"approved": False, "reason": f"Margine insufficiente per aprire 2 posizioni da almeno {symbol_info.volume_min} lotti"}
+            return {"approved": False, "reason": f"Margine insufficiente per aprire {len(keys)} posizioni da almeno {symbol_info.volume_min} lotti"}
 
         # 5. Gestione Multi-Ticket: ogni ticket usa il TP salvato per il suo target
         # (None in fase rapida, in attesa degli update successivi)
         orders_to_execute = {}
-        for key in ("tp1", "tp2"):
+        for key in keys:
             take_profit = tickets.get(key, {}).get("take_profit")
             # TP già superato dal prezzo (es. ereditato da un re-entry dopo che il
             # padre lo aveva preso): MT5 rifiuterebbe l'ordine, si apre senza TP.
@@ -155,24 +170,24 @@ class RiskManager:
             "orders": orders_to_execute
         }
 
-    def _entry_levels(self, direction: str, entry_min, entry_max) -> dict:
+    def _entry_levels(self, direction: str, entry_min, entry_max, keys: list) -> dict:
         """
-        Prezzi limite dei due ticket nella zona del trader, o None (= a mercato).
-        TP1 al prezzo del segnale (il bordo della zona da cui il trader parte),
-        TP2 a metà zona. Senza prezzo nel segnale ("Try buy again") o con
-        ENTRY_MODE=market si entra a mercato come prima.
+        Prezzi limite dei ticket nella zona del trader, o None (= a mercato).
+        Distribuiti a passo costante dal prezzo del segnale (il bordo da cui il
+        trader parte) verso l'interno: con 2 ticket bordo e metà zona, con 4
+        per "sell 4180" (zona 4180-4185) 4180 / 4181,25 / 4182,5 / 4183,75.
+        Senza prezzo nel segnale ("Try buy again") o con ENTRY_MODE=market si
+        entra a mercato.
         """
-        if ENTRY_MODE != "zone" or entry_min is None:
-            return {"tp1": None, "tp2": None}
+        zone = zone_bounds(direction, entry_min, entry_max)
+        if ENTRY_MODE != "zone" or zone is None:
+            return {key: None for key in keys}
 
-        low, high = entry_min, entry_max
-        if high is None:
-            # Fase rapida: solo il prezzo del segnale, la zona si estende a favore
-            low, high = (entry_min - ENTRY_ZONE_WIDTH, entry_min) if direction == "BUY" else (entry_min, entry_min + ENTRY_ZONE_WIDTH)
-        low, high = min(low, high), max(low, high)
-
-        signal_edge = high if direction == "BUY" else low
-        return {"tp1": round(signal_edge, 2), "tp2": round((low + high) / 2, 2)}
+        low, high = zone
+        step = (high - low) / len(keys)
+        if direction == "BUY":
+            return {key: round(high - i * step, 2) for i, key in enumerate(keys)}
+        return {key: round(low + i * step, 2) for i, key in enumerate(keys)}
 
     def _max_lots_by_margin(self, symbol: str, direction: str, price: float) -> float:
         """

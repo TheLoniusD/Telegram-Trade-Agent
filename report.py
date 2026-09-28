@@ -129,7 +129,7 @@ def describe(event: dict) -> str:
         return f"🎯 BE in attesa applicato a #{e.get('mt5_ticket')} (SL {e.get('entry_price')})"
     if kind == "RISK_CALC":
         levels = e.get("entry_levels") or {}
-        entry = (f" | ingressi TP1 {levels.get('tp1') or 'mercato'} / TP2 {levels.get('tp2') or 'mercato'}"
+        entry = (" | ingressi " + " / ".join(f"{k} {v or 'mercato'}" for k, v in levels.items())
                  if levels else "")
         return (f"🧮 lotti: rischio {e.get('risk_percent')}% → {e.get('lots') or e.get('lots_by_risk')} | tetto margine "
                 f"{e.get('lots_by_margin')} | totale {e.get('lots_total')} (prezzo {e.get('price')}, SL {e.get('stop_loss')}){entry}")
