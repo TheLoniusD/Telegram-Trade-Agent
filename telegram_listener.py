@@ -13,7 +13,7 @@ load_dotenv()
 import journal
 from agent_classifier import agent_classify_telegram_message
 from order_manager import OrderManager, CLOSABLE_STATUSES
-from risk_manager import RiskManager
+from risk_manager import RiskManager, zone_bounds
 from mt5_executor import MT5Executor, MT5UnavailableError
 from market_hours import is_market_time_open
 from logger_config import setup_logger
@@ -62,6 +62,17 @@ IGNORE_FORWARDED_MESSAGES = True
 # ingresso chiude con un piccolo guadagno invece che a zero. 0 = BE esatto.
 # Il 23/09 un SELL portato a BE esatto si è chiuso a 0,00 due minuti dopo.
 BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
+
+# Dove va lo SL quando il trader chiede il BE.
+# 'zone'  = a metà della zona del trader, vicino al SUO pareggio (lui entra in
+#           più punti della zona). Il 28/09 lo SL a ingresso+0,5 veniva preso
+#           da risalite normali di 1-2$ dopo 1-2 minuti, mentre il trader restava
+#           dentro fino al TP. Per chi è entrato sul bordo è una piccola perdita
+#           possibile (max metà zona), ma MT5 lo accetta anche se in quel momento
+#           siamo leggermente in perdita. Per i ticket entrati oltre metà zona, e
+#           per i re-entry senza zona, resta ingresso + BE_OFFSET.
+# 'entry' = sempre ingresso + BE_OFFSET, come prima.
+BE_MODE = os.getenv("BE_MODE", "zone")
 
 # Filtro locale PRIMA dell'agente: un messaggio senza nemmeno una parola del
 # lessico operativo (solo emoji, "Another profitable day💪", "Thanks sir",
@@ -128,13 +139,28 @@ def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
     return True
 
 
-def breakeven_price(tp_config: dict):
-    """Prezzo dello SL di breakeven per un ticket, con l'eventuale margine BE_OFFSET."""
+def breakeven_price(tp_config: dict, trade: dict = None):
+    """Prezzo dello SL di breakeven per un ticket (vedi BE_OFFSET e BE_MODE)."""
     entry = tp_config.get("entry_price")
     if entry is None:
         return None
-    offset = BE_OFFSET if tp_config.get("direction") == "BUY" else -BE_OFFSET
-    return round(entry + offset, 2)
+    direction = tp_config.get("direction")
+    offset = BE_OFFSET if direction == "BUY" else -BE_OFFSET
+    be = entry + offset
+    zone = zone_bounds(direction, trade.get("entry_min"), trade.get("entry_max")) if trade and BE_MODE == "zone" else None
+    if zone:
+        mid = (zone[0] + zone[1]) / 2
+        # Il più lontano dal prezzo tra i due: sotto per un BUY, sopra per un SELL
+        be = min(be, mid) if direction == "BUY" else max(be, mid)
+    return round(be, 2)
+
+
+def sl_already_protective(tp_config: dict, be_price) -> bool:
+    """True se lo SL attuale del ticket protegge già almeno quanto il BE."""
+    sl = tp_config.get("stop_loss")
+    if sl is None or be_price is None:
+        return False
+    return sl >= be_price if tp_config.get("direction") == "BUY" else sl <= be_price
 
 
 def be_margin_reached(mt5_ticket: int, quiet: bool = False) -> bool:
@@ -571,7 +597,12 @@ def handle_message(event, is_edit: bool):
                     cancel_pending_ticket(tp_config, "il trader ha chiesto il BE prima che l'ordine venisse eseguito")
                     continue
                 real_mt5_ticket = tp_config.get("mt5_ticket")
-                entry_price = breakeven_price(tp_config)
+                entry_price = breakeven_price(tp_config, parent_trade)
+                if sl_already_protective(tp_config, entry_price):
+                    # Lo SL attuale è già oltre il livello di BE (es. il trader ha
+                    # stretto lo stop): spostarlo sarebbe un peggioramento.
+                    tp_config["be_active"] = True
+                    continue
 
                 if not be_margin_reached(real_mt5_ticket):
                     # Posizione non ancora abbastanza in guadagno: nessun invio a
@@ -701,7 +732,7 @@ def retry_pending_breakeven() -> None:
                     or tp_config.get("pending")):
                 continue
             mt5_ticket = tp_config.get("mt5_ticket")
-            entry_price = breakeven_price(tp_config)
+            entry_price = breakeven_price(tp_config, trade)
             if not be_margin_reached(mt5_ticket, quiet=True) or not mt5_agent.can_move_sl(mt5_ticket, entry_price):
                 continue
 

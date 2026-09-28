@@ -26,6 +26,25 @@ TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 # di un'operazione che non c'entra è maggiore del vantaggio.
 REENTRY_PARENT_MAX_AGE_SECONDS = 3600
 
+# Ticket aperti per ogni segnale, distribuiti nella zona del trader (vedi
+# RiskManager._entry_levels) e alternati sui suoi TP: con 4 ticket due vanno
+# al TP1 e due al TP2, uno alto e uno profondo nella zona per ciascun TP.
+ENTRY_TICKETS = max(1, int(os.getenv("ENTRY_TICKETS", "4")))
+
+
+def ticket_tp_index(key: str, ticket: dict) -> int:
+    """Indice del TP del trader assegnato al ticket (0 = TP1, 1 = TP2)."""
+    if ticket.get("tp_index") is not None:
+        return ticket["tp_index"]
+    # Operazioni aperte prima dei 4 ticket: chiavi tp1/tp2
+    return 1 if key == "tp2" else 0
+
+
+def first_ticket(trade: Optional[dict]) -> dict:
+    """Primo ticket dell'operazione (simbolo e direzione sono uguali per tutti)."""
+    tickets = (trade or {}).get("tickets") or {}
+    return next(iter(tickets.values()), {})
+
 
 class OrderManager:
     """
@@ -189,7 +208,7 @@ class OrderManager:
         memoria, poi nello storico di oggi e di ieri se chiusa da poco.
         """
         def matches(trade):
-            ticket = trade.get("tickets", {}).get("tp1", {})
+            ticket = first_ticket(trade)
             return ((direction is None or ticket.get("direction") == direction)
                     and (symbol is None or ticket.get("symbol") == symbol))
 
@@ -232,18 +251,15 @@ class OrderManager:
         
         return matching_trades
 
-    # Helper per cercare il valore prima su root, poi dentro tickets['tp1']
+    # Helper per cercare il valore prima su root, poi dentro il primo ticket
     def _get_param(self, latest_trade, key, ticket_field=None):
         if not latest_trade:
             return None
         # 1. Cerca a livello root nel vecchio trade
         if latest_trade.get(key) is not None:
             return latest_trade[key]
-        # 2. Fallback su tickets -> tp1
-        field = ticket_field or key
-        if "tickets" in latest_trade and "tp1" in latest_trade["tickets"]:
-            return latest_trade["tickets"]["tp1"].get(field)
-        return None
+        # 2. Fallback sul primo ticket
+        return first_ticket(latest_trade).get(ticket_field or key)
 
 
     def _explicit_target(self, msg_id: int, reply_to: Optional[int]) -> Optional[int]:
@@ -270,8 +286,8 @@ class OrderManager:
 
     def _resolve_layer_target(self, trade: dict, layer_target: str) -> list:
         """
-        Mappa LOWEST/HIGHEST/ALL sulle chiavi reali dei ticket (tp1/tp2) in base alla
-        distanza del take_profit dall'entry price, non all'ordine tp1/tp2 (che dipende
+        Mappa LOWEST/HIGHEST/ALL sulle chiavi reali dei ticket in base alla
+        distanza del take_profit dall'entry price, non all'ordine dei ticket (che dipende
         solo dall'ordine in cui il trader ha scritto i TP nel messaggio). Considera
         solo i ticket ancora aperti (mt5_ticket presente, non già marcati 'closed').
         """
@@ -295,12 +311,16 @@ class OrderManager:
                 return float("inf")
             return abs(cfg["take_profit"] - entry)
 
+        # Con più ticket sullo stesso TP del trader, il layer è l'insieme dei
+        # ticket con quel TP (non un ticket solo).
         by_distance = sorted(open_tickets.items(), key=lambda item: distance(item[1]))
         if layer_target == "LOWEST":
-            return [by_distance[0][0]]
-        if layer_target == "HIGHEST":
-            return [by_distance[-1][0]]
-        return []
+            target_tp = by_distance[0][1]["take_profit"]
+        elif layer_target == "HIGHEST":
+            target_tp = by_distance[-1][1]["take_profit"]
+        else:
+            return []
+        return [key for key, cfg in open_tickets.items() if cfg["take_profit"] == target_tp]
 
 
     def handle_agent_output(self, msg_id: int, reply_to: Optional[int], ai_output: dict) -> Optional[dict]:
@@ -347,16 +367,33 @@ class OrderManager:
             # sostituisce con quello provvisorio.
             stop_loss = data.get("stop_loss") if data.get("stop_loss") is not None else (source_trade or {}).get("signal_stop_loss")
 
-            # Gestione Take Profit (da lista se fornita, altrimenti ereditati)
+            # Take Profit del trader (dal messaggio, o ereditati dal padre del re-entry)
             tp_list = data.get("take_profit", [])
             if isinstance(tp_list, list) and len(tp_list) > 0:
-                tp1 = tp_list[0]
-                tp2 = tp_list[1] if len(tp_list) > 1 else None
+                trader_tps = list(tp_list[:2])
             else:
-                tp1 = self._get_param(source_trade, "tp1", "take_profit")
-                tp2 = self._get_param(source_trade, "tp2")
-                if tp2 is None and source_trade and "tickets" in source_trade and "tp2" in source_trade["tickets"]:
-                    tp2 = source_trade["tickets"]["tp2"].get("take_profit")
+                trader_tps = [None, None]
+                for key, ticket in ((source_trade or {}).get("tickets") or {}).items():
+                    index = ticket_tp_index(key, ticket)
+                    if index < 2 and trader_tps[index] is None:
+                        trader_tps[index] = ticket.get("take_profit")
+
+            tickets = {}
+            for i in range(ENTRY_TICKETS):
+                tp_index = i % 2
+                tickets[f"e{i + 1}"] = {
+                    "symbol": symbol,
+                    "direction": direction,
+                    "entry_price": entry_min,
+                    "stop_loss": stop_loss,
+                    "tp_index": tp_index,
+                    "take_profit": trader_tps[tp_index] if tp_index < len(trader_tps) else None,
+                    "volume": None,      # Sarà calcolato dal Risk Manager
+                    "mt5_ticket": None,  # Sarà aggiunto dal MT5Executor
+                    "success": False,    # true = ordine aperto correttamente su MT5
+                    "closed": False,     # true = TP colpito / posizione non più aperta
+                    "be_active": False
+                }
 
             trade_record = {
                 "ticket_id": ticket_id,
@@ -368,32 +405,7 @@ class OrderManager:
                 "reentry": is_reentry,
                 "status": "ACTIVE",
                 "created_at": time.time(),
-                "tickets": {
-                    "tp1": {
-                        "symbol": symbol,
-                        "direction": direction,
-                        "entry_price": entry_min,
-                        "stop_loss": stop_loss,
-                        "take_profit": tp1,
-                        "volume": None,  # Sarà calcolato dal Risk Manager
-                        "mt5_ticket": None, # Sarà aggiunto dal MT5Executor
-                        "success": False,  # true = ordine aperto correttamente su MT5
-                        "closed": False,   # true = TP colpito / posizione non più aperta
-                        "be_active": False
-                    },
-                    "tp2": {
-                        "symbol": symbol,
-                        "direction": direction,
-                        "entry_price": entry_min,
-                        "stop_loss": stop_loss,
-                        "take_profit": tp2,
-                        "volume": None,  # Sarà calcolato dal Risk Manager
-                        "mt5_ticket": None, # Sarà aggiunto dal MT5Executor
-                        "success": False,  # true = ordine aperto correttamente su MT5
-                        "closed": False,   # true = TP colpito / posizione non più aperta
-                        "be_active": False
-                    }
-                }
+                "tickets": tickets
             }
 
             self.active_trades[msg_id] = trade_record
@@ -459,15 +471,15 @@ class OrderManager:
 
                 # C. Aggiornamento Take Profit (fase COMPLETA / ereditarietà re-entry)
                 if new_tp_list and isinstance(new_tp_list, list):
-                    ticket_keys = list(trade.get("tickets", {}).keys())  # ['tp1', 'tp2']
-                    for i, tp_key in enumerate(ticket_keys):
-                        if i < len(new_tp_list):
-                            trade["tickets"][tp_key]["take_profit"] = new_tp_list[i]
+                    for tp_key, tp_config in trade.get("tickets", {}).items():
+                        index = ticket_tp_index(tp_key, tp_config)
+                        if index < len(new_tp_list):
+                            tp_config["take_profit"] = new_tp_list[index]
                     modified = True
 
                 # D. Marcatura del layer colpito, SOLO se il messaggio lo indica
                 #    esplicitamente (es. "close lowest layer"). Il mapping è basato
-                #    sulla distanza take_profit-entry, non sull'ordine tp1/tp2 (che
+                #    sulla distanza take_profit-entry, non sull'ordine dei ticket (che
                 #    dipende solo dall'ordine in cui il trader ha scritto i TP).
                 if layer_target:
                     for target_key in self._resolve_layer_target(trade, layer_target):
