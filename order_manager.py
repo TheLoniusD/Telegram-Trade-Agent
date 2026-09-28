@@ -22,8 +22,9 @@ TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 # e il trader non lo corregge mai con SL/TP, quindi eredita tutto dall'ultima
 # operazione classica nella stessa direzione. Di solito è ancora aperta; se nel
 # frattempo si è chiusa (es. dopo un "Hit risk") la cerchiamo nello storico, ma
-# solo se chiusa da non più di queste ore.
-REENTRY_PARENT_MAX_AGE_SECONDS = 6 * 3600
+# solo se aperta da non più di un'ora: oltre, il rischio di ereditare i livelli
+# di un'operazione che non c'entra è maggiore del vantaggio.
+REENTRY_PARENT_MAX_AGE_SECONDS = 3600
 
 
 class OrderManager:
