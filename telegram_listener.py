@@ -112,6 +112,15 @@ BE_MIN_PROFIT = float(os.getenv("BE_MIN_PROFIT", "0"))
 # così, che non sia un segnale ancora aperto, viene registrato ma non esegue nulla.
 EDIT_MAX_AGE_SECONDS = 10 * 60
 
+# Telegram segnala come "modifica" anche i cambi di reazioni e visualizzazioni
+# dei post del canale, con il testo e la data di modifica vecchi. Di solito il
+# filtro "testo non cambiato" li scarta, ma dopo un riavvio il bot non ricorda
+# più i testi: il 29/09 alle 09:13 due di questi falsi edit del SELL 4144
+# (modificato davvero alle 08:25) sono stati riclassificati e, con l'agente
+# funzionante, avrebbero riportato lo SL da pareggio a quello originale del
+# trader. Una modifica vera ha la data di modifica di pochi secondi fa.
+EDIT_FRESHNESS_SECONDS = 120
+
 # Ordini limite nella zona non ancora eseguiti dopo questo tempo vengono
 # cancellati: il prezzo è partito senza tornare nella zona del trader.
 ENTRY_ORDER_EXPIRY_SECONDS = int(os.getenv("ENTRY_ORDER_EXPIRY_MINUTES", "30")) * 60
@@ -454,6 +463,13 @@ def handle_message(event, is_edit: bool):
     if is_edit and _last_text_by_msg.get(msg_id) == text:
         logger.debug(f"⏭️ Edit del messaggio {msg_id} scartato: il testo non è cambiato.")
         journal.record("MESSAGE_SKIPPED", reason="edit senza modifiche al testo")
+        return
+
+    edit_date = getattr(event, "edit_date", None)
+    if is_edit and (edit_date is None or time.time() - edit_date.timestamp() > EDIT_FRESHNESS_SECONDS):
+        logger.debug(f"⏭️ Edit del messaggio {msg_id} scartato: nessuna modifica recente del testo "
+                     f"(data di modifica {edit_date}), solo reazioni o visualizzazioni.")
+        journal.record("MESSAGE_SKIPPED", reason="aggiornamento di reazioni/visualizzazioni, non una modifica")
         return
 
     # event.date è la data di invio ORIGINALE del messaggio, anche per gli edit
@@ -835,8 +851,23 @@ async def main():
         monitor_task.cancel()
 
 
+def missing_settings() -> list:
+    """Parametri indispensabili assenti dal .env (il bot non può funzionare senza)."""
+    required = {"ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY"), "TELEGRAM_API_ID": TELEGRAM_API_ID,
+                "TELEGRAM_API_HASH": TELEGRAM_API_HASH, "TARGET_CHANNEL": TARGET_CHANNEL}
+    return [name for name, value in required.items() if not value]
+
+
 # Avvio del client
 if __name__ == "__main__":
+    # Il 29/09 alle 09:12 il bot è partito senza la chiave dell'agente e se ne è
+    # accorto solo al primo messaggio: meglio fermarsi subito con un errore chiaro.
+    missing = missing_settings()
+    if missing:
+        logger.error(f"❌ Parametri mancanti nel .env: {', '.join(missing)}. Bot non avviato.")
+        journal.record("ERROR", where="avvio", error=f"Parametri mancanti nel .env: {', '.join(missing)}")
+        raise SystemExit(1)
+
     account = mt5_agent.account_snapshot()
     journal.record("BOT_START", test_mode=mt5_agent.test_mode, channel=TARGET_CHANNEL,
                    allowed_senders=sorted(ALLOWED_SENDER_IDS), **account)
