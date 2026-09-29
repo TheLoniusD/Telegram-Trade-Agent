@@ -1,0 +1,82 @@
+2026-09-29 09:12:09 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (1 trade attivi)
+2026-09-29 09:12:09 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-09-29 09:12:09 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-09-29 09:12:09 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-09-29 09:12:10 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-09-29 09:12:10 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-09-29 09:13:10 | ERROR    | telegram_listener | ❌ Errore durante l'elaborazione del messaggio
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 418, in process_message
+    handle_message(event, is_edit)
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 490, in handle_message
+    ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/agent_classifier.py", line 259, in agent_classify_telegram_message
+    response = client.messages.create(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_utils/_utils.py", line 294, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/resources/messages/messages.py", line 997, in create
+    return self._post(
+           ^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 1543, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 1150, in request
+    response, prepared = self._attempt_request(
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 1290, in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 557, in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 502, in _build_headers
+    self._validate_headers(headers, omitted)
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_client.py", line 418, in _validate_headers
+    raise TypeError(
+TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+2026-09-29 09:13:10 | ERROR    | telegram_listener | ❌ Errore durante l'elaborazione del messaggio
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 418, in process_message
+    handle_message(event, is_edit)
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 490, in handle_message
+    ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/agent_classifier.py", line 259, in agent_classify_telegram_message
+    response = client.messages.create(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_utils/_utils.py", line 294, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/resources/messages/messages.py", line 997, in create
+    return self._post(
+           ^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 1543, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 1150, in request
+    response, prepared = self._attempt_request(
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 1290, in _attempt_request
+    request = self._build_request(options, retries_taken=retries_taken)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 557, in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_base_client.py", line 502, in _build_headers
+    self._validate_headers(headers, omitted)
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/anthropic/_client.py", line 418, in _validate_headers
+    raise TypeError(
+TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+2026-09-29 09:16:50 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (1 trade attivi)
+2026-09-29 09:16:50 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-09-29 09:16:50 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-09-29 09:16:50 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-09-29 09:16:50 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-09-29 09:16:50 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-09-29 13:52:42 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58674802526: Invalid stops (retcode 10016)
+2026-09-29 13:52:42 | WARNING  | telegram_listener | 🔄 Ticket MT5 58674802526 ancora aperto: memoria riallineata al broker (SL 4167.0, TP 4147.0).
+2026-09-29 13:52:50 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58674802526: Invalid stops (retcode 10016)
+2026-09-29 13:52:50 | WARNING  | telegram_listener | 🔄 Ticket MT5 58674802526 ancora aperto: memoria riallineata al broker (SL 4167.0, TP 4147.0).
