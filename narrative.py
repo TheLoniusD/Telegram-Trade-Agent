@@ -237,8 +237,13 @@ class Narrator:
             signal = self.classified.get(e.get("trade_msg_id")) or {}
             entry_min = e.get("entry_min") if e.get("entry_min") is not None else signal.get("entry_min")
             entry_max = e.get("entry_max") if e.get("entry_max") is not None else signal.get("entry_max")
+            label = label_for(any_ticket.get("direction"), entry_min, e.get("reentry"), entry_max)
+            # Due segnali allo stesso prezzo (il 29/09 due SELL 4156 a 15 minuti):
+            # l'ora di apertura li distingue
+            if any(t["label"] == label for t in self.trades.values()):
+                label += f" delle {e.get('ts', '')[11:16]}"
             trade = self.trades[tid] = {
-                "label": label_for(any_ticket.get("direction"), entry_min, e.get("reentry"), entry_max),
+                "label": label,
                 "snapshot": {}, "alive": set(), "profit": 0.0,
             }
         for key, t in tickets.items():
