@@ -201,6 +201,22 @@ class OrderManager:
         return None
 
 
+    def _recent_archive(self) -> list:
+        """Operazioni archiviate oggi e ieri (storico/trades_AAAA-MM-GG.jsonl)."""
+        trades = []
+        for day in (datetime.now() - timedelta(days=1), datetime.now()):
+            path = os.path.join(self.archive_dir, f"trades_{day.strftime('%Y-%m-%d')}.jsonl")
+            if not os.path.exists(path):
+                continue
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        trades.append(json.loads(line))
+                    except ValueError:
+                        continue
+        return trades
+
+
     def _find_reentry_parent(self, symbol: Optional[str], direction: Optional[str]) -> Optional[dict]:
         """
         Operazione da cui un re-entry eredita i valori: la più recente con la
@@ -216,22 +232,18 @@ class OrderManager:
         if live:
             return max(live, key=lambda t: t.get("created_at") or 0)
 
-        archived = []
         now = time.time()
-        for day in (datetime.now(), datetime.now() - timedelta(days=1)):
-            path = os.path.join(self.archive_dir, f"trades_{day.strftime('%Y-%m-%d')}.jsonl")
-            if not os.path.exists(path):
-                continue
-            with open(path, encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        trade = json.loads(line)
-                    except ValueError:
-                        continue
-                    if (trade.get("status") == "CLOSED" and matches(trade)
-                            and now - (trade.get("created_at") or 0) <= REENTRY_PARENT_MAX_AGE_SECONDS):
-                        archived.append(trade)
+        archived = [t for t in self._recent_archive() if t.get("status") == "CLOSED" and matches(t)
+                    and now - (t.get("created_at") or 0) <= REENTRY_PARENT_MAX_AGE_SECONDS]
         return max(archived, key=lambda t: t.get("created_at") or 0) if archived else None
+
+
+    def _was_closed(self, msg_id: int) -> bool:
+        """True se il segnale di questo messaggio è già stato aperto e poi chiuso."""
+        trade = self.active_trades.get(msg_id)
+        if trade:
+            return trade.get("status") == "CLOSED"
+        return any(t.get("msg_id") == msg_id and t.get("status") == "CLOSED" for t in self._recent_archive())
 
 
     def _get_trades_by_group(self, target_msg_id: int) -> list[dict]:
@@ -323,9 +335,22 @@ class OrderManager:
         return [key for key, cfg in open_tickets.items() if cfg["take_profit"] == target_tp]
 
 
-    def handle_agent_output(self, msg_id: int, reply_to: Optional[int], ai_output: dict) -> Optional[dict]:
+    def handle_agent_output(self, msg_id: int, reply_to: Optional[int], ai_output: dict, is_edit: bool = False) -> Optional[dict]:
         intent = ai_output.get("intent")
         data = ai_output.get("data", {})
+
+        # Modifica di un segnale che il bot non ha mai aperto: il 29/09 alle 09:12
+        # il "Gold sell 4144" (msg 58185) è arrivato mentre il bot si riavviava e
+        # sono arrivate solo le sue modifiche. È un segnale nuovo, non un
+        # aggiornamento di un'altra operazione. Non vale per i segnali già chiusi
+        # (una correzione tardiva non deve riaprirli); vale invece per quelli
+        # rifiutati o non aperti, così una correzione del trader (es. un prezzo
+        # sbagliato) viene eseguita.
+        if (is_edit and intent == "UPDATE_SIGNAL" and self._explicit_target(msg_id, reply_to) is None
+                and data.get("direction") and data.get("entry_min") is not None
+                and not self._was_closed(msg_id)):
+            logger.warning(f"🆕 [RECUPERO] Modifica del messaggio {msg_id} mai aperto come segnale: trattata come nuovo segnale.")
+            intent = "NEW_SIGNAL"
     
         # 1. NUOVO SEGNALE (Lo salviamo SEMPRE per tracciare futuri edit o reply)
         if intent == "NEW_SIGNAL":
@@ -434,7 +459,9 @@ class OrderManager:
             #    riconosciuta della famiglia di operazioni.
             target_msg_id = self._explicit_target(msg_id, reply_to)
 
-            if not target_msg_id:
+            # La modifica di un messaggio vale solo per quel messaggio: mai
+            # ricadere sull'ultima operazione aperta, che non c'entra.
+            if not target_msg_id and not is_edit:
                 latest_trade = self._get_latest_trade()
                 if latest_trade and latest_trade.get("status") == "ACTIVE":
                     target_msg_id = latest_trade["msg_id"]
@@ -526,7 +553,7 @@ class OrderManager:
             # quel messaggio non è un'operazione.
             target_msg_id = self._explicit_target(msg_id, reply_to)
 
-            if not target_msg_id:
+            if not target_msg_id and not is_edit:
                 latest_trade = self._get_latest_trade()
                 if latest_trade and latest_trade.get("status") in CLOSABLE_STATUSES:
                     target_msg_id = latest_trade["msg_id"]
