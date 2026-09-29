@@ -64,6 +64,8 @@ IGNORE_FORWARDED_MESSAGES = True
 BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
 
 # Dove va lo SL quando il trader chiede il BE.
+# 'entry' = ingresso + BE_OFFSET (default). Il 29/09 il pareggio a metà zona
+#           ha chiuso in perdita 5 operazioni su 5 in una giornata laterale.
 # 'zone'  = a metà della zona del trader, vicino al SUO pareggio (lui entra in
 #           più punti della zona). Il 28/09 lo SL a ingresso+0,5 veniva preso
 #           da risalite normali di 1-2$ dopo 1-2 minuti, mentre il trader restava
@@ -71,8 +73,7 @@ BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
 #           possibile (max metà zona), ma MT5 lo accetta anche se in quel momento
 #           siamo leggermente in perdita. Per i ticket entrati oltre metà zona, e
 #           per i re-entry senza zona, resta ingresso + BE_OFFSET.
-# 'entry' = sempre ingresso + BE_OFFSET, come prima.
-BE_MODE = os.getenv("BE_MODE", "zone")
+BE_MODE = os.getenv("BE_MODE", "entry")
 
 # Filtro locale PRIMA dell'agente: un messaggio senza nemmeno una parola del
 # lessico operativo (solo emoji, "Another profitable day💪", "Thanks sir",
@@ -516,7 +517,7 @@ def handle_message(event, is_edit: bool):
                    data=ai_output.get("data"), reasoning=ai_output.get("raw_reasoning"))
 
     # 2. Passaggio all'Order Manager (il tuo file separato)
-    manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output)
+    manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output, is_edit=is_edit)
     if manager_result:
         journal.record("DECISION", action=manager_result.get("action"), reason=manager_result.get("reason"))
     else:
