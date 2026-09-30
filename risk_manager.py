@@ -19,6 +19,12 @@ DEFAULT_SL_DIST_GOLD = 10.0
 # provvisorio a DEFAULT_SL_DIST_GOLD.
 MIN_SL_DIST_GOLD = 3.0
 
+# Distanza massima tra il prezzo del segnale e il mercato. Oltre, il segnale è
+# quasi certamente un errore di battitura (30/09: "Gold buy 4285" con l'oro a
+# 4185, corretto dal trader 50 secondi dopo): non si apre nulla e si aspetta la
+# correzione, che il bot riconosce come segnale nuovo.
+MAX_SIGNAL_DISTANCE = float(os.getenv("MAX_SIGNAL_DISTANCE", "20"))
+
 # Quota massima del margine libero impegnabile da un singolo segnale (2 ticket)
 MARGIN_USAGE_LIMIT = 0.5
 
@@ -97,6 +103,14 @@ class RiskManager:
 
         current_price = symbol_info.ask if direction == "BUY" else symbol_info.bid
         entry_price = entry_min if entry_min is not None else current_price
+
+        signal_prices = [p for p in (entry_min, trade_data.get("entry_max")) if p is not None]
+        if signal_prices:
+            distance = min(abs(p - current_price) for p in signal_prices)
+            if distance > MAX_SIGNAL_DISTANCE:
+                return {"approved": False,
+                        "reason": f"prezzo del segnale {entry_min:g} lontano {distance:.2f} $ dal mercato "
+                                  f"({current_price}): probabile errore di battitura, attendo la correzione"}
 
         # 2. Prezzi di ingresso dei due ticket (vedi ENTRY_MODE)
         entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"), keys)
