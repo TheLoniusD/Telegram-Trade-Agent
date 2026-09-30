@@ -341,6 +341,18 @@ class Narrator:
         self.say(f"⚠️ {self.tag(trade)}{key} livelli incoerenti con un {e.get('direction')} "
                  f"(SL {num(e.get('stop_loss'))}, TP {num(e.get('take_profit'))}): non inviati")
 
+    def on_trade_active_plan(self, e):
+        trade = self.trades.get(e.get("ticket_id"))
+        if e.get("note"):
+            self.say(f"💰 {self.tag(trade)}Trade Active {e.get('trader_pips'):g} pips: {e['note']}")
+            return
+        parts = []
+        if e.get("closed"):
+            parts.append(f"incasso {', '.join(e['closed'])}")
+        if e.get("below_threshold"):
+            parts.append(f"{', '.join(e['below_threshold'])} sotto la soglia di {num(e.get('min_move'))} $, a pareggio")
+        self.say(f"💰 {self.tag(trade)}Trade Active {e.get('trader_pips'):g} pips: {' · '.join(parts) or 'nulla da incassare'}")
+
     def on_partial_close_plan(self, e):
         skipped = [self.trade_of(t)[1] or f"#{t}" for t in e.get("skipped_in_loss") or []]
         note = f" · {', '.join(skipped)} in perdita, non chiusi" if skipped else ""
@@ -359,7 +371,9 @@ class Narrator:
         mt5_ticket = e.get("mt5_ticket")
         trade, key = self.trade_of(mt5_ticket)
         reason = e.get("close_reason")
-        if reason == "STOP_LOSS":
+        if e.get("closed_by") == "TRADE_ACTIVE":
+            how = "incassato al Trade Active a"
+        elif reason == "STOP_LOSS":
             protected = trade and trade["snapshot"].get(key, {}).get("be_active")
             how = "a pareggio" if protected else "a stop"
         else:
@@ -548,6 +562,8 @@ def build_sheets(day: str) -> str:
                 reason = close.get("close_reason")
                 how = ("pareggio" if any(k == key for _, k, _ in trade["be"]) else "stop") if reason == "STOP_LOSS" \
                     else {"TAKE_PROFIT": "TP", "BOT": "bot"}.get(reason, reason or "chiuso")
+                if close.get("closed_by") == "TRADE_ACTIVE":
+                    how = "incasso TA"
                 outcome = f"{how} {hhmm(close['ts'])} {money(close.get('profit')):>12}"
             elif cancel:
                 outcome = short_reason(cancel.get("reason"))
