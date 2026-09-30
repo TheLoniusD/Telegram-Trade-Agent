@@ -1,0 +1,23 @@
+2026-09-30 06:07:07 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58687620886: Invalid stops (retcode 10016)
+2026-09-30 06:07:07 | WARNING  | telegram_listener | 🔄 Ticket MT5 58687620886 ancora aperto: memoria riallineata al broker (SL 4165.0, TP 4185.0).
+2026-09-30 06:07:07 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58687620901: Invalid stops (retcode 10016)
+2026-09-30 06:07:07 | WARNING  | telegram_listener | 🔄 Ticket MT5 58687620901 ancora aperto: memoria riallineata al broker (SL 4165.0, TP 4195.0).
+2026-09-30 08:33:57 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (1 trade attivi)
+2026-09-30 08:33:57 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-09-30 08:33:58 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-09-30 08:33:58 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-09-30 08:33:58 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-09-30 08:33:58 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-09-30 12:59:54 | ERROR    | mt5_executor | ❌ Errore apertura ordine MT5: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | WARNING  | telegram_listener | ⚠️ Apertura e1 non riuscita: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | ERROR    | mt5_executor | ❌ Errore apertura ordine MT5: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | WARNING  | telegram_listener | ⚠️ Apertura e2 non riuscita: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | ERROR    | mt5_executor | ❌ Errore apertura ordine MT5: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | WARNING  | telegram_listener | ⚠️ Apertura e3 non riuscita: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | ERROR    | mt5_executor | ❌ Errore apertura ordine MT5: Invalid stops (retcode 10016)
+2026-09-30 12:59:54 | WARNING  | telegram_listener | ⚠️ Apertura e4 non riuscita: Invalid stops (retcode 10016)
+2026-09-30 13:00:46 | WARNING  | order_manager | 🆕 [RECUPERO] Modifica del messaggio 58354 mai aperto come segnale: trattata come nuovo segnale.
+2026-09-30 13:28:07 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58694875708: Invalid stops (retcode 10016)
+2026-09-30 13:28:07 | WARNING  | telegram_listener | 🔄 Ticket MT5 58694875708 ancora aperto: memoria riallineata al broker (SL 4175.0, TP 4195.0).
+2026-09-30 13:28:07 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58694875765: Invalid stops (retcode 10016)
+2026-09-30 13:28:07 | WARNING  | telegram_listener | 🔄 Ticket MT5 58694875765 ancora aperto: memoria riallineata al broker (SL 4175.0, TP 4205.0).

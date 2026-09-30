@@ -1,0 +1,169 @@
+Operazioni del 2026-09-30 · 10 segnali · risultato delle operazioni chiuse: +45,17 $ · aggiornato alle 14:21
+
+═══ SELL 4178 · aperto 04:26 · CHIUSO +1,76 $ ═══
+Zona 4178–4183 · SL 4.188,00 · TP 4.168,00 / 4.158,00
+
+Trader
+  04:26  Gold sell 4178
+  04:27  (modifica) GOLD SELL NOW · SELL @ 4178 - 4183 · SL🔴4188 · TP✅4168 · TP✅4158
+  04:34  Trade Active ✅ · Gold Sell Running 95+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  04:34  (modifica) Trade Active ✅ · Gold Sell Running 75+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.178,04     4.168,00   pareggio 04:37      +1,76 $       58686967929
+  e2    (4.179,25)   4.158,00   cancellato al pareggio            58686967949
+  e3    (4.180,50)   4.168,00   cancellato al pareggio            58686967968
+  e4    (4.181,75)   4.158,00   cancellato al pareggio            58686967988
+
+Pareggio 04:34 → e1 SL 4.177,54
+
+═══ BUY 4175 · aperto 05:37 · CHIUSO +6,62 $ ═══
+Zona 4170–4175 · SL 4.165,00 · TP 4.185,00 / 4.195,00
+
+Trader
+  05:37  Gold buy 4175
+  05:38  (modifica) GOLD BUY NOW · BUY @ 4175 - 4170 · SL🔴4165 · TP✅4185 · TP✅4195
+  06:07  Trade Active ✅ · Gold Buy Running 45+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.175,00     4.185,00   pareggio 07:12      +1,76 $       58687620886
+  e2    4.173,75     4.195,00   pareggio 07:13      +2,21 $       58687620901
+  e3    4.172,50     4.185,00   pareggio 06:08      +2,65 $       58687620924
+  e4    (4.171,25)   4.195,00   cancellato al pareggio            58687620936
+
+Pareggio 06:07 → e3 SL 4.173,00
+Pareggio 06:15 → e2 SL 4.174,25
+Pareggio 06:17 → e1 SL 4.175,50
+
+═══ BUY 4174 · aperto 06:08 · CHIUSO +37,83 $ ═══
+Zona 4169–4174 · SL 4.164,00 · TP 4.184,00 / 4.194,00
+
+Trader
+  06:08  Gold buy 4174
+  06:09  (modifica) GOLD BUY NOW · BUY @ 4174 - 4169 · SL🔴4164 · TP✅4184 · TP✅4194
+  06:20  Trade Active ✅ · Gold Sell Running 65+ Pips · Gold Sell Running 55+ Pips · Scalpers secur…
+  06:43  HIT TP⚡️⚡️ · Gold Buy 135+ Pips ✔️ · Gold Buy 125+ Pips ✔️ · Collect all or half & BE+ ur…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.173,91     4.184,00   TP 06:40     +35,62 $             58687897415
+  e2    4.172,75     4.194,00   pareggio 07:13      +2,21 $       58687897465
+  e3    (4.171,50)   4.184,00   cancellato al pareggio            58687897501
+  e4    (4.170,25)   4.194,00   cancellato al pareggio            58687897514
+
+Pareggio 06:20 → e1 SL 4.174,41 · e2 SL 4.173,25
+
+═══ BUY 4180 · aperto 07:04 · CHIUSO −152,19 $ ═══
+Zona 4175–4180 · SL 4.170,00 · TP 4.190,00 / 4.200,00
+
+Trader
+  07:04  Gold buy 4180
+  07:05  (modifica) GOLD BUY NOW · BUY @ 4180 - 4175 · SL🔴4170 · TP✅4190 · TP✅4200
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.180,00     4.190,00   stop 07:16     −35,29 $           58688431969
+  e2    4.178,75     4.200,00   stop 07:16     −38,60 $           58688431980
+  e3    4.177,50     4.190,00   stop 07:16     −39,70 $           58688431990
+  e4    4.176,25     4.200,00   stop 07:16     −38,60 $           58688432001
+
+═══ BUY 4168 · aperto 07:19 · CHIUSO +0,00 $ ═══
+Zona 4163–4168 · SL 4.158,00 · TP 4.178,00 / 4.188,00
+
+Trader
+  07:19  Gold buy 4168
+  07:20  (modifica) GOLD BUY NOW · BUY @ 4168 - 4163 · SL🔴4158 · TP✅4178 · TP✅4188
+  07:24  Trade Active ✅ · Gold Buy Running 55+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  07:36  HIT TP⚡️⚡️ · Gold Buy 140+ Pips ✔️ · Collect all or half & BE+ ur entries · If u caught i…
+  08:18  HIT TP⚡️⚡️ · Gold Buy 190+ Pips ✔️ · Collect all or half & BE+ ur entries · Lets your pro…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    (4.168,00)   4.178,00   cancellato al pareggio            58688632022
+  e2    (4.166,75)   4.188,00   cancellato al pareggio            58688632072
+  e3    (4.165,50)   4.178,00   cancellato al pareggio            58688632108
+  e4    (4.164,25)   4.188,00   cancellato al pareggio            58688632145
+
+═══ BUY 4181 · aperto 08:27 · CHIUSO +128,83 $ ═══
+Zona 4176–4181 · SL 4.171,00 · TP 4.191,00 / 4.201,00
+
+Trader
+  08:27  Gold buy 4181
+  08:29  (modifica) GOLD BUY NOW · BUY @ 4181 - 4176 · SL🔴4171 · TP✅4191 · TP✅4201
+  08:59  HIT TP MAX⚡️⚡️ · Gold Buy 290+ Pips ✔️ · Gold Buy 160+ Pips ✔️ · Collect all or half & BE…
+  09:11  (modifica) HIT TP MAX⚡️⚡️ · Gold Buy 320+ Pips ✔️ · Gold Buy 190+ Pips ✔️ · Collect all or half & BE…
+  09:27  (modifica) HIT TP MAX⚡️⚡️ · Gold Buy 355+ Pips ✔️ · Gold Buy 225+ Pips ✔️ · Collect all or half & BE…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.181,00     4.191,00   TP 08:53     +35,24 $             58689510471
+  e2    4.179,75     4.201,00   TP 09:24     +93,59 $             58689510526
+  e3    (4.178,50)   4.191,00   scaduto                           58689510658
+  e4    (4.177,25)   4.201,00   scaduto                           58689510728
+
+Pareggio 09:00 → e2 SL 4.180,25
+
+═══ BUY 4195 · aperto 09:30 · CHIUSO +1,76 $ ═══
+Zona 4190–4195 · SL 4.185,00 · TP 4.205,00 / 4.215,00
+
+Trader
+  09:29  Gold buy 4195
+  09:31  (modifica) GOLD BUY NOW · BUY @ 4195 - 4190 · SL🔴4185 · TP✅4205 · TP✅4215
+  09:37  Trade Active ✅ · Gold Buy Running 50+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.195,00     4.205,00   pareggio 09:39      +1,76 $       58690655161
+  e2    (4.193,75)   4.215,00   cancellato al pareggio            58690655188
+  e3    (4.192,50)   4.205,00   cancellato al pareggio            58690655201
+  e4    (4.191,25)   4.215,00   cancellato al pareggio            58690655233
+
+Pareggio 09:38 → e1 SL 4.195,50
+
+═══ BUY 4285 · aperto 12:59 · NON APERTO ═══
+Zona 4285–4185 · SL 4.175,00 · TP —
+
+Trader
+  12:59  Gold buy 4285
+  13:00  (modifica) GOLD BUY NOW · BUY @ 4185 - 4180 · SL🔴4175 · TP✅4195 · TP✅4205
+  13:28  Gold running 80 pips now, close half and set your BE
+  13:40  Trade Active ✅ · Gold Buy Running 160+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.285,00     —          rifiutato da MT5                  
+  e2    4.285,00     —          rifiutato da MT5                  
+  e3    4.285,00     —          rifiutato da MT5                  
+  e4    4.285,00     —          rifiutato da MT5                  
+
+═══ BUY 4185 · aperto 13:00 · CHIUSO +16,60 $ ═══
+Zona 4180–4185 · SL 4.175,00 · TP 4.195,00 / 4.205,00
+
+Trader
+  12:59  Gold buy 4285
+  13:00  (modifica) GOLD BUY NOW · BUY @ 4185 - 4180 · SL🔴4175 · TP✅4195 · TP✅4205
+  13:27  Lets close half now
+  13:28  Gold running 80 pips now, close half and set your BE
+  13:40  Trade Active ✅ · Gold Buy Running 160+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.185,00     4.195,00   pareggio 13:45      +1,76 $       58694875708
+  e2    4.183,75     4.205,00   pareggio 13:32      −0,93 $       58694875765
+  e3    4.182,50     4.195,00   pareggio 13:28      +2,64 $       58694875801
+  e4    4.181,25     4.205,00   bot 13:27     +13,13 $            58694875837
+
+Pareggio 13:28 → e3 SL 4.183,00
+Pareggio 13:31 → e2 SL 4.184,25
+Pareggio 13:34 → e1 SL 4.185,50
+
+═══ BUY 4185 · aperto 13:48 · CHIUSO +3,96 $ ═══
+Zona 4180–4185 · SL 4.175,00 · TP 4.195,00 / 4.205,00
+
+Trader
+  13:48  Gold buy 4185
+  13:49  (modifica) GOLD BUY NOW · BUY @ 4185 - 4180 · SL🔴4175 · TP✅4195 · TP✅4205
+  14:02  Trade Active ✅ · Gold Buy Running 45+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  14:07  Trade Active ✅ · Gold Buy Running 60+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  14:18  HIT TP⚡️⚡️ · Gold Buy 185+ Pips ✔️ · Gold Buy 115+ Pips ✔️ · Collect all or half & BE+ ur…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.183,96     4.195,00   pareggio 14:21      +1,76 $       58695824796
+  e2    4.183,75     4.205,00   pareggio 14:21      +2,20 $       58695824999
+  e3    (4.182,50)   4.195,00   cancellato al pareggio            58695825290
+  e4    (4.181,25)   4.205,00   cancellato al pareggio            58695825487
+
+Pareggio 14:02 → e1 SL 4.184,46 · e2 SL 4.184,25
