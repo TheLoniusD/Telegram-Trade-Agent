@@ -145,6 +145,10 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
   - Prezzo assente (mercato immediato, re-entry): entry_min e entry_max entrambi null.
 - 'is_reentry': true SOLO per il re-entry del punto 3b (messaggio "again" senza prezzo); false in tutti gli
   altri casi, compresi UPDATE_SIGNAL, CLOSE_SIGNAL e IGNORE.
+- 'running_pips': SOLO per i messaggi "Trade Active": i numeri delle righe "Gold Buy/Sell Running N+ Pips",
+  nell'ordine in cui compaiono (es. "Running 100+ Pips / Running 80+ Pips" -> [100.0, 80.0]).
+  [] in tutti gli altri casi, compresi HIT TP / HIT TP MAX (le loro righe "Gold Sell 185+ Pips ✔️" non contengono
+  "Running") e i comandi liberi come "Gold running 80 pips now, close half".
 - 'stop_loss': valore numerico diretto (sia per SL espliciti che per invalidation/cut loss). Assente -> null.
 - 'take_profit': array dei target estratti. Assenti -> [].
 - 'update_details.move_sl_to_be': true se il testo contiene "BE+", "BE", "B/E", "break even", "breakeven",
@@ -179,7 +183,8 @@ reply al messaggio del segnale.
 7. "Running 65 pips, close half set your BE"
    -> UPDATE_SIGNAL, close_percentage 50.0, move_sl_to_be true.
 8. "Trade Active ✅\n\nGold Buy Running 130+ Pips\n\nScalpers secure ur Profits & BE+ ur entries" (reply al segnale)
-   -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null (i pips indicati sono solo un resoconto).
+   -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null, running_pips [130.0].
+   Con più righe ("Gold Sell Running 100+ Pips\nGold Sell Running 80+ Pips") -> running_pips [100.0, 80.0].
 9. "HIT TP⚡️⚡️\n\nGold Buy 185+ Pips ✔️\n\nCollect all or half & BE+ ur entries" (reply al segnale)
    -> UPDATE_SIGNAL, move_sl_to_be true, close_percentage null ("Collect all or half" senza MAX è un invito ai follower).
 10. "HIT TP MAX⚡️⚡️\n\nGold Sell 350+ Pips ✔️\nGold Sell 310+ Pips ✔️\n\nCollect all or half & BE+ ur entries" (reply al segnale)
@@ -216,6 +221,7 @@ CLASSIFY_SIGNAL_TOOL = {
                     "stop_loss": {"type": ["number", "null"]},
                     "take_profit": {"type": "array", "items": {"type": "number"}},
                     "is_reentry": {"type": "boolean"},
+                    "running_pips": {"type": "array", "items": {"type": "number"}},
                     "update_details": {
                         "type": "object",
                         "properties": {
@@ -227,7 +233,7 @@ CLASSIFY_SIGNAL_TOOL = {
                         "additionalProperties": False
                     }
                 },
-                "required": ["symbol", "direction", "entry_min", "entry_max", "stop_loss", "take_profit", "is_reentry", "update_details"],
+                "required": ["symbol", "direction", "entry_min", "entry_max", "stop_loss", "take_profit", "is_reentry", "running_pips", "update_details"],
                 "additionalProperties": False
             },
             "raw_reasoning": {"type": "string"}

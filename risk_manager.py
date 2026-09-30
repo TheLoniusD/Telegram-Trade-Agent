@@ -34,10 +34,21 @@ MARGIN_USAGE_LIMIT = 0.5
 # bordo peggiore o oltre (fino a 3,4$ peggio il 25/09), e quando il trader
 # scriveva "Running 45 pips, BE+" eravamo ancora in pari o in perdita.
 # 'zone'   = ordini limite distribuiti nella zona, dal prezzo del segnale
-#            verso l'interno (a mercato se il prezzo è già a quel livello o migliore)
+#            verso l'interno (a mercato se il prezzo è già a quel livello o migliore,
+#            e il primo anche se è poco oltre: vedi ENTRY_MARKET_TOLERANCE)
 # 'market' = tutto a mercato subito, come prima
 ENTRY_MODE = os.getenv("ENTRY_MODE", "zone")
 ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
+
+# Gli ordini oltre il primo coprono solo i primi ENTRY_ZONE_DEPTH $ della zona:
+# sul 29-30/09 i livelli a 2,5 e 3,75 $ dal segnale sono entrati solo nel 55% e
+# 35% dei casi. Con 4 ordini e 3 $: segnale, +1, +2, +3 $.
+ENTRY_ZONE_DEPTH = float(os.getenv("ENTRY_ZONE_DEPTH", "3.0"))
+
+# Il primo ordine entra a mercato anche se il prezzo è già fino a questa
+# distanza oltre il segnale: il 30/09 "Gold buy 4168" con l'oro a 4169,24 non
+# è entrato (tutti limite) ed è arrivato a HIT TP. Oltre, aspetta al segnale.
+ENTRY_MARKET_TOLERANCE = float(os.getenv("ENTRY_MARKET_TOLERANCE", "3.0"))
 
 def zone_bounds(direction: str, entry_min, entry_max):
     """
@@ -113,7 +124,7 @@ class RiskManager:
                                   f"({current_price}): probabile errore di battitura, attendo la correzione"}
 
         # 2. Prezzi di ingresso dei due ticket (vedi ENTRY_MODE)
-        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"), keys)
+        entry_levels = self._entry_levels(direction, entry_min, trade_data.get("entry_max"), keys, current_price)
 
         # Prezzo di ingresso più sfavorevole allo SL tra quelli possibili
         # (mercato o livelli limite): lo SL deve stare oltre tutti.
@@ -184,12 +195,13 @@ class RiskManager:
             "orders": orders_to_execute
         }
 
-    def _entry_levels(self, direction: str, entry_min, entry_max, keys: list) -> dict:
+    def _entry_levels(self, direction: str, entry_min, entry_max, keys: list, current_price: float = None) -> dict:
         """
         Prezzi limite dei ticket nella zona del trader, o None (= a mercato).
-        Distribuiti a passo costante dal prezzo del segnale (il bordo da cui il
-        trader parte) verso l'interno: con 2 ticket bordo e metà zona, con 4
-        per "sell 4180" (zona 4180-4185) 4180 / 4181,25 / 4182,5 / 4183,75.
+        Dal prezzo del segnale (il bordo da cui il trader parte) verso l'interno,
+        sui primi ENTRY_ZONE_DEPTH $: con 4 ticket per "sell 4178" 4178 / 4179 /
+        4180 / 4181. Il primo va a mercato se il prezzo è già oltre il segnale
+        di non più di ENTRY_MARKET_TOLERANCE $.
         Senza prezzo nel segnale ("Try buy again") o con ENTRY_MODE=market si
         entra a mercato.
         """
@@ -198,10 +210,20 @@ class RiskManager:
             return {key: None for key in keys}
 
         low, high = zone
-        step = (high - low) / len(keys)
+        depth = min(ENTRY_ZONE_DEPTH, high - low)
+        step = depth / (len(keys) - 1) if len(keys) > 1 else 0
         if direction == "BUY":
-            return {key: round(high - i * step, 2) for i, key in enumerate(keys)}
-        return {key: round(low + i * step, 2) for i, key in enumerate(keys)}
+            levels = {key: round(high - i * step, 2) for i, key in enumerate(keys)}
+        else:
+            levels = {key: round(low + i * step, 2) for i, key in enumerate(keys)}
+
+        # Primo ordine a mercato se il prezzo è già poco oltre il segnale
+        if current_price is not None and keys:
+            first = keys[0]
+            beyond = current_price - levels[first] if direction == "BUY" else levels[first] - current_price
+            if 0 < beyond <= ENTRY_MARKET_TOLERANCE:
+                levels[first] = None
+        return levels
 
     def _max_lots_by_margin(self, symbol: str, direction: str, price: float) -> float:
         """

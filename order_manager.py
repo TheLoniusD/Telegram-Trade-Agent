@@ -453,6 +453,11 @@ class OrderManager:
             close_percentage = update_details.get("close_percentage")
             partial_close = close_percentage is not None and 0 < close_percentage < 100
             layer_target = update_details.get("layer_target")
+            # "Trade Active ... Running 60+ Pips ... BE+": una riga di pips per
+            # ogni segnale della serie, dal più vecchio; l'ultima è il segnale a
+            # cui il messaggio risponde. Non vale per "close half" espliciti.
+            running_pips = [p for p in (data.get("running_pips") or []) if p]
+            trade_active = bool(move_to_be and running_pips and not partial_close)
 
             # 1. Identificazione del Trade Bersaglio: 'reply_to' punta sempre al
             #    messaggio COMPLETO (quello con SL/TP impostati), che è la radice
@@ -531,7 +536,21 @@ class OrderManager:
                 if modified:
                     updated_trades.append(trade)
 
-            if updated_trades or be_candidates or partial_close:
+            # Trade Active su più righe: parla anche dei segnali precedenti della
+            # stessa direzione. Quelli ancora aperti vanno a pareggio (nessuna
+            # chiusura: non sappiamo con certezza quale riga sia di quale).
+            if trade_active and len(running_pips) > 1 and trades_to_update:
+                direction = first_ticket(trades_to_update[0]).get("direction")
+                chain_ids = {id(t) for t in trades_to_update}
+                for other in self.active_trades.values():
+                    if (id(other) in chain_ids or other.get("status") != "ACTIVE"
+                            or first_ticket(other).get("direction") != direction):
+                        continue
+                    for tp_config in other.get("tickets", {}).values():
+                        if tp_config.get("mt5_ticket") and not tp_config.get("be_active") and not tp_config.get("closed"):
+                            be_candidates.append({"trade": other, "ticket": tp_config})
+
+            if updated_trades or be_candidates or partial_close or trade_active:
                 self.save_state_to_file()
                 logger.debug(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
                 return {
@@ -541,6 +560,7 @@ class OrderManager:
                     "sl_tp_changed": bool(new_sl is not None or (new_tp_list and isinstance(new_tp_list, list))),
                     "sl_changed": new_sl is not None,
                     "close_percentage": close_percentage if partial_close else None,
+                    "trade_active_pips": running_pips[-1] if trade_active else None,
                 }
 
             return {"action": "IGNORE", "reason": "Nessuna modifica applicabile (nessun trade idoneo)."}

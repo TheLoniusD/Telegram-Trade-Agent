@@ -12,7 +12,7 @@ load_dotenv()
 
 import journal
 from agent_classifier import agent_classify_telegram_message
-from order_manager import OrderManager, CLOSABLE_STATUSES
+from order_manager import OrderManager, CLOSABLE_STATUSES, ticket_tp_index
 from risk_manager import RiskManager, zone_bounds
 from mt5_executor import MT5Executor, MT5UnavailableError
 from market_hours import is_market_time_open
@@ -62,6 +62,10 @@ IGNORE_FORWARDED_MESSAGES = True
 # ingresso chiude con un piccolo guadagno invece che a zero. 0 = BE esatto.
 # Il 23/09 un SELL portato a BE esatto si è chiuso a 0,00 due minuti dopo.
 BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
+
+# "Trade Active": un ticket si incassa solo se guadagna almeno questa quota dei
+# pips scritti dal trader (0.5 = metà: "Running 60+ Pips" -> almeno 3 $).
+TRADE_ACTIVE_MIN_PIPS_RATIO = float(os.getenv("TRADE_ACTIVE_MIN_PIPS_RATIO", "0.5"))
 
 # Dove va lo SL quando il trader chiede il BE.
 # 'entry' = ingresso + BE_OFFSET (default). Il 29/09 il pareggio a metà zona
@@ -198,6 +202,59 @@ def mark_closed_if_complete(trade: dict) -> None:
     opened = [t for t in trade.get("tickets", {}).values() if t.get("mt5_ticket")]
     if opened and all(t.get("closed") for t in opened):
         trade["status"] = "CLOSED"
+
+
+def execute_trade_active(trade: dict, trader_pips: float) -> None:
+    """
+    "Trade Active ... Running N+ Pips": incassa i ticket entrati al prezzo
+    peggiore (i più vicini al prezzo del segnale, con il pareggio più vicino
+    al prezzo e quindi i primi a saltare), gli altri vanno poi a pareggio.
+      - 3-4 ticket eseguiti: chiude il peggiore sul TP1 e il peggiore sul TP2
+      - 2 ticket eseguiti: chiude solo il peggiore sul TP1
+      - 1 ticket eseguito: nessuna chiusura (resta la possibilità del TP)
+    Un ticket si chiude solo se guadagna almeno TRADE_ACTIVE_MIN_PIPS_RATIO dei
+    pips del trader (10 pips = 1 $), che sono contati dai suoi ingressi migliori;
+    sotto la soglia va a pareggio come gli altri. Una sola volta per operazione.
+    """
+    if trade.get("trade_active_closed"):
+        return
+    filled = [(k, t) for k, t in trade.get("tickets", {}).items()
+              if t.get("mt5_ticket") and not t.get("closed") and not t.get("pending")]
+    if len(filled) < 2:
+        journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
+                       closed=[], note="un solo ticket eseguito: solo pareggio")
+        return
+
+    direction = filled[0][1].get("direction")
+    # Peggiore = ingresso più alto per un BUY, più basso per un SELL
+    worst_first = sorted(filled, key=lambda kt: kt[1].get("entry_price") or 0, reverse=(direction == "BUY"))
+    wanted_indexes = (0, 1) if len(filled) >= 3 else (0,)
+    chosen = []
+    for index in wanted_indexes:
+        pick = next((kt for kt in worst_first if ticket_tp_index(*kt) == index and kt not in chosen), None)
+        if pick:
+            chosen.append(pick)
+
+    min_move = trader_pips / 10 * TRADE_ACTIVE_MIN_PIPS_RATIO
+    closed, below = [], []
+    for key, tp_config in chosen:
+        mt5_ticket = tp_config["mt5_ticket"]
+        try:
+            move = mt5_agent.favorable_move(mt5_ticket)
+        except MT5UnavailableError:
+            move = None
+        if move is None or move < min_move:
+            below.append(key)
+            continue
+        if mt5_agent.close_position(ticket=mt5_ticket, symbol=tp_config.get("symbol")):
+            tp_config["closed"] = True
+            closed.append(key)
+            record_position_closed(mt5_ticket, closed_by="TRADE_ACTIVE", trade=trade)
+    if closed:
+        trade["trade_active_closed"] = True
+    journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
+                   min_move=round(min_move, 2), closed=closed, below_threshold=below)
+    mark_closed_if_complete(trade)
 
 
 def ticket_in_profit(tp_config: dict) -> bool:
@@ -620,6 +677,12 @@ def handle_message(event, is_edit: bool):
             # applicato solo a ciò che resta aperto.
             if manager_result.get("close_percentage"):
                 execute_partial_close(trades, manager_result["close_percentage"])
+
+            # 2.0b "Trade Active": incassa i ticket peggiori dell'operazione a
+            # cui risponde, prima del BE che protegge gli altri.
+            if manager_result.get("trade_active_pips"):
+                for trade in trades:
+                    execute_trade_active(trade, manager_result["trade_active_pips"])
 
             # 2a. Breakeven, ticket per ticket. MT5 stesso verifica se la posizione
             # esiste ancora: se il TP è già scattato, il broker l'ha già chiusa e
