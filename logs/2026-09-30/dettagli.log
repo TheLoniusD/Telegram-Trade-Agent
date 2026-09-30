@@ -21,3 +21,9 @@
 2026-09-30 13:28:07 | WARNING  | telegram_listener | 🔄 Ticket MT5 58694875708 ancora aperto: memoria riallineata al broker (SL 4175.0, TP 4195.0).
 2026-09-30 13:28:07 | ERROR    | mt5_executor | ❌ Errore spostamento BE posizione #58694875765: Invalid stops (retcode 10016)
 2026-09-30 13:28:07 | WARNING  | telegram_listener | 🔄 Ticket MT5 58694875765 ancora aperto: memoria riallineata al broker (SL 4175.0, TP 4205.0).
+2026-09-30 19:36:22 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-09-30 19:36:22 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-09-30 19:36:22 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-09-30 19:36:22 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-09-30 19:36:23 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-09-30 19:36:23 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
