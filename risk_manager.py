@@ -40,9 +40,11 @@ MARGIN_USAGE_LIMIT = 0.5
 ENTRY_MODE = os.getenv("ENTRY_MODE", "zone")
 ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
 
-# Gli ordini oltre il primo coprono solo i primi ENTRY_ZONE_DEPTH $ della zona:
-# sul 29-30/09 i livelli a 2,5 e 3,75 $ dal segnale sono entrati solo nel 55% e
-# 35% dei casi. Con 4 ordini e 3 $: segnale, +1, +2, +3 $.
+# Gli ordini oltre il primo partono distribuiti su tutta la zona (5 $: segnale,
+# +1,67, +3,33, +5 $) per cercare il prezzo migliore; quelli non eseguiti dopo
+# ENTRY_TIGHTEN_AFTER_MINUTES vengono avvicinati ai primi ENTRY_ZONE_DEPTH $
+# (segnale, +1, +2, +3 $). Sul 29-30/09 gli ordini a 2,5 e 3,75 $ dal segnale
+# sono entrati solo nel 55% e 35% dei casi, quasi sempre nei primi minuti.
 ENTRY_ZONE_DEPTH = float(os.getenv("ENTRY_ZONE_DEPTH", "3.0"))
 
 # Il primo ordine entra a mercato anche se il prezzo è già fino a questa
@@ -150,8 +152,14 @@ class RiskManager:
         # mercato), poi limitata dal margine libero.
         step_lot = symbol_info.volume_step or 0.01
         lots = {}
+        # Lotti calcolati sul livello avvicinato (il prezzo peggiore a cui l'ordine
+        # può entrare): anche dopo lo spostamento il rischio resta nel limite.
+        tight = self.tight_levels(direction, entry_min, trade_data.get("entry_max"), keys)
         for key in keys:
             level = entry_levels[key]
+            if level is not None and tight.get(key) is not None:
+                # Peggiore = più alto per un BUY, più basso per un SELL
+                level = max(level, tight[key]) if direction == "BUY" else min(level, tight[key])
             price = level if level is not None else current_price
             lots[key] = self._calculate_lot_size(symbol, direction, price, stop_loss) / len(keys)
         margin_lots = self._max_lots_by_margin(symbol, direction, current_price)
@@ -184,6 +192,7 @@ class RiskManager:
                 "direction": direction,
                 "entry_price": entry_levels[key] if entry_levels[key] is not None else entry_price,
                 "limit_price": entry_levels[key],
+                "tighten_price": tight.get(key) if entry_levels[key] is not None and tight.get(key) != entry_levels[key] else None,
                 "stop_loss": stop_loss,
                 "take_profit": take_profit,
                 "volume": lots[key],
@@ -199,9 +208,10 @@ class RiskManager:
         """
         Prezzi limite dei ticket nella zona del trader, o None (= a mercato).
         Dal prezzo del segnale (il bordo da cui il trader parte) verso l'interno,
-        sui primi ENTRY_ZONE_DEPTH $: con 4 ticket per "sell 4178" 4178 / 4179 /
-        4180 / 4181. Il primo va a mercato se il prezzo è già oltre il segnale
-        di non più di ENTRY_MARKET_TOLERANCE $.
+        su tutta la zona: con 4 ticket per "sell 4178" 4178 / 4179,67 / 4181,33 /
+        4183. Dopo ENTRY_TIGHTEN_AFTER_MINUTES il listener avvicina quelli non
+        eseguiti ai livelli di tight_levels(). Il primo va a mercato se il prezzo
+        è già oltre il segnale di non più di ENTRY_MARKET_TOLERANCE $.
         Senza prezzo nel segnale ("Try buy again") o con ENTRY_MODE=market si
         entra a mercato.
         """
@@ -210,12 +220,7 @@ class RiskManager:
             return {key: None for key in keys}
 
         low, high = zone
-        depth = min(ENTRY_ZONE_DEPTH, high - low)
-        step = depth / (len(keys) - 1) if len(keys) > 1 else 0
-        if direction == "BUY":
-            levels = {key: round(high - i * step, 2) for i, key in enumerate(keys)}
-        else:
-            levels = {key: round(low + i * step, 2) for i, key in enumerate(keys)}
+        levels = self._spread(direction, low, high, high - low, keys)
 
         # Primo ordine a mercato se il prezzo è già poco oltre il segnale
         if current_price is not None and keys:
@@ -224,6 +229,21 @@ class RiskManager:
             if 0 < beyond <= ENTRY_MARKET_TOLERANCE:
                 levels[first] = None
         return levels
+
+    def _spread(self, direction: str, low: float, high: float, depth: float, keys: list) -> dict:
+        """Livelli a passo costante dal bordo del segnale verso l'interno, su 'depth' $."""
+        step = depth / (len(keys) - 1) if len(keys) > 1 else 0
+        if direction == "BUY":
+            return {key: round(high - i * step, 2) for i, key in enumerate(keys)}
+        return {key: round(low + i * step, 2) for i, key in enumerate(keys)}
+
+    def tight_levels(self, direction: str, entry_min, entry_max, keys: list) -> dict:
+        """Livelli avvicinati ai primi ENTRY_ZONE_DEPTH $ (seconda fase dell'ingresso)."""
+        zone = zone_bounds(direction, entry_min, entry_max)
+        if ENTRY_MODE != "zone" or zone is None:
+            return {key: None for key in keys}
+        low, high = zone
+        return self._spread(direction, low, high, min(ENTRY_ZONE_DEPTH, high - low), keys)
 
     def _max_lots_by_margin(self, symbol: str, direction: str, price: float) -> float:
         """

@@ -412,6 +412,42 @@ class MT5Executor:
         logger.debug(f"✂️ Chiusi {volume} lotti su {pos.volume} della posizione {pos.ticket}.")
         return volume
 
+    def current_price(self, symbol: str, direction: str):
+        """Prezzo a cui entrerebbe adesso un ordine nella direzione indicata (ask per BUY, bid per SELL)."""
+        if self.test_mode:
+            return None
+        try:
+            tick = mt5.symbol_info_tick(symbol or "XAUUSD")
+        except Exception as e:
+            raise MT5UnavailableError(str(e))
+        if tick is None:
+            return None
+        return tick.ask if direction == "BUY" else tick.bid
+
+    def move_pending(self, ticket: int, price: float) -> bool:
+        """Sposta il prezzo di un ordine limite in attesa, lasciando SL e TP invariati."""
+        if self.test_mode:
+            return True
+        try:
+            pending = self._find_pending(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Spostamento dell'ordine {ticket} non inviato: {e}")
+            return False
+        if pending is None:
+            return False
+        request = {
+            "action": mt5.TRADE_ACTION_MODIFY,
+            "order": ticket,
+            "price": float(price),
+            "sl": pending.sl,
+            "tp": pending.tp,
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        ok, result, error = self._send("MOVE_PENDING", request, symbol=pending.symbol)
+        if not ok:
+            logger.error(f"❌ Errore spostamento ordine in attesa {ticket}: {error}")
+        return ok
+
     def modify_order_levels(self, ticket: int, stop_loss: float, take_profit: list) -> bool:
         """
         Invia una richiesta TRADE_ACTION_SLTP a MT5 per aggiornare Stop Loss e Take Profit.

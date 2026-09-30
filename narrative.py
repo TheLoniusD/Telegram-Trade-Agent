@@ -33,6 +33,7 @@ OPERATION_NAMES = {
     "OPEN": "l'apertura a mercato", "OPEN_LIMIT": "l'ordine limite", "CLOSE": "la chiusura",
     "PARTIAL_CLOSE": "la chiusura parziale", "BREAKEVEN": "il pareggio", "MODIFY_SL_TP": "la modifica di SL/TP",
     "MODIFY_PENDING": "la modifica dell'ordine in attesa", "CANCEL": "la cancellazione",
+    "MOVE_PENDING": "lo spostamento dell'ordine in attesa",
 }
 
 CLOSE_REASONS = {
@@ -319,6 +320,14 @@ class Narrator:
         else:
             self.say(f"✅ {self.tag(trade)}{key} eseguito a {num(e.get('price'))}")
 
+    def on_pending_moved(self, e):
+        trade, key = self.trade_of(e.get("mt5_ticket"))
+        if e.get("new_price") is None:
+            return
+        if trade and key in trade["snapshot"]:
+            trade["snapshot"][key]["entry_price"] = e["new_price"]
+        self.say(f"↔️ {self.tag(trade)}{key} avvicinato da {num(e.get('old_price'))} a {num(e['new_price'])}: {e.get('reason')}")
+
     def on_pending_cancelled(self, e):
         trade, key = self.trade_of(e.get("mt5_ticket"))
         if trade:
@@ -552,7 +561,8 @@ def build_sheets(day: str) -> str:
         lines.append("")
         lines.append(f"{'Ticket':<8}{'ingresso':<13}{'TP':<11}{'esito':<34}{'MT5'}")
         for key, t in tickets.items():
-            entry = num(t.get("entry_price"))
+            fill = trade["fills"].get(key)
+            entry = num(fill.get("price") if fill and fill.get("price") else t.get("entry_price"))
             if key in trade["cancels"] or (t.get("pending") and key not in trade["fills"]):
                 entry = f"({entry})"
             close, cancel = trade["closes"].get(key), trade["cancels"].get(key)
