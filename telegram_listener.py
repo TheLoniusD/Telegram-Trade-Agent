@@ -63,6 +63,10 @@ IGNORE_FORWARDED_MESSAGES = True
 # Il 23/09 un SELL portato a BE esatto si è chiuso a 0,00 due minuti dopo.
 BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
 
+# Seconda fase dell'ingresso: dopo questi minuti gli ordini limite non eseguiti
+# vengono avvicinati al prezzo del segnale (vedi ENTRY_ZONE_DEPTH in risk_manager).
+ENTRY_TIGHTEN_AFTER_SECONDS = int(float(os.getenv("ENTRY_TIGHTEN_AFTER_MINUTES", "3")) * 60)
+
 # "Trade Active": un ticket si incassa solo se guadagna almeno questa quota dei
 # pips scritti dal trader (0.5 = metà: "Running 60+ Pips" -> almeno 3 $).
 TRADE_ACTIVE_MIN_PIPS_RATIO = float(os.getenv("TRADE_ACTIVE_MIN_PIPS_RATIO", "0.5"))
@@ -369,6 +373,30 @@ def filled_and_closed(mt5_ticket: int) -> bool:
         return False
 
 
+def tighten_pending_ticket(tp_config: dict) -> None:
+    """
+    Seconda fase dell'ingresso: un ordine limite in fondo alla zona non ancora
+    eseguito viene avvicinato al prezzo del segnale (vedi ENTRY_ZONE_DEPTH).
+    Se il prezzo è già oltre il nuovo livello (più vicino al fondo della zona),
+    l'ordine resta dov'è: è sulla buona strada per essere eseguito.
+    """
+    mt5_ticket, new_price = tp_config["mt5_ticket"], tp_config["tighten_price"]
+    old_price = tp_config.get("entry_price")
+    tp_config["tighten_price"] = None  # un solo tentativo
+    try:
+        price = mt5_agent.current_price(tp_config.get("symbol"), tp_config.get("direction"))
+    except MT5UnavailableError:
+        return
+    if price is not None and ((price <= new_price) if tp_config.get("direction") == "BUY" else (price >= new_price)):
+        journal.record("PENDING_MOVED", mt5_ticket=mt5_ticket, old_price=old_price, new_price=None,
+                       reason="prezzo già oltre il nuovo livello, ordine lasciato in fondo alla zona")
+        return
+    if mt5_agent.move_pending(mt5_ticket, new_price):
+        tp_config["entry_price"] = new_price
+        journal.record("PENDING_MOVED", mt5_ticket=mt5_ticket, old_price=old_price, new_price=new_price,
+                       reason=f"non eseguito in {ENTRY_TIGHTEN_AFTER_SECONDS // 60} minuti")
+
+
 def sync_pending_entries() -> None:
     """
     Segue gli ordini limite in attesa: se eseguiti registra prezzo e volume
@@ -411,6 +439,10 @@ def sync_pending_entries() -> None:
                     changed = True
                 elif time.time() - (tp_config.get("pending_since") or time.time()) > ENTRY_ORDER_EXPIRY_SECONDS:
                     cancel_pending_ticket(tp_config, f"non eseguito entro {ENTRY_ORDER_EXPIRY_SECONDS // 60} minuti")
+                    changed = True
+                elif (tp_config.get("tighten_price") is not None
+                      and time.time() - (tp_config.get("pending_since") or time.time()) > ENTRY_TIGHTEN_AFTER_SECONDS):
+                    tighten_pending_ticket(tp_config)
                     changed = True
             finally:
                 journal.clear_current_message(token)
@@ -630,6 +662,7 @@ def handle_message(event, is_edit: bool):
                             ticket_data["entry_price"] = order_config.get("limit_price")
                             ticket_data["pending"] = True
                             ticket_data["pending_since"] = time.time()
+                            ticket_data["tighten_price"] = order_config.get("tighten_price")
                             journal.record("ENTRY_PENDING", mt5_ticket=ticket_data["mt5_ticket"], key=target_key,
                                            limit_price=order_config.get("limit_price"), volume=ticket_data["volume"])
 
