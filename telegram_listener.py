@@ -779,7 +779,14 @@ def handle_message(event, is_edit: bool):
                             # ancora in attesa: non va sovrascritto più tardi.
                             tp_config["be_pending"] = False
 
-            for trade in trades:
+            # Anche le operazioni messe a pareggio da un Trade Active su più righe,
+            # che non fanno parte della catena a cui risponde il messaggio
+            touched = list(trades)
+            for candidate in be_candidates:
+                if all(candidate["trade"] is not t for t in touched):
+                    touched.append(candidate["trade"])
+            for trade in touched:
+                mark_closed_if_complete(trade)
                 journal.record("TRADE_STATUS", **trade_summary(trade))
             manager.save_state_to_file()
 
