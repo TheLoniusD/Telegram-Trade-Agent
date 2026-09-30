@@ -1,4 +1,4 @@
-Operazioni del 2026-09-29 · 11 segnali · risultato delle operazioni chiuse: −32,06 $ · aggiornato alle 14:44
+Operazioni del 2026-09-29 · 11 segnali · risultato delle operazioni chiuse: −32,06 $ · aggiornato alle 14:21
 
 ═══ BUY 4131 · aperto 04:05 · CHIUSO −11,22 $ ═══
 Zona 4126–4131 · SL 4.121,00 · TP 4.141,00 / 4.151,00
@@ -171,6 +171,7 @@ Trader
   14:30  Gold sell 4155
   14:32  (modifica) GOLD SELL NOW · SELL @ 4155 - 4160 · SL🔴4165 · TP✅4145 · TP✅4135
   14:41  Trade Active ✅ · Gold Sell Running 75+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  15:00  Trade Active ✅ · Gold Sell Running 95+ Pips · Scalpers secure ur Profits & BE+ ur entries
 
 Ticket  ingresso     TP         esito                             MT5
   e1    4.155,00     4.145,00   pareggio 14:41      +1,76 $       58675678727
