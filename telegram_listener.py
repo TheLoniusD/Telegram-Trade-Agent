@@ -200,6 +200,15 @@ def mark_closed_if_complete(trade: dict) -> None:
         trade["status"] = "CLOSED"
 
 
+def ticket_in_profit(tp_config: dict) -> bool:
+    """True se il ticket si chiuderebbe adesso in guadagno (o se non è misurabile)."""
+    try:
+        move = mt5_agent.favorable_move(tp_config.get("mt5_ticket"))
+    except MT5UnavailableError:
+        return False
+    return move is None or move > 0
+
+
 def execute_partial_close(trades: list, percentage: float) -> None:
     """
     "Close half" e simili: chiude circa la percentuale indicata del volume ancora
@@ -243,12 +252,20 @@ def execute_partial_close(trades: list, percentage: float) -> None:
     open_tickets.sort(key=tp_distance, reverse=True)
     open_volume = sum(t.get("volume") or 0 for _, t in open_tickets)
     to_close = open_volume * percentage / 100
-    logger.debug(f"✂️ Chiusura parziale {percentage:g}%: {to_close:.3f} lotti su {open_volume:.2f} aperti "
-                f"(arrotondati per difetto allo step del broker).")
-    journal.record("PARTIAL_CLOSE_PLAN", percentage=percentage, open_volume=round(open_volume, 2),
-                   target_volume=round(to_close, 3))
 
-    for trade, tp_config in open_tickets:
+    # Il trader chiede di incassare: un ticket in perdita (entrato più in
+    # alto/basso degli altri) non si chiude, resta aperto per il BE. Il 30/09
+    # "Lets close half now" chiudeva anche e2, sotto il suo ingresso.
+    closable, in_loss = [], []
+    for item in open_tickets:
+        (closable if ticket_in_profit(item[1]) else in_loss).append(item)
+    logger.debug(f"✂️ Chiusura parziale {percentage:g}%: {to_close:.3f} lotti su {open_volume:.2f} aperti "
+                f"(arrotondati per difetto allo step del broker), {len(in_loss)} ticket in perdita esclusi.")
+    journal.record("PARTIAL_CLOSE_PLAN", percentage=percentage, open_volume=round(open_volume, 2),
+                   target_volume=round(to_close, 3),
+                   skipped_in_loss=[t.get("mt5_ticket") for _, t in in_loss])
+
+    for trade, tp_config in closable:
         if to_close < 1e-9:
             break
         mt5_ticket = tp_config["mt5_ticket"]

@@ -342,8 +342,10 @@ class Narrator:
                  f"(SL {num(e.get('stop_loss'))}, TP {num(e.get('take_profit'))}): non inviati")
 
     def on_partial_close_plan(self, e):
+        skipped = [self.trade_of(t)[1] or f"#{t}" for t in e.get("skipped_in_loss") or []]
+        note = f" · {', '.join(skipped)} in perdita, non chiusi" if skipped else ""
         self.say(f"✂️ Chiusura parziale del {e.get('percentage'):g}%: {num(e.get('target_volume'))} "
-                 f"lotti su {num(e.get('open_volume'))}")
+                 f"lotti su {num(e.get('open_volume'))}{note}")
 
     def on_partial_close_repeated(self, e):
         self.say(f"✂️ Chiusura parziale ripetuta dopo {e.get('minutes_since_last')} minuti: trattata come la stessa, ignorata")
