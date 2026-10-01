@@ -33,19 +33,23 @@ MARGIN_USAGE_LIMIT = 0.5
 # posiziona al suo interno. Entrando tutto subito a mercato noi finivamo sul
 # bordo peggiore o oltre (fino a 3,4$ peggio il 25/09), e quando il trader
 # scriveva "Running 45 pips, BE+" eravamo ancora in pari o in perdita.
-# 'range'  = (default) tutti i ticket al prezzo del segnale, il bordo della zona
+# 'range'  = (default) metà dei ticket al prezzo del segnale, il bordo della zona
 #            da cui parte il trader: se il prezzo è già nella zona (o migliore)
-#            entrano tutti subito a mercato, al prezzo del momento; se è oltre il
-#            bordo, cioè fuori dalla zona dalla parte sbagliata, restano ordini
-#            limite al bordo ed entrano appena il prezzo torna nella zona. Non si
-#            entra mai fuori dalla zona dalla parte sbagliata (01/10: e1 a mercato
-#            a 4152,68 su "Gold sell 4155", in perdita al Trade Active e chiuso a
-#            stop pieno), e quando il prezzo è nella zona entrano tutti e 4 subito.
+#            entrano subito a mercato; se è oltre il bordo, cioè fuori dalla zona
+#            dalla parte sbagliata, restano limite al bordo ed entrano appena il
+#            prezzo torna nella zona. Gli altri limite a metà e a 3/4 della zona.
+#            Mai ingressi fuori zona dalla parte sbagliata (01/10: e1 a mercato a
+#            4152,68 su "Gold sell 4155", in perdita al Trade Active e chiuso a
+#            stop pieno).
 # 'zone'   = ordini limite distribuiti nella zona, dal prezzo del segnale
 #            verso l'interno (a mercato se il prezzo è già a quel livello o migliore,
 #            e il primo anche se è poco oltre: vedi ENTRY_MARKET_TOLERANCE)
 # 'market' = tutto a mercato subito, anche fuori dalla zona
 ENTRY_MODE = os.getenv("ENTRY_MODE", "range")
+
+# Modalità 'range': quanti ticket entrano subito al prezzo del segnale (uno sul
+# TP1 e uno sul TP2); gli altri aspettano più dentro la zona.
+ENTRY_IMMEDIATE_TICKETS = int(os.getenv("ENTRY_IMMEDIATE_TICKETS", "2"))
 ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
 
 # Gli ordini oltre il primo partono distribuiti su tutta la zona (5 $: segnale,
@@ -230,10 +234,21 @@ class RiskManager:
 
         low, high = zone
         if ENTRY_MODE == "range":
-            # Tutti al bordo del segnale: l'esecutore li apre a mercato se il
-            # prezzo è già nella zona o migliore, altrimenti restano in attesa.
+            # I primi ENTRY_IMMEDIATE_TICKETS al bordo del segnale: l'esecutore li
+            # apre subito a mercato se il prezzo è già nella zona (o migliore),
+            # altrimenti restano in attesa al bordo. Gli altri limite più dentro
+            # la zona (metà, poi 3/4), eseguiti solo se il prezzo ci arriva.
             edge = high if direction == "BUY" else low
-            return {key: round(edge, 2) for key in keys}
+            sign = -1 if direction == "BUY" else 1
+            width = high - low
+            levels = {}
+            for i, key in enumerate(keys):
+                if i < ENTRY_IMMEDIATE_TICKETS:
+                    levels[key] = round(edge, 2)
+                else:
+                    depth = min(width, width * (0.5 + 0.25 * (i - ENTRY_IMMEDIATE_TICKETS)))
+                    levels[key] = round(edge + sign * depth, 2)
+            return levels
 
         levels = self._spread(direction, low, high, high - low, keys)
 

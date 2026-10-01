@@ -360,6 +360,9 @@ class Narrator:
 
     def on_trade_active_plan(self, e):
         trade = self.trades.get(e.get("ticket_id"))
+        if e.get("note"):
+            self.say(f"💰 {self.tag(trade)}Trade Active {e.get('trader_pips'):g} pips: {e['note']}")
+            return
         parts = []
         if e.get("closed"):
             parts.append(f"incasso {', '.join(e['closed'])}")
