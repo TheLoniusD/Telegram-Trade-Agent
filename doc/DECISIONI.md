@@ -82,7 +82,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ### 01/10 (sera) — Pulizia del repository
 - `main` allineato al codice per Windows e usato per lo sviluppo; `claude-branch` eliminato; `server` = `main` + RPyC + log.
-- Eliminati `doc/TODO` (punti ancora aperti spostati qui sotto in *Questioni aperte*), `doc/requirements.txt` (doppione: ora un solo `requirements.txt` in radice) e `report.py` (sostituito da `bot.log` e `operazioni.txt`); scritto il `README.md`.
+- Eliminati `doc/TODO` (punti ancora aperti spostati qui sotto in *Questioni aperte*), `doc/requirements.txt` (doppione: ora un solo `requirements.txt` in radice) e `report.py` (sostituito da `bot.log` e `operazioni.txt`); scritto il `README.md`; eliminato anche `doc/Opzioni_gestione_Trade_Active.md` (opzioni del 29/09, superate dalle decisioni del 30/09 e 01/10).
 
 ### 01/10 — Ingresso sempre nella zona, Trade Active che lascia un ticket, stop di protezione
 - **Decisioni**
