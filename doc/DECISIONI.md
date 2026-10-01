@@ -45,9 +45,10 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - **Re-entry** ("Try buy again", senza prezzo): eredita SL e TP *scritti dal trader* dall'ultima operazione nella stessa direzione (aperta, o chiusa nell'ultima ora), entra a mercato; i messaggi sul segnale padre valgono anche per lui.
 - Un segnale con prezzo non è mai un re-entry, anche se vicino a uno aperto.
 
-### Log
+### Log e repository
 - Per giorno: `bot.log` (racconto), `operazioni.txt` (schede), `dettagli.log`, `errors.log`, `journal.jsonl` (dati). Heartbeat ogni 4 ore.
 - Sul server i log si caricano con **pull e poi push, mai push forzati**.
+- Branch: si sviluppa su **`main`** (Windows); **`server`** = `main` + collegamento RPyC + log, aggiornato unendo `main`. (`claude-branch` eliminato il 01/10.)
 
 ### Parametri `.env` (valore di default)
 | Parametro | Default | Note |
@@ -78,6 +79,10 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 01/10 (sera) — Pulizia del repository
+- `main` allineato al codice per Windows e usato per lo sviluppo; `claude-branch` eliminato; `server` = `main` + RPyC + log.
+- Eliminati `doc/TODO` (punti ancora aperti spostati qui sotto in *Questioni aperte*), `doc/requirements.txt` (doppione: ora un solo `requirements.txt` in radice) e `report.py` (sostituito da `bot.log` e `operazioni.txt`); scritto il `README.md`.
 
 ### 01/10 — Ingresso sempre nella zona, Trade Active che lascia un ticket, stop di protezione
 - **Decisioni**
@@ -119,3 +124,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
 - Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
+- Segnale rapido mai completato dal trader (nessuna modifica con SL e TP): oggi resta lo SL provvisorio a 10 $ e nessun TP. Decidere se chiudere o mettere a pareggio dopo un certo tempo.
+- Notizie ad alto impatto (NFP, CPI…): operare o no durante la pubblicazione.
+- "Cut loss if solid break X": oggi diventa uno SL rigido; valutare uno SL "morbido" che chiude solo a candela chiusa oltre il livello.
+- Più esempi reali nel prompt dell'agente, man mano che arrivano messaggi nuovi.

@@ -1,5 +1,7 @@
 telethon>=1.30.0
 anthropic>=1.0.0
 python-dotenv>=1.0.0
+# Collegamento a mt5server.exe sotto Wine (vedi mt5_connection.py): sul server
+# Linux il pacchetto MetaTrader5 di main non si installa e non serve.
 rpyc==6.0.2
 tzdata

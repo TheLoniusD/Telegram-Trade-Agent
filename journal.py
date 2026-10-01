@@ -6,7 +6,7 @@ in bot.log e aggiorna le schede di operazioni.txt (vedi narrative.py). Il
 diario registra ogni
 evento rilevante come una riga JSON (un evento per riga, in append), così lo
 storico di una giornata si può ricostruire e analizzare anche a posteriori,
-quando il bot ha girato senza nessuno davanti al PC (vedi report.py).
+quando il bot ha girato senza nessuno davanti al PC.
 
 Ogni evento ha: ts (ora nel fuso dei log, di default italiana, con offset), event (tipo) e i campi specifici.
 Gli eventi generati mentre si elabora un messaggio Telegram portano anche il

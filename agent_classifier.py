@@ -282,7 +282,7 @@ def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: 
     )
 
     # Token consumati: sul canale ufficiale ogni messaggio costa una chiamata,
-    # così report.py può mostrare quanto ha speso il bot in una giornata.
+    # così dal journal si può calcolare quanto ha speso il bot in una giornata.
     usage = response.usage
     journal.record(
         "CLASSIFIER_CALL", model=MODEL_ID, stop_reason=response.stop_reason, request_id=response._request_id,
