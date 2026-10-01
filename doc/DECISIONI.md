@@ -1,0 +1,121 @@
+# Decisioni e regole del bot
+
+Documento di riferimento per non perdere il filo: **come si comporta il bot oggi** e **perché abbiamo scelto così**.
+
+**Regola di lavoro:** a ogni sessione in cui cambiamo una regola di trading (non per le correzioni di bug ovvie) si aggiorna questo file nello stesso push del codice:
+1. la sezione *Regole in vigore* si riscrive con lo stato nuovo;
+2. si aggiunge in cima al *Registro* una voce con data, decisione, motivo (con i dati), alternative scartate e cosa resta da verificare.
+
+Prima di proporre una modifica si controlla qui che non contraddica una scelta già fatta, o che, se la cambia, lo faccia consapevolmente.
+
+---
+
+## Regole in vigore (aggiornato al 01/10/2026)
+
+### Segnali e classificazione
+- Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
+- Prima dell'agente vengono scartati: messaggi senza testo, inoltrati, senza parole operative, modifiche identiche, **falsi edit** (reazioni/visualizzazioni: senza data di modifica recente), correzioni di messaggi vecchi (> 10 minuti) che non sono segnali aperti.
+- **Errore di battitura**: un segnale con prezzo a più di **20 $** dal mercato non viene aperto (`MAX_SIGNAL_DISTANCE`); la correzione del trader viene aperta dal **recupero**.
+- **Recupero**: una modifica recente di un segnale mai aperto (perso durante un riavvio, o rifiutato) viene trattata come segnale nuovo; mai riaperto un segnale già chiuso.
+- Una **modifica** vale solo per il proprio messaggio (o quello a cui risponde), mai per "l'ultima operazione aperta".
+
+### Ingresso (`ENTRY_MODE=range`)
+- 4 ticket per segnale; rischio totale **2%** del saldo, diviso tra i ticket.
+- **e1 (TP1) ed e2 (TP2) al prezzo del segnale**: subito a mercato se il prezzo è nella zona del trader (o migliore); se è oltre il bordo dalla parte sbagliata restano limite al bordo ed entrano appena il prezzo torna nella zona. **Mai ingressi fuori zona dalla parte sbagliata.**
+- **e3 (TP1) ed e4 (TP2) limite a metà e a ¾ della zona**, eseguiti solo se il prezzo ci arriva.
+- Zona: quella scritta dal trader; nella fase rapida ("Gold buy 4186") si assume larga 5 $ a favore del trader.
+- SL provvisorio a 10 $ dal segnale finché il trader non scrive il suo; SL a meno di 3 $ o dalla parte sbagliata → provvisorio.
+- Ordini limite non eseguiti: cancellati dopo 30 minuti, o al primo comando di pareggio/Trade Active/chiusura.
+
+### "Trade Active … Running N+ Pips" (con BE+)
+- Si chiudono **al massimo 2 ticket, quelli entrati al prezzo peggiore**, e **ne resta sempre aperto almeno uno** (4 aperti → 2 chiusi, 2 → 1, 1 → nessuno). A parità di prezzo si chiude prima il TP1 (resta il TP2).
+- **Mai chiusure in perdita**; nessuna soglia sui pips. Una sola volta per operazione.
+- I ticket rimasti vanno a **pareggio**; gli ordini non eseguiti vengono cancellati.
+- Messaggio su più righe di pips: la regola vale per l'operazione a cui risponde (ultima riga); le altre operazioni aperte nella stessa direzione vanno solo a pareggio.
+
+### Pareggio (BE) e protezione
+- Pareggio = ingresso **± 0,50 $** dalla parte del guadagno (`BE_MODE=entry`, `BE_OFFSET=0.5`).
+- **Stop di protezione**: se MT5 rifiuta il pareggio (siamo in perdita o troppo vicini) lo stop si avvicina al primo gradino accettato tra ¼, ½, ¾ della distanza ingresso–stop; ogni 30 secondi si riprova il pareggio vero e si migliora la protezione.
+- Uno SL già più protettivo del pareggio non viene mai peggiorato.
+
+### Altri messaggi del trader
+- **HIT TP** (con BE+): pareggio, nessuna chiusura.
+- **HIT TP MAX**: è il tabellone della serie → **pareggio su tutto, nessuna chiusura**. Chiusura totale solo per comandi espliciti ("Close all", "Close now").
+- **"Close half" e simili**: chiude la percentuale chiesta, prima i ticket con il TP più lontano, **mai ticket in perdita**; ripetizione entro 15 minuti = stesso comando.
+- **Re-entry** ("Try buy again", senza prezzo): eredita SL e TP *scritti dal trader* dall'ultima operazione nella stessa direzione (aperta, o chiusa nell'ultima ora), entra a mercato; i messaggi sul segnale padre valgono anche per lui.
+- Un segnale con prezzo non è mai un re-entry, anche se vicino a uno aperto.
+
+### Log
+- Per giorno: `bot.log` (racconto), `operazioni.txt` (schede), `dettagli.log`, `errors.log`, `journal.jsonl` (dati). Heartbeat ogni 4 ore.
+- Sul server i log si caricano con **pull e poi push, mai push forzati**.
+
+### Parametri `.env` (valore di default)
+| Parametro | Default | Note |
+|---|---|---|
+| `ENTRY_MODE` | `range` | `zone` = ingresso in due fasi (30/09), `market` = tutto a mercato |
+| `ENTRY_TICKETS` | 4 | |
+| `ENTRY_IMMEDIATE_TICKETS` | 2 | ticket al prezzo del segnale in modalità `range` |
+| `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
+| `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
+| `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
+| `BE_MODE` / `BE_OFFSET` | `entry` / 0.5 | sul server il `.env` contiene anche `BE_MODE=entry` |
+| `MAX_SIGNAL_DISTANCE` | 20 | |
+| `LOG_TIMEZONE` / `LOG_DETAILS_LEVEL` | Europe/Rome / INFO | |
+
+---
+
+## Risultati per giornata
+
+| Giorno | Risultato | Versione / note |
+|---|---|---|
+| 24/09 | −29 $ | ingresso a mercato, 2 ticket |
+| 25/09 | −638 $ | BE solo con 3 $ di guadagno minimo (poi tolto) |
+| 28/09 | +691 $ (≈ −36 $ non registrati) | ordini limite nella zona; trend forte |
+| 29/09 | −32 $ | mattina BE a metà zona (−62 $), pomeriggio BE a ingresso +0,5 (+29 $); laterale |
+| 30/09 | +45 $ | e1 a mercato entro 3 $, ordini nei primi 3 $; 1 stop pieno (−152 $) |
+| 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
+
+---
+
+## Registro delle decisioni (dal più recente)
+
+### 01/10 — Ingresso sempre nella zona, Trade Active che lascia un ticket, stop di protezione
+- **Decisioni**
+  - Ingresso `range`: e1/e2 subito al prezzo del segnale (o in attesa al bordo), e3/e4 a metà e ¾ di zona. Mai fuori zona.
+  - Trade Active: chiusi al massimo 2 ticket, quelli entrati peggio; ne resta sempre almeno uno; nessuna soglia pips; mai in perdita.
+  - Stop di protezione a gradini quando MT5 rifiuta il pareggio.
+  - Niente invio di modifiche SL/TP identiche ("No changes").
+- **Perché**: 01/10 e1 entrato a mercato 2,32 $ fuori zona (SELL 4155) → in perdita al Trade Active, pareggio rifiutato, stop pieno (−32,64 $). La soglia "metà dei pips" non veniva quasi mai raggiunta (un solo incasso su 9 Trade Active). Il pareggio rifiutato lasciava lo stop pieno: 23 rifiuti dal 24/09.
+- **Scartato**: tutti e 4 subito al bordo (rischio pieno su ogni operazione, anche le perdenti); chiudere anche l'ultimo ticket (nessuna possibilità di TP); chiudere i più in profitto (con il nuovo ingresso hanno lo stesso prezzo); limite di perdita giornaliera e di operazioni contemporanee (proposto, **non voluto per ora**).
+- **Da verificare**: quante volte entrano e3/e4 e se lo fanno soprattutto quando il prezzo va contro; quanto rende l'incasso al Trade Active rispetto al solo pareggio; se lo stop di protezione crea piccole perdite su operazioni che poi sarebbero tornate; segnali persi perché il prezzo era già oltre il bordo (~1 su 7).
+
+### 30/09 — Ingresso più vicino al segnale e prima regola sul Trade Active
+- **Decisioni**: e1 a mercato se il prezzo era entro 3 $ oltre il segnale; e2–e4 prima su tutta la zona, poi avvicinati ai primi 3 $ dopo 3 minuti; Trade Active: incasso del peggiore sul TP1 e del peggiore sul TP2 se guadagnano metà dei pips del trader; "close half" mai su ticket in perdita; segnali a più di 20 $ dal mercato non aperti.
+- **Perché**: 30/09 BUY 4168 perso (prezzo 1,24 $ sopra il segnale, ordini tutti limite) e arrivato a HIT TP; gli ordini a 2,5 e 3,75 $ entravano nel 55% e 35% dei casi; "close half" aveva chiuso un ticket in perdita; "Gold buy 4285" con l'oro a 4185.
+- **Superato il 01/10**: la tolleranza di 3 $ faceva entrare fuori zona; la soglia pips era troppo alta.
+
+### 29/09 — Pareggio a ingresso +0,5 come default, modifiche solo sul proprio messaggio
+- **Decisioni**: `BE_MODE=entry` di default (pareggio a metà zona solo su richiesta); una modifica vale solo per il proprio messaggio; recupero dei segnali persi o rifiutati; falsi edit delle reazioni ignorati; il bot non parte se mancano chiavi nel `.env`.
+- **Perché**: mattina del 29/09 il pareggio a metà zona ha chiuso 5 operazioni su 5 in perdita (−11 $ ciascuna) in giornata laterale; alle 09:13 le modifiche di un segnale arrivato durante un riavvio sarebbero finite sull'operazione aperta riportando il suo SL da pareggio a 4154.
+- **Da verificare**: il pareggio stretto (+0,5) chiude spesso operazioni che poi vanno al TP nei giorni di trend (28/09: ~150 $; 30/09 BUY 4185: ~130 $).
+
+### 28/09 — HIT TP MAX non chiude, 4 ticket, re-entry corretti
+- **Decisioni**: HIT TP MAX → pareggio invece di chiusura; 4 ticket per segnale; re-entry solo per "again" senza prezzo, con lo SL originale del trader; SL troppo vicini sostituiti; ordini limite eseguiti e chiusi tra due controlli registrati; log riscritti (racconto + schede).
+- **Perché**: HIT TP MAX è il tabellone della serie, pubblicato più volte mentre il prezzo continua: chiudere ha fatto perdere ~195 $ il 28/09. "Gold sell 4179" collegato al sell 4180 ne ereditava lo SL già a pareggio (stop a 0,5 $, lotti ×10).
+- **Scartato**: pareggio a metà zona (provato il 29/09 mattina, peggiorativo).
+
+### 25/09 — Ingresso con ordini limite, nessun margine minimo sul BE
+- **Decisioni**: ordini limite nella zona del trader invece di tutto a mercato; `BE_MIN_PROFIT=0`; correzioni di messaggi vecchi ignorate.
+- **Perché**: entravamo in media 0,8 $ peggio del trader (fino a 3,4 $) e al "Trade Active" eravamo in pari o in perdita; il BE con 3 $ di guadagno minimo ha portato −638 $ (22 stop su 24 chiusure). **Lezione: le modifiche di strategia vanno verificate sui dati prima di metterle in produzione.**
+
+### 23–24/09 — Prima messa a punto
+- Rischio 2% calcolato con `order_calc_profit` (prima ~12% reale), tetto sul margine, SL provvisorio 10 $; chiusura parziale; `BE_OFFSET=0.5` (un BE esatto si chiudeva a 0,00); filtro mittenti; log per giorno in ora italiana; cache del prompt (~0,13 $/giorno di agente).
+
+---
+
+## Questioni aperte
+- **Prezzi al minuto**: script da far girare sul server per scaricare le candele M1 e rigiocare le giornate con regole diverse (Trade Active, pareggio, ingresso). Serve per scegliere con i numeri.
+- Pareggio stretto vs più largo nei giorni di trend.
+- Gestione dei Trade Active su più righe oltre al pareggio.
+- Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
+- Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
