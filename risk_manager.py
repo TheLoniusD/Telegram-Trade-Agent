@@ -33,11 +33,19 @@ MARGIN_USAGE_LIMIT = 0.5
 # posiziona al suo interno. Entrando tutto subito a mercato noi finivamo sul
 # bordo peggiore o oltre (fino a 3,4$ peggio il 25/09), e quando il trader
 # scriveva "Running 45 pips, BE+" eravamo ancora in pari o in perdita.
+# 'range'  = (default) tutti i ticket al prezzo del segnale, il bordo della zona
+#            da cui parte il trader: se il prezzo è già nella zona (o migliore)
+#            entrano tutti subito a mercato, al prezzo del momento; se è oltre il
+#            bordo, cioè fuori dalla zona dalla parte sbagliata, restano ordini
+#            limite al bordo ed entrano appena il prezzo torna nella zona. Non si
+#            entra mai fuori dalla zona dalla parte sbagliata (01/10: e1 a mercato
+#            a 4152,68 su "Gold sell 4155", in perdita al Trade Active e chiuso a
+#            stop pieno), e quando il prezzo è nella zona entrano tutti e 4 subito.
 # 'zone'   = ordini limite distribuiti nella zona, dal prezzo del segnale
 #            verso l'interno (a mercato se il prezzo è già a quel livello o migliore,
 #            e il primo anche se è poco oltre: vedi ENTRY_MARKET_TOLERANCE)
-# 'market' = tutto a mercato subito, come prima
-ENTRY_MODE = os.getenv("ENTRY_MODE", "zone")
+# 'market' = tutto a mercato subito, anche fuori dalla zona
+ENTRY_MODE = os.getenv("ENTRY_MODE", "range")
 ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
 
 # Gli ordini oltre il primo partono distribuiti su tutta la zona (5 $: segnale,
@@ -207,7 +215,8 @@ class RiskManager:
     def _entry_levels(self, direction: str, entry_min, entry_max, keys: list, current_price: float = None) -> dict:
         """
         Prezzi limite dei ticket nella zona del trader, o None (= a mercato).
-        Dal prezzo del segnale (il bordo da cui il trader parte) verso l'interno,
+        ENTRY_MODE=range: tutti al prezzo del segnale (vedi sopra).
+        ENTRY_MODE=zone: dal prezzo del segnale (il bordo da cui il trader parte) verso l'interno,
         su tutta la zona: con 4 ticket per "sell 4178" 4178 / 4179,67 / 4181,33 /
         4183. Dopo ENTRY_TIGHTEN_AFTER_MINUTES il listener avvicina quelli non
         eseguiti ai livelli di tight_levels(). Il primo va a mercato se il prezzo
@@ -216,10 +225,16 @@ class RiskManager:
         entra a mercato.
         """
         zone = zone_bounds(direction, entry_min, entry_max)
-        if ENTRY_MODE != "zone" or zone is None:
+        if ENTRY_MODE not in ("zone", "range") or zone is None:
             return {key: None for key in keys}
 
         low, high = zone
+        if ENTRY_MODE == "range":
+            # Tutti al bordo del segnale: l'esecutore li apre a mercato se il
+            # prezzo è già nella zona o migliore, altrimenti restano in attesa.
+            edge = high if direction == "BUY" else low
+            return {key: round(edge, 2) for key in keys}
+
         levels = self._spread(direction, low, high, high - low, keys)
 
         # Primo ordine a mercato se il prezzo è già poco oltre il segnale

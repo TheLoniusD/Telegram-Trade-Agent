@@ -31,6 +31,11 @@ def broker_time_str(broker_epoch) -> Optional[str]:
     return datetime.fromtimestamp(broker_epoch, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def same_levels(broker_value, wanted) -> bool:
+    """True se un livello SL/TP del broker coincide con quello voluto (0/None = nessun livello)."""
+    return round(float(broker_value or 0.0), 2) == round(float(wanted or 0.0), 2)
+
+
 class MT5UnavailableError(Exception):
     """
     MT5 non ha risposto alla richiesta (terminale chiuso, connessione persa).
@@ -260,7 +265,7 @@ class MT5Executor:
         logger.debug(f"🗑️ Ordine in attesa {ticket} cancellato.")
         return True
 
-    def set_sl_to_be(self, ticket: int, entry_price: float) -> bool:
+    def set_sl_to_be(self, ticket: int, entry_price: float, operation: str = "BREAKEVEN") -> bool:
         """
         Sposta lo Stop Loss al prezzo di ingresso (Breakeven) per UN SINGOLO ticket.
         Se la posizione non esiste più su MT5 (es. il broker l'ha già chiusa perché
@@ -290,12 +295,12 @@ class MT5Executor:
             "sl": float(entry_price),
             "tp": pos.tp
         }
-        ok, result, error = self._send("BREAKEVEN", request, symbol=pos.symbol)
+        ok, result, error = self._send(operation, request, symbol=pos.symbol)
         if ok:
-            logger.debug(f"🎯 SL spostato a BE per la posizione #{pos.ticket}")
+            logger.debug(f"🎯 SL spostato a {entry_price} ({operation}) per la posizione #{pos.ticket}")
             return True
 
-        logger.error(f"❌ Errore spostamento BE posizione #{pos.ticket}: {error}")
+        logger.error(f"❌ Errore spostamento SL ({operation}) posizione #{pos.ticket}: {error}")
         return False
 
     def close_position(self, ticket: int, symbol: str = None) -> bool:
@@ -466,6 +471,8 @@ class MT5Executor:
             logger.error(f"❌ Modifica del ticket {ticket} non inviata: {e}")
             return False
         if pending is not None:
+            if same_levels(pending.sl, stop_loss) and same_levels(pending.tp, tp_price):
+                return True
             request = {
                 "action": mt5.TRADE_ACTION_MODIFY,
                 "order": ticket,
@@ -479,6 +486,16 @@ class MT5Executor:
                 logger.error(f"❌ Errore modifica ordine in attesa {ticket}: {error}")
                 return False
             logger.debug(f"✅ Ordine in attesa {ticket} aggiornato | SL: {stop_loss} | TP: {tp_price}")
+            return True
+
+        # Valori già attivi sul broker (es. il trader corregge solo la zona e
+        # riscrive SL e TP uguali): MT5 risponderebbe "No changes" (01/10 14:24).
+        try:
+            position = self._find_position(ticket)
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Modifica del ticket {ticket} non inviata: {e}")
+            return False
+        if position is not None and same_levels(position.sl, stop_loss) and same_levels(position.tp, tp_price):
             return True
 
         request = {
