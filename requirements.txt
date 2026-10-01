@@ -1,0 +1,8 @@
+telethon>=1.30.0
+anthropic>=1.0.0
+python-dotenv>=1.0.0
+# Collegamento diretto al terminale MetaTrader 5 (solo Windows).
+# Sul server Linux, branch "server", al suo posto c'è rpyc verso mt5server.
+MetaTrader5
+# Fusi orari dei log su Windows (database dei fusi non incluso nel sistema)
+tzdata

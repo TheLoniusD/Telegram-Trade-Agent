@@ -22,18 +22,54 @@ Uso (dove MT5 è raggiungibile, cioè sul server o sul PC con MT5):
 """
 import argparse
 import time
-from datetime import datetime
+import json
+import os
+import sys
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from logger_config import to_local
-from report import load_events
+from logger_config import LOG_DIR, to_local
 
 SYMBOL = "XAUUSD"
 POINT = 0.01
 BE_OFFSET_DEFAULT = 0.5
 
+
+
+def load_events(day: str) -> list:
+    """
+    Eventi del giorno richiesto, con gli orari nel fuso dei log (ora italiana).
+    Legge anche le cartelle del giorno prima e dopo: i log scritti quando il
+    server registrava in UTC hanno gli eventi tra mezzanotte e le 02:00
+    italiane nella cartella del giorno precedente.
+    """
+    target = datetime.strptime(day, "%Y-%m-%d")
+    events = []
+    for offset in (-1, 0, 1):
+        folder_day = (target + timedelta(days=offset)).strftime("%Y-%m-%d")
+        path = os.path.join(LOG_DIR, folder_day, "journal.jsonl")
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line_number, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    print(f"⚠️ Riga {line_number} di {path} illeggibile, saltata.")
+                    continue
+                local_ts = to_local(datetime.fromisoformat(event["ts"]))
+                if local_ts.strftime("%Y-%m-%d") == day:
+                    event["ts"] = local_ts.isoformat(timespec="seconds")
+                    events.append(event)
+    if not events:
+        sys.exit(f"Nessun evento per il {day} in {LOG_DIR}/.")
+    events.sort(key=lambda e: e["ts"])
+    return events
 
 def collect_positions(events: list) -> list:
     """Ricostruisce dal diario la vita di ogni posizione aperta dal bot."""
@@ -164,7 +200,14 @@ def main():
     if not positions:
         raise SystemExit("Nessuna posizione aperta dal bot in questo giorno.")
 
-    from mt5_connection import mt5  # import qui: serve MT5 solo per le candele e i profitti
+    # Import qui: serve MT5 solo per le candele e i profitti. Sul server passa
+    # da mt5_connection (RPyC verso mt5server), sul PC Windows dal pacchetto diretto.
+    try:
+        from mt5_connection import mt5
+    except ImportError:
+        import MetaTrader5 as mt5
+        if not mt5.initialize():
+            raise SystemExit(f"MetaTrader 5 non raggiungibile: {mt5.last_error()}")
     offset = int(args.offset_broker * 3600) if args.offset_broker is not None else estimate_broker_offset(mt5)
     print(f"Orologio del broker: UTC{offset / 3600:+.1f} h | BE a ingresso {args.be_offset:+}$ | "
           f"{len(positions)} posizioni")
