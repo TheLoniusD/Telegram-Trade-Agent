@@ -67,6 +67,9 @@ BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
 # vengono avvicinati al prezzo del segnale (vedi ENTRY_ZONE_DEPTH in risk_manager).
 ENTRY_TIGHTEN_AFTER_SECONDS = int(float(os.getenv("ENTRY_TIGHTEN_AFTER_MINUTES", "3")) * 60)
 
+# "Trade Active": quanti ticket al massimo si incassano (ne resta sempre almeno 1).
+TRADE_ACTIVE_MAX_CLOSE = int(os.getenv("TRADE_ACTIVE_MAX_CLOSE", "2"))
+
 # Dove va lo SL quando il trader chiede il BE.
 # 'entry' = ingresso + BE_OFFSET (default). Il 29/09 il pareggio a metà zona
 #           ha chiuso in perdita 5 operazioni su 5 in una giornata laterale.
@@ -206,46 +209,37 @@ def mark_closed_if_complete(trade: dict) -> None:
 
 def execute_trade_active(trade: dict, trader_pips: float) -> None:
     """
-    "Trade Active ... Running N+ Pips": chiude subito i 2 ticket più in
-    profitto (tutti, se ne sono aperti solo 1 o 2); gli altri vanno poi a
-    pareggio. A parità di profitto (stesso prezzo di ingresso) ne chiude uno
-    sul TP1 e uno sul TP2, così chi resta aperto può ancora arrivare a
-    entrambi i TP. Un ticket in perdita non viene chiuso in perdita: va a
-    pareggio, o allo stop di protezione se il pareggio non è possibile.
-    Una sola volta per operazione.
+    "Trade Active ... Running N+ Pips": chiude i ticket entrati al prezzo
+    peggiore, al massimo 2, lasciandone sempre aperto almeno 1 (con 4 aperti
+    ne chiude 2, con 2 ne chiude 1, con 1 nessuno), così resta la possibilità
+    del TP. A parità di prezzo chiude prima quello sul TP1: resta aperto quello
+    sul TP2, che punta al movimento più lungo. Un ticket in perdita non viene
+    chiuso in perdita. Gli altri vanno poi a pareggio. Una volta per operazione.
     """
     if trade.get("trade_active_closed"):
         return
     filled = [(k, t) for k, t in trade.get("tickets", {}).items()
               if t.get("mt5_ticket") and not t.get("closed") and not t.get("pending")]
-    if not filled:
+    to_close = min(TRADE_ACTIVE_MAX_CLOSE, len(filled) - 1)
+    if to_close <= 0:
+        journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
+                       closed=[], in_loss=[], note="un solo ticket aperto: resta per il TP, va a pareggio")
         return
 
-    measured = []
-    for key, tp_config in filled:
+    buy = filled[0][1].get("direction") == "BUY"
+    # Peggiore = ingresso più alto per un BUY, più basso per un SELL; a parità prima il TP1
+    worst_first = sorted(filled, key=lambda kt: ((-(kt[1].get("entry_price") or 0)) if buy else (kt[1].get("entry_price") or 0),
+                                                 ticket_tp_index(*kt)))
+    closed, in_loss = [], []
+    for key, tp_config in worst_first[:to_close]:
+        mt5_ticket = tp_config["mt5_ticket"]
         try:
-            move = mt5_agent.favorable_move(tp_config["mt5_ticket"])
+            move = mt5_agent.favorable_move(mt5_ticket)
         except MT5UnavailableError:
             move = None
-        measured.append((key, tp_config, move))
-    # Più in profitto per primi (non misurabile = in fondo)
-    measured.sort(key=lambda item: item[2] if item[2] is not None else float("-inf"), reverse=True)
-
-    chosen = measured[:1]
-    rest = measured[1:]
-    if rest:
-        best = rest[0][2]
-        ties = [item for item in rest if item[2] is not None and best is not None and best - item[2] <= 0.01]
-        first_index = ticket_tp_index(chosen[0][0], chosen[0][1])
-        other_tp = next((item for item in ties if ticket_tp_index(item[0], item[1]) != first_index), None)
-        chosen.append(other_tp or rest[0])
-
-    closed, in_loss = [], []
-    for key, tp_config, move in chosen:
         if move is None or move <= 0:
             in_loss.append(key)
             continue
-        mt5_ticket = tp_config["mt5_ticket"]
         if mt5_agent.close_position(ticket=mt5_ticket, symbol=tp_config.get("symbol")):
             tp_config["closed"] = True
             closed.append(key)
