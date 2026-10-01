@@ -34,6 +34,7 @@ OPERATION_NAMES = {
     "PARTIAL_CLOSE": "la chiusura parziale", "BREAKEVEN": "il pareggio", "MODIFY_SL_TP": "la modifica di SL/TP",
     "MODIFY_PENDING": "la modifica dell'ordine in attesa", "CANCEL": "la cancellazione",
     "MOVE_PENDING": "lo spostamento dell'ordine in attesa",
+    "PROTECTIVE_SL": "lo stop di protezione",
 }
 
 CLOSE_REASONS = {
@@ -339,6 +340,13 @@ class Narrator:
         self.say(f"⏳ {self.tag(trade)}{key} pareggio a {num(e.get('entry_price'))} in attesa: "
                  f"{e.get('reason') or 'prezzo ancora troppo vicino'}, riprovo ogni 30 secondi")
 
+    def on_protective_stop(self, e):
+        trade, key = self.trade_of(e.get("mt5_ticket"))
+        if trade and key in trade["snapshot"]:
+            trade["snapshot"][key].update(stop_loss=e.get("stop_loss"), protected=True)
+        self.say(f"🛟 {self.tag(trade)}{key} pareggio non ancora possibile (a {num(e.get('be_price'))}): "
+                 f"stop di protezione da {num(e.get('previous_stop_loss'))} a {num(e.get('stop_loss'))}")
+
     def on_be_pending_applied(self, e):
         trade, key = self.trade_of(e.get("mt5_ticket"))
         if trade and key in trade["snapshot"]:
@@ -352,14 +360,11 @@ class Narrator:
 
     def on_trade_active_plan(self, e):
         trade = self.trades.get(e.get("ticket_id"))
-        if e.get("note"):
-            self.say(f"💰 {self.tag(trade)}Trade Active {e.get('trader_pips'):g} pips: {e['note']}")
-            return
         parts = []
         if e.get("closed"):
             parts.append(f"incasso {', '.join(e['closed'])}")
-        if e.get("below_threshold"):
-            parts.append(f"{', '.join(e['below_threshold'])} sotto la soglia di {num(e.get('min_move'))} $, a pareggio")
+        if e.get("in_loss"):
+            parts.append(f"{', '.join(e['in_loss'])} in perdita, non chiusi")
         self.say(f"💰 {self.tag(trade)}Trade Active {e.get('trader_pips'):g} pips: {' · '.join(parts) or 'nulla da incassare'}")
 
     def on_partial_close_plan(self, e):
@@ -383,8 +388,13 @@ class Narrator:
         if e.get("closed_by") == "TRADE_ACTIVE":
             how = "incassato al Trade Active a"
         elif reason == "STOP_LOSS":
-            protected = trade and trade["snapshot"].get(key, {}).get("be_active")
-            how = "a pareggio" if protected else "a stop"
+            snapshot = trade["snapshot"].get(key, {}) if trade else {}
+            if snapshot.get("be_active"):
+                how = "a pareggio"
+            elif snapshot.get("protected"):
+                how = "allo stop di protezione"
+            else:
+                how = "a stop"
         else:
             how = CLOSE_REASONS.get(reason, "(motivo n/d)")
         line = f"🏁 {self.tag(trade)}{key or '#' + str(mt5_ticket)} chiuso {how} {num(e.get('close_price'))} · {money(e.get('profit'))}"
@@ -482,7 +492,7 @@ def build_sheets(day: str) -> str:
             if tid not in trades:
                 if not e["ts"].startswith(day):
                     continue
-                trades[tid] = {"first": e, "msgs": set(), "closes": {}, "cancels": {}, "be": [], "fills": {}}
+                trades[tid] = {"first": e, "msgs": set(), "closes": {}, "cancels": {}, "be": [], "protect": [], "fills": {}}
                 order.append(tid)
             trades[tid]["last"] = e
             trades[tid]["msgs"].add(e.get("msg_id"))
@@ -495,7 +505,7 @@ def build_sheets(day: str) -> str:
         owner = None
         if kind in ("POSITION_CLOSED", "PENDING_CANCELLED", "PENDING_FILLED"):
             owner = ticket_owner.get(e.get("mt5_ticket"))
-        elif kind == "MT5_ORDER" and e.get("operation") == "BREAKEVEN" and e.get("ok"):
+        elif kind == "MT5_ORDER" and e.get("operation") in ("BREAKEVEN", "PROTECTIVE_SL") and e.get("ok"):
             owner = ticket_owner.get((e.get("request") or {}).get("position"))
         if not owner or owner[0] not in trades:
             continue
@@ -506,6 +516,8 @@ def build_sheets(day: str) -> str:
             trade["cancels"][key] = e
         elif kind == "PENDING_FILLED":
             trade["fills"][key] = e
+        elif e.get("operation") == "PROTECTIVE_SL":
+            trade["protect"].append((hhmm(e["ts"]), key, (e.get("request") or {}).get("sl")))
         else:
             trade["be"].append((hhmm(e["ts"]), key, (e.get("request") or {}).get("sl")))
 
@@ -570,8 +582,11 @@ def build_sheets(day: str) -> str:
                 outcome = "rifiutato da MT5"
             elif close:
                 reason = close.get("close_reason")
-                how = ("pareggio" if any(k == key for _, k, _ in trade["be"]) else "stop") if reason == "STOP_LOSS" \
-                    else {"TAKE_PROFIT": "TP", "BOT": "bot"}.get(reason, reason or "chiuso")
+                if reason == "STOP_LOSS":
+                    how = "pareggio" if any(k == key for _, k, _ in trade["be"]) else \
+                        "protezione" if any(k == key for _, k, _ in trade["protect"]) else "stop"
+                else:
+                    how = {"TAKE_PROFIT": "TP", "BOT": "bot"}.get(reason, reason or "chiuso")
                 if close.get("closed_by") == "TRADE_ACTIVE":
                     how = "incasso TA"
                 outcome = f"{how} {hhmm(close['ts'])} {money(close.get('profit')):>12}"
@@ -590,6 +605,11 @@ def build_sheets(day: str) -> str:
                 by_time.setdefault(time_, []).append(f"{key} SL {num(sl_value)}")
             for time_, parts in by_time.items():
                 lines.append(f"Pareggio {time_} → {' · '.join(parts)}")
+        if trade["protect"]:
+            if not trade["be"]:
+                lines.append("")
+            for time_, key, sl_value in trade["protect"]:
+                lines.append(f"Stop di protezione {time_} → {key} SL {num(sl_value)} (pareggio rifiutato da MT5)")
         blocks.append("\n".join(lines))
 
     header = (f"Operazioni del {day} · {len(order)} segnali · risultato delle operazioni chiuse: "

@@ -67,10 +67,6 @@ BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
 # vengono avvicinati al prezzo del segnale (vedi ENTRY_ZONE_DEPTH in risk_manager).
 ENTRY_TIGHTEN_AFTER_SECONDS = int(float(os.getenv("ENTRY_TIGHTEN_AFTER_MINUTES", "3")) * 60)
 
-# "Trade Active": un ticket si incassa solo se guadagna almeno questa quota dei
-# pips scritti dal trader (0.5 = metà: "Running 60+ Pips" -> almeno 3 $).
-TRADE_ACTIVE_MIN_PIPS_RATIO = float(os.getenv("TRADE_ACTIVE_MIN_PIPS_RATIO", "0.5"))
-
 # Dove va lo SL quando il trader chiede il BE.
 # 'entry' = ingresso + BE_OFFSET (default). Il 29/09 il pareggio a metà zona
 #           ha chiuso in perdita 5 operazioni su 5 in una giornata laterale.
@@ -210,46 +206,46 @@ def mark_closed_if_complete(trade: dict) -> None:
 
 def execute_trade_active(trade: dict, trader_pips: float) -> None:
     """
-    "Trade Active ... Running N+ Pips": incassa i ticket entrati al prezzo
-    peggiore (i più vicini al prezzo del segnale, con il pareggio più vicino
-    al prezzo e quindi i primi a saltare), gli altri vanno poi a pareggio.
-      - 3-4 ticket eseguiti: chiude il peggiore sul TP1 e il peggiore sul TP2
-      - 2 ticket eseguiti: chiude solo il peggiore sul TP1
-      - 1 ticket eseguito: nessuna chiusura (resta la possibilità del TP)
-    Un ticket si chiude solo se guadagna almeno TRADE_ACTIVE_MIN_PIPS_RATIO dei
-    pips del trader (10 pips = 1 $), che sono contati dai suoi ingressi migliori;
-    sotto la soglia va a pareggio come gli altri. Una sola volta per operazione.
+    "Trade Active ... Running N+ Pips": chiude subito i 2 ticket più in
+    profitto (tutti, se ne sono aperti solo 1 o 2); gli altri vanno poi a
+    pareggio. A parità di profitto (stesso prezzo di ingresso) ne chiude uno
+    sul TP1 e uno sul TP2, così chi resta aperto può ancora arrivare a
+    entrambi i TP. Un ticket in perdita non viene chiuso in perdita: va a
+    pareggio, o allo stop di protezione se il pareggio non è possibile.
+    Una sola volta per operazione.
     """
     if trade.get("trade_active_closed"):
         return
     filled = [(k, t) for k, t in trade.get("tickets", {}).items()
               if t.get("mt5_ticket") and not t.get("closed") and not t.get("pending")]
-    if len(filled) < 2:
-        journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
-                       closed=[], note="un solo ticket eseguito: solo pareggio")
+    if not filled:
         return
 
-    direction = filled[0][1].get("direction")
-    # Peggiore = ingresso più alto per un BUY, più basso per un SELL
-    worst_first = sorted(filled, key=lambda kt: kt[1].get("entry_price") or 0, reverse=(direction == "BUY"))
-    wanted_indexes = (0, 1) if len(filled) >= 3 else (0,)
-    chosen = []
-    for index in wanted_indexes:
-        pick = next((kt for kt in worst_first if ticket_tp_index(*kt) == index and kt not in chosen), None)
-        if pick:
-            chosen.append(pick)
-
-    min_move = trader_pips / 10 * TRADE_ACTIVE_MIN_PIPS_RATIO
-    closed, below = [], []
-    for key, tp_config in chosen:
-        mt5_ticket = tp_config["mt5_ticket"]
+    measured = []
+    for key, tp_config in filled:
         try:
-            move = mt5_agent.favorable_move(mt5_ticket)
+            move = mt5_agent.favorable_move(tp_config["mt5_ticket"])
         except MT5UnavailableError:
             move = None
-        if move is None or move < min_move:
-            below.append(key)
+        measured.append((key, tp_config, move))
+    # Più in profitto per primi (non misurabile = in fondo)
+    measured.sort(key=lambda item: item[2] if item[2] is not None else float("-inf"), reverse=True)
+
+    chosen = measured[:1]
+    rest = measured[1:]
+    if rest:
+        best = rest[0][2]
+        ties = [item for item in rest if item[2] is not None and best is not None and best - item[2] <= 0.01]
+        first_index = ticket_tp_index(chosen[0][0], chosen[0][1])
+        other_tp = next((item for item in ties if ticket_tp_index(item[0], item[1]) != first_index), None)
+        chosen.append(other_tp or rest[0])
+
+    closed, in_loss = [], []
+    for key, tp_config, move in chosen:
+        if move is None or move <= 0:
+            in_loss.append(key)
             continue
+        mt5_ticket = tp_config["mt5_ticket"]
         if mt5_agent.close_position(ticket=mt5_ticket, symbol=tp_config.get("symbol")):
             tp_config["closed"] = True
             closed.append(key)
@@ -257,7 +253,7 @@ def execute_trade_active(trade: dict, trader_pips: float) -> None:
     if closed:
         trade["trade_active_closed"] = True
     journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
-                   min_move=round(min_move, 2), closed=closed, below_threshold=below)
+                   closed=closed, in_loss=in_loss)
     mark_closed_if_complete(trade)
 
 
@@ -769,6 +765,10 @@ def handle_message(event, is_edit: bool):
                         tp_config["be_pending"] = True
                         logger.debug(f"⏳ BE del ticket {real_mt5_ticket} in attesa: verrà applicato appena il prezzo lo consente.")
                         journal.record("BE_PENDING", mt5_ticket=real_mt5_ticket, entry_price=entry_price)
+                        # Intanto lo stop originale non resta dov'è: lo avviciniamo
+                        # il più possibile per limitare la perdita (01/10: SELL 4155
+                        # in perdita al Trade Active, pareggio rifiutato, stop pieno).
+                        apply_protective_stop(parent_trade, tp_config)
 
             # 2b. Aggiornamento SL/TP "standard" (fase COMPLETA, invalidation, ecc.),
             # solo se il messaggio conteneva davvero nuovi valori.
@@ -862,11 +862,61 @@ def handle_message(event, is_edit: bool):
     logger.debug(f"📋 Operazioni attive in memoria: {list(manager.active_trades.keys())}")
 
 
+# Stop di protezione quando il pareggio viene rifiutato (siamo in perdita o
+# troppo vicini): lo stop si avvicina all'ingresso del primo di questi gradini,
+# in quota della distanza tra ingresso e stop originale, che MT5 accetta. Per un
+# segnale standard (zona 5 $, stop a 10 $ dal segnale) sono metà zona, il bordo
+# lontano della zona e un livello intermedio verso lo stop.
+PROTECTIVE_STOP_STEPS = (0.25, 0.5, 0.75)
+
+
+def protective_stop_levels(trade: dict, tp_config: dict) -> list:
+    """Livelli dello stop di protezione, dal più vicino all'ingresso al più lontano."""
+    entry = tp_config.get("entry_price")
+    # Riferimento fisso (lo stop del trader al primo tentativo): gli stop di
+    # protezione successivi non devono restringere i gradini.
+    reference = tp_config.get("protect_reference") or trade.get("signal_stop_loss") or tp_config.get("stop_loss")
+    if entry is None or reference is None:
+        return []
+    tp_config["protect_reference"] = reference
+    risk = abs(entry - reference)
+    sign = -1 if tp_config.get("direction") == "BUY" else 1
+    return [round(entry + sign * step * risk, 2) for step in PROTECTIVE_STOP_STEPS]
+
+
+def apply_protective_stop(trade: dict, tp_config: dict) -> bool:
+    """
+    Pareggio rifiutato da MT5: porta lo stop al gradino più vicino all'ingresso
+    che MT5 accetta adesso, solo se protegge più dello stop attuale. Il
+    pareggio vero resta in attesa e viene applicato appena possibile.
+    """
+    mt5_ticket = tp_config.get("mt5_ticket")
+    current = tp_config.get("stop_loss")
+    buy = tp_config.get("direction") == "BUY"
+    for level in protective_stop_levels(trade, tp_config):
+        if current is not None and (level <= current if buy else level >= current):
+            continue  # non migliorerebbe la protezione attuale
+        try:
+            if not mt5_agent.can_move_sl(mt5_ticket, level):
+                continue
+        except MT5UnavailableError:
+            return False
+        if mt5_agent.set_sl_to_be(ticket=mt5_ticket, entry_price=level, operation="PROTECTIVE_SL"):
+            tp_config["stop_loss"] = level
+            journal.record("PROTECTIVE_STOP", mt5_ticket=mt5_ticket, stop_loss=level, previous_stop_loss=current,
+                           be_price=breakeven_price(tp_config, trade))
+            return True
+        return False
+    return False
+
+
 def retry_pending_breakeven() -> None:
     """
     Applica i BE chiesti dal trader ma rifiutati da MT5 perché il prezzo era
-    ancora troppo vicino all'ingresso. Invia la modifica solo quando MT5 la
-    accetterebbe, così non riempie il log di rifiuti a ogni giro.
+    ancora troppo vicino all'ingresso (o la posizione in perdita). Invia la
+    modifica solo quando MT5 la accetterebbe, così non riempie il log di
+    rifiuti a ogni giro; finché il pareggio non è possibile, migliora lo stop
+    di protezione appena il prezzo lo consente.
     """
     changed = False
     for trade in manager.active_trades.values():
@@ -878,11 +928,22 @@ def retry_pending_breakeven() -> None:
                 continue
             mt5_ticket = tp_config.get("mt5_ticket")
             entry_price = breakeven_price(tp_config, trade)
-            if not be_margin_reached(mt5_ticket, quiet=True) or not mt5_agent.can_move_sl(mt5_ticket, entry_price):
+            try:
+                be_possible = be_margin_reached(mt5_ticket, quiet=True) and mt5_agent.can_move_sl(mt5_ticket, entry_price)
+            except MT5UnavailableError:
                 continue
 
             # Nel diario l'evento resta legato al messaggio dell'operazione
             token = journal.set_current_message(trade.get("msg_id"))
+            if not be_possible:
+                # Pareggio ancora impossibile: migliora lo stop di protezione
+                # se nel frattempo il prezzo lo consente.
+                try:
+                    if apply_protective_stop(trade, tp_config):
+                        changed = True
+                finally:
+                    journal.clear_current_message(token)
+                continue
             try:
                 if mt5_agent.set_sl_to_be(ticket=mt5_ticket, entry_price=entry_price):
                     tp_config.update(be_active=True, be_pending=False, stop_loss=entry_price)
