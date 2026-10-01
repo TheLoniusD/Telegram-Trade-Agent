@@ -25,7 +25,7 @@ Le regole di trading in vigore e il perché di ogni scelta sono in **[doc/DECISI
 | `narrative.py` | racconto leggibile (`bot.log`) e schede delle operazioni (`operazioni.txt`) |
 | `logger_config.py` | file di log per giorno, in ora italiana |
 | `verifica_be.py` | rigioca le posizioni di un giorno sulle candele al minuto di MT5 (analisi) |
-| `doc/` | `DECISIONI.md` (regole e scelte), documenti di discussione, archivio di messaggi del canale |
+| `doc/` | `DECISIONI.md` (regole e scelte), archivio di messaggi reali del canale |
 
 ## Branch
 
