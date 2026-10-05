@@ -1,0 +1,50 @@
+Orologio del broker: UTC+3.0 h | 9 operazioni | 4 ore di prezzo dopo ogni segnale | 1 $ = 10 pips
+
+05:27 SELL 4174 «Gold sell 4174» · zona 4174–4179 · SL trader 4184.0 (bot 4184.0) · TP 4164 / 4154 · bot +5.78 $
+   a favore max 23 pips (05:46), contro max 110 pips, prima di SL/TP1
+   SL del trader toccato alle 06:02, oltre al massimo di 12.96 $; dopo lo SL a favore max 0 pips, TP1 mai raggiunto (dopo la richiesta di pareggio)
+   dopo la richiesta di pareggio (05:34): tornato contro fino a 10.95 $ dal bordo prima del TP1
+
+05:36 SELL 4175 «Gold sell 4175» · zona 4175–4180 · SL trader 4185.0 (bot 4185.0) · TP 4165 / 4155 · bot +11.56 $
+   a favore max 33 pips (05:46), contro max 102 pips, prima di SL/TP1
+   SL del trader toccato alle 06:06, oltre al massimo di 11.96 $; dopo lo SL a favore max 0 pips, TP1 mai raggiunto (dopo la richiesta di pareggio)
+   dopo la richiesta di pareggio (05:48): tornato contro fino a 10.20 $ dal bordo prima del TP1
+
+05:58 SELL 4177 «Gold sell 4177» · zona 4177–4182 · SL trader 4187.0 (bot 4187.0) · TP 4167 / 4157 · bot -143.31 $
+   a favore max 9 pips (05:59), contro max 114 pips, prima di SL/TP1
+   SL del trader toccato alle 06:13, oltre al massimo di 9.96 $; dopo lo SL a favore max 0 pips, TP1 mai raggiunto
+
+06:27 SELL 4187 «Gold sell 4187» · zona 4187–4192 · SL trader 4197.0 (bot 4197.0) · TP 4177 / 4167 · bot +34.55 $
+   a favore max 96 pips (08:58), contro max 100 pips, prima di SL/TP1
+   né SL né TP1 nel periodo guardato
+   dopo la richiesta di pareggio (06:41): tornato contro fino a 9.96 $ dal bordo prima del TP1
+
+07:03 SELL 4185 «Gold sell 4185» · zona 4185–4190 · SL trader 4195.0 (bot 4195.0) · TP 4175 / 4165 · bot -19.23 $
+   a favore max 19 pips (07:54), contro max 102 pips, prima di SL/TP1
+   SL del trader toccato alle 08:04, oltre al massimo di 1.96 $; dopo lo SL a favore max 76 pips, TP1 mai raggiunto (dopo la richiesta di pareggio)
+   dopo la richiesta di pareggio (07:33): tornato contro fino a 10.22 $ dal bordo prima del TP1
+
+08:18 BUY 4188 «Gold buy 4188» · zona 4183–4188 · SL trader 4178.0 (bot 4178.0) · TP 4198 / 4208 · bot +11.55 $
+   a favore max 41 pips (08:22), contro max 102 pips, prima di SL/TP1
+   SL del trader toccato alle 08:51, oltre al massimo di 8.28 $; dopo lo SL a favore max 83 pips, TP1 mai raggiunto (dopo la richiesta di pareggio)
+   dopo la richiesta di pareggio (08:23): tornato contro fino a 10.24 $ dal bordo prima del TP1
+
+08:32 BUY 4188 «Gold buy 4188» · zona 4183–4188 · SL trader 4178.0 (bot 4178.0) · TP 4198 / 4208 · bot -141.50 $
+   a favore max 0 pips (--:--), contro max 102 pips, prima di SL/TP1
+   SL del trader toccato alle 08:51, oltre al massimo di 12.07 $; dopo lo SL a favore max 83 pips, TP1 mai raggiunto
+
+13:11 SELL 4186 «Gold sell 4186» · zona 4186–4191 · SL trader 4196.0 (bot 4196.0) · TP 4176 / 4166 · bot -17.80 $
+   a favore max 106 pips (14:12), contro max 24 pips, prima di SL/TP1
+   TP1 raggiunto alle 14:12, contro al massimo 2.44 $ prima
+   dopo la richiesta di pareggio (13:15): tornato contro fino a 2.44 $ dal bordo prima del TP1
+
+13:16 SELL 4187 «Gold sell 4187» · zona 4187–4192 · SL trader 4197.0 (bot 4197.0) · TP 4177 / 4167 · bot +0.00 $
+   a favore max 102 pips (13:51), contro max 0 pips, prima di SL/TP1
+   TP1 raggiunto alle 13:51, contro al massimo 0.00 $ prima
+   dopo la richiesta di pareggio (13:19): mai tornato al bordo della zona prima del TP1
+
+Margine sullo SL del trader: su 2 SL toccati prima del pareggio, quelli evitati che poi hanno raggiunto il TP1
+   +0.5 $: 0 (nessuno); gli altri 2 stop pieni costano circa il 5% in più (con SL a 10 $)
+   +1 $: 0 (nessuno); gli altri 2 stop pieni costano circa il 10% in più (con SL a 10 $)
+   +2 $: 0 (nessuno); gli altri 2 stop pieni costano circa il 20% in più (con SL a 10 $)
+   +3 $: 0 (nessuno); gli altri 2 stop pieni costano circa il 30% in più (con SL a 10 $)
