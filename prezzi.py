@@ -17,19 +17,31 @@ Limiti: candele da 1 minuto (se nella stessa candela il prezzo tocca sia lo SL
 che il TP1 si assume prima lo SL, per prudenza); lato BUY si usa il bid, lato
 SELL l'ask (bid + spread della candela), come fa il broker per SL e TP.
 
+Rigioco ("python prezzi.py rigioco DAL AL"): i segnali e i comandi del trader
+di più giornate rigiocati sulle candele con regole diverse (pareggio,
+Trade Active, protezione, e3/e4, margine sullo SL: vedi STRATEGIES), con il
+totale per giorno e per strategia accanto al risultato reale del bot.
+
 Uso (dove MT5 è raggiungibile, cioè sul server o sul PC con MT5):
     python prezzi.py 2026-10-05
     python prezzi.py 2026-10-02 --ore 3 --margini 0.5,1,2,3
     python prezzi.py 2026-10-05 --offset-broker 3   # ore del broker rispetto a UTC
+    python prezzi.py rigioco 2026-09-24 2026-10-05
+    python prezzi.py rigioco 2026-10-02 --dettaglio --strategie "attuale,BE +2 $,BE al TP1"
 """
 import argparse
+import glob
+import json
+import os
+import re
+import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from logger_config import to_local
+from logger_config import LOG_DIR, to_local
 from verifica_be import POINT, download_bars, estimate_broker_offset, load_events
 
 PIPS_PER_DOLLAR = 10  # oro: 1 $ = 10 pips, come li conta il trader
@@ -134,7 +146,20 @@ def pips(dollars: float) -> str:
     return f"{dollars * PIPS_PER_DOLLAR:.0f}"
 
 
+def connect_mt5():
+    """Sul server passa da mt5_connection (RPyC verso mt5server), sul PC Windows dal pacchetto diretto."""
+    try:
+        from mt5_connection import mt5
+    except ImportError:
+        import MetaTrader5 as mt5
+        if not mt5.initialize():
+            raise SystemExit(f"MetaTrader 5 non raggiungibile: {mt5.last_error()}")
+    return mt5
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "rigioco":
+        return main_rigioco(sys.argv[2:])
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("giorno", help="AAAA-MM-GG")
     parser.add_argument("--ore", type=float, default=4, help="ore di prezzo da guardare dopo ogni segnale (default 4)")
@@ -146,13 +171,7 @@ def main():
     if not trades:
         raise SystemExit("Nessuna operazione con prezzo di ingresso in questo giorno.")
 
-    # Sul server passa da mt5_connection (RPyC verso mt5server), sul PC Windows dal pacchetto diretto
-    try:
-        from mt5_connection import mt5
-    except ImportError:
-        import MetaTrader5 as mt5
-        if not mt5.initialize():
-            raise SystemExit(f"MetaTrader 5 non raggiungibile: {mt5.last_error()}")
+    mt5 = connect_mt5()
     offset = int(args.offset_broker * 3600) if args.offset_broker is not None else estimate_broker_offset(mt5)
     start = min(t["open_ts"] for t in trades) - 120
     end = min(time.time(), max(t["open_ts"] for t in trades) + args.ore * 3600)
@@ -201,6 +220,512 @@ def main():
         names = ", ".join(f"{hm(t['open_ts'])} {'BUY' if t['buy'] else 'SELL'} {t['edge']:g}" for t in saved[m]) or "nessuno"
         print(f"   +{m:g} $: {len(saved[m])} ({names}); gli altri {len(full_stops) - len(saved[m])} stop pieni "
               f"costano circa il {m / 10 * 100:.0f}% in più (con SL a 10 $)")
+
+
+# ======================================================================
+# RIGIOCO: i segnali del trader rigiocati sulle candele con regole diverse
+# ======================================================================
+#
+# Non rigioca quello che ha fatto il bot (che ha cambiato regole quasi ogni
+# giorno) ma i MESSAGGI del trader, così tutte le giornate sono confrontabili
+# con le stesse regole: per ogni segnale ingresso nella zona, SL e TP scritti
+# dal trader, e poi i suoi comandi (Trade Active, BE, close half, close all)
+# all'ora in cui sono arrivati.
+#
+# Ogni strategia è la regola attuale con qualche parametro cambiato. Il rischio
+# è fisso per segnale (--rischio, default 140 $ ≈ 2% di 7.000 $) così i giorni
+# pesano uguale; i lotti sono calcolati come nel bot (rischio diviso fra i
+# ticket, sul prezzo a cui ciascuno entra).
+
+MAX_SIGNAL_DISTANCE = 20.0   # come risk_manager: oltre è un errore di battitura
+DEFAULT_ZONE = 5.0           # zona assunta nella fase rapida
+PROVISIONAL_SL = 10.0        # SL provvisorio finché il trader non scrive il suo
+MIN_SL_DISTANCE = 3.0
+STOPS_DISTANCE = 0.1         # distanza minima dal prezzo per spostare uno stop
+REENTRY_PARENT_SECONDS = 3600
+PARTIAL_CLOSE_REPEAT_SECONDS = 15 * 60  # come il bot: un secondo "close half" vicino è lo stesso comando
+COMMAND_LINK_SECONDS = 6 * 3600
+
+RE_TRADE_ACTIVE = re.compile(r"trade active|running|zero float", re.I)
+RE_HIT_TP = re.compile(r"hit\s*tp", re.I)
+
+BASE_RULES = dict(
+    deep=0.5,                  # lotto di e3/e4 rispetto a e1/e2 (0 = niente e3/e4)
+    ta_close=2,                # ticket incassati al Trade Active (ne resta sempre 1)
+    be="trader",               # "trader" = pareggio quando lo chiede il trader, "none" = mai
+    be_after_tp1=False,        # pareggio di tutti i ticket appena uno prende il TP1
+    be_keys=("e1", "e2", "e3", "e4"),  # ticket che vanno a pareggio quando lo chiede il trader
+    be_offset=0.5,             # pareggio = ingresso ± questo
+    be_risk=None,              # invece del pareggio: stop a questa frazione della distanza dallo SL (0.5 = metà rischio)
+    be_min=0.0,                # pareggio solo con almeno questo guadagno (altrimenti si aspetta)
+    protect=(0.25, 0.5, 0.75), # gradini dello stop di protezione se il pareggio non è possibile
+    sl_margin=0.0,             # margine oltre lo SL del trader
+    expiry=30 * 60,            # ordini limite non eseguiti cancellati dopo
+)
+
+STRATEGIES = {
+    "attuale":            {},
+    "e3/e4 lotto pieno":  dict(deep=1.0),
+    "solo e1/e2":         dict(deep=0.0),
+    "senza protezione":   dict(protect=()),
+    "protezione da 1/2":  dict(protect=(0.5, 0.75)),
+    "TA senza incasso":   dict(ta_close=0),
+    "TA incassa 1":       dict(ta_close=1),
+    "BE +1 $":            dict(be_offset=1.0),
+    "BE +2 $":            dict(be_offset=2.0),
+    "BE con 3 $ minimo":  dict(be_min=3.0),
+    "BE con 5 $ minimo":  dict(be_min=5.0),
+    "BE a metà rischio":  dict(be_risk=0.5),
+    "TP1 senza BE":       dict(be_keys=("e2", "e4"), be_after_tp1=True, ta_close=0),
+    "BE al TP1":          dict(be="none", be_after_tp1=True, ta_close=0),
+    "mai BE":             dict(be="none", ta_close=0, protect=()),
+    "SL +1 $":            dict(sl_margin=1.0),
+    "SL +2 $":            dict(sl_margin=2.0),
+}
+
+
+def load_day_events(day: str) -> list:
+    """
+    Eventi del giorno (ora italiana) da tutti i diari: logs/<giorno>/journal*.jsonl
+    e il formato fino al 23/09 (logs/journal_<giorno>.jsonl). Si leggono anche
+    i giorni vicini: quando il server registrava in UTC gli eventi tra
+    mezzanotte e le 02:00 italiane finivano nella cartella del giorno prima.
+    """
+    target = datetime.strptime(day, "%Y-%m-%d")
+    paths = []
+    for delta in (-1, 0, 1):
+        d = (target + timedelta(days=delta)).strftime("%Y-%m-%d")
+        paths += sorted(glob.glob(os.path.join(LOG_DIR, d, "journal*.jsonl")))
+        paths.append(os.path.join(LOG_DIR, f"journal_{d}.jsonl"))
+    seen, events = set(), []
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line in seen:
+                    continue
+                seen.add(line)
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                local = to_local(datetime.fromisoformat(event["ts"]))
+                if local.strftime("%Y-%m-%d") == day:
+                    event["_t"] = local.timestamp()
+                    events.append(event)
+    events.sort(key=lambda e: e["_t"])
+    return events
+
+
+def _levels(data: dict):
+    """Livelli scritti in un messaggio (solo quelli presenti), o None."""
+    levels = {"entry_min": data.get("entry_min"), "entry_max": data.get("entry_max"),
+              "sl": data.get("stop_loss"), "tps": [tp for tp in (data.get("take_profit") or []) if tp]}
+    if levels["entry_min"] is None and levels["sl"] is None and not levels["tps"]:
+        return None
+    return levels
+
+
+def levels_at(signal: dict, t: float) -> dict:
+    """Livelli del segnale validi al tempo t (le modifiche si sommano)."""
+    merged = {"entry_min": None, "entry_max": None, "sl": None, "tps": []}
+    for vt, levels in signal["versions"]:
+        if vt > t:
+            break
+        for key, value in levels.items():
+            if value not in (None, []):
+                merged[key] = value
+    return merged
+
+
+def extract_signals(events: list) -> list:
+    """
+    I segnali del trader con le loro modifiche e i comandi successivi, dalla
+    classificazione dell'agente (evento CLASSIFIED, presente in tutti i diari).
+    Un comando vale per il segnale a cui risponde (e per i suoi re-entry);
+    senza risposta, per l'ultimo segnale nella stessa direzione.
+    """
+    texts, replies = {}, {}
+    for e in events:
+        if e["event"] == "MESSAGE":
+            texts.setdefault(e.get("msg_id"), e.get("text") or "")
+            replies.setdefault(e.get("msg_id"), e.get("reply_to"))
+
+    signals, by_id, done = [], {}, set()
+    for e in events:
+        if e["event"] != "CLASSIFIED":
+            continue
+        intent, data, msg_id, t = e.get("intent"), e.get("data") or {}, e.get("msg_id"), e["_t"]
+        details = data.get("update_details") or {}
+        direction = data.get("direction")
+        levels = _levels(data)
+        text = texts.get(msg_id, "")
+
+        if msg_id in by_id:  # modifica del messaggio del segnale (fase completa, correzioni)
+            if levels:
+                by_id[msg_id]["versions"].append((t, levels))
+            continue
+
+        if intent == "NEW_SIGNAL" and direction in ("BUY", "SELL"):
+            signal = {"id": msg_id, "t": t, "buy": direction == "BUY", "versions": [], "events": [],
+                      "label": text.split("\n")[0][:24], "parent": None}
+            if data.get("entry_min") is None:
+                # Re-entry ("Try buy again"): a mercato, SL e TP dell'ultimo segnale nella stessa direzione
+                parents = [s for s in signals if s["buy"] == signal["buy"] and t - s["t"] <= REENTRY_PARENT_SECONDS]
+                if not parents:
+                    continue
+                parent = parents[-1]
+                inherited = levels_at(parent, t)
+                signal["parent"] = parent["id"]
+                signal["versions"].append((t, {"entry_min": None, "entry_max": None,
+                                               "sl": inherited["sl"], "tps": inherited["tps"]}))
+            else:
+                signal["versions"].append((t, levels))
+            signals.append(signal)
+            by_id[msg_id] = signal
+            continue
+
+        # Comandi. HIT TP / HIT TP MAX = pareggio (regola dal 28/09, qualunque
+        # cosa abbia deciso l'agente nei giorni prima).
+        if RE_HIT_TP.search(text):
+            kind = "BE"
+        elif intent == "CLOSE_SIGNAL":
+            kind = "CLOSE"
+        elif details.get("close_percentage"):
+            kind = "HALF"
+        elif details.get("move_sl_to_be"):
+            kind = "TA" if (data.get("running_pips") or RE_TRADE_ACTIVE.search(text)) else "BE"
+        else:
+            continue
+        if (msg_id, kind) in done:
+            continue
+        done.add((msg_id, kind))
+
+        target, ref, depth = None, replies.get(msg_id), 0
+        while ref and depth < 5:
+            if ref in by_id:
+                target = by_id[ref]
+                break
+            ref, depth = replies.get(ref), depth + 1
+        if target is None:
+            candidates = [s for s in signals if t - s["t"] <= COMMAND_LINK_SECONDS
+                          and (direction not in ("BUY", "SELL") or s["buy"] == (direction == "BUY"))]
+            if not candidates:
+                continue
+            target = candidates[-1]
+        family = [target] + [s for s in signals if s["parent"] == target["id"]]
+        for s in family:
+            if kind == "HALF" and any(k == "HALF" and t - et < PARTIAL_CLOSE_REPEAT_SECONDS for et, k, _ in s["events"]):
+                continue
+            s["events"].append((t, kind, details.get("close_percentage")))
+    return signals
+
+
+def _zone(signal_levels: dict, buy: bool):
+    """(basso, alto) della zona; nella fase rapida 5 $ a favore del trader."""
+    p, q = signal_levels["entry_min"], signal_levels["entry_max"]
+    if p is None:
+        return None
+    if q is None:
+        return (p - DEFAULT_ZONE, p) if buy else (p, p + DEFAULT_ZONE)
+    return (min(p, q), max(p, q))
+
+
+def _plan_levels(zone, buy: bool, deep: float) -> dict:
+    """Prezzi limite come ENTRY_MODE=range: e1/e2 al bordo, e3/e4 a metà e a ¾ della zona."""
+    low, high = zone
+    edge, sign, width = (high, -1, high - low) if buy else (low, 1, high - low)
+    plan = {"e1": edge, "e2": edge}
+    if deep > 0:
+        plan["e3"] = round(edge + sign * width * 0.5, 2)
+        plan["e4"] = round(edge + sign * width * 0.75, 2)
+    return plan
+
+
+def _tp_for(key: str, tps: list, buy: bool, entry: float):
+    valid = [tp for tp in tps if (tp > entry) == buy]
+    if not valid:
+        return None
+    valid.sort(reverse=not buy)
+    return valid[0] if key in ("e1", "e3") else valid[-1]
+
+
+def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: float) -> dict:
+    """Rigioca un segnale con una strategia. Ritorna il risultato e i dettagli dei ticket."""
+    buy = signal["buy"]
+    end = signal["t"] + hours * 3600
+    tickets, started, ta_done, applied = {}, False, False, 0
+    events = sorted(signal["events"])
+    next_event = 0
+    be_wanted = be_all = False
+
+    def pnl(ticket, exit_price):
+        move = (exit_price - ticket["entry"]) if buy else (ticket["entry"] - exit_price)
+        return move * ticket["lots"]
+
+    def close(ticket, price, reason, fraction=1.0):
+        ticket["realized"] += pnl(ticket, price) * fraction
+        if fraction >= 0.999:
+            ticket["state"], ticket["exit"], ticket["reason"] = "closed", price, reason
+        else:
+            ticket["lots"] *= (1 - fraction)
+
+    def in_profit(ticket, bid, ask):
+        return ((bid - ticket["entry"]) if buy else (ticket["entry"] - ask)) > 0
+
+    def stop_valid(sl, bid, ask):
+        return (bid - sl >= STOPS_DISTANCE) if buy else (sl - ask >= STOPS_DISTANCE)
+
+    def better(new_sl, old_sl):
+        return new_sl > old_sl if buy else new_sl < old_sl
+
+    def trader_sl(levels, worst_entry):
+        sl = levels["sl"]
+        if sl is not None and ((worst_entry - sl) if buy else (sl - worst_entry)) >= MIN_SL_DISTANCE:
+            return sl - rules["sl_margin"] if buy else sl + rules["sl_margin"]
+        return None
+
+    for bar_ts, o, h, l, c, spread in bars:
+        if bar_ts < signal["t"] - signal["t"] % 60 + 60 or bar_ts > end:
+            continue
+        sp = spread * POINT
+        ask_o, ask_h, ask_l, ask_c = o + sp, h + sp, l + sp, c + sp
+
+        if not started:
+            levels = levels_at(signal, bar_ts)
+            market = ask_o if buy else o
+            zone = _zone(levels, buy)
+            if zone is not None and min(abs(market - zone[0]), abs(market - zone[1])) > MAX_SIGNAL_DISTANCE:
+                if bar_ts - signal["t"] > 600:
+                    break  # errore di battitura mai corretto
+                continue
+            # Re-entry (nessun prezzo): 4 ticket a mercato, lotto pieno
+            plan = ({k: None for k in ("e1", "e2", "e3", "e4")} if zone is None
+                    else _plan_levels(zone, buy, rules["deep"]))
+            # A mercato se il prezzo è già al livello o migliore, altrimenti limite
+            prices = {k: (market if v is None or ((market <= v) if buy else (market >= v)) else v)
+                      for k, v in plan.items()}
+            worst = min(prices.values()) if buy else max(prices.values())
+            edge = (zone[1] if buy else zone[0]) if zone else market
+            sl = trader_sl(levels, worst)
+            if sl is None:
+                sl = edge - PROVISIONAL_SL if buy else edge + PROVISIONAL_SL
+            weights = {k: (1.0 if k in ("e1", "e2") or zone is None else rules["deep"]) for k in prices}
+            for key, price in prices.items():
+                distance = abs(price - sl)
+                if distance <= 0:
+                    continue
+                at_market = price == market
+                tickets[key] = {"key": key, "state": "open" if at_market else "pending", "price": price,
+                                "entry": price, "sl": sl, "orig_sl": sl, "tp": _tp_for(key, levels["tps"], buy, price),
+                                "lots": risk * weights[key] / 4 / distance, "realized": 0.0, "be": False,
+                                "since": bar_ts, "reason": None, "exit": None}
+            started = True
+            applied = sum(1 for vt, _ in signal["versions"] if vt <= bar_ts)
+
+        # Modifiche del trader arrivate dopo l'ingresso (fase completa, correzioni)
+        while applied < len(signal["versions"]) and signal["versions"][applied][0] <= bar_ts:
+            applied += 1
+            levels = levels_at(signal, bar_ts)
+            zone = _zone(levels, buy)
+            plan = _plan_levels(zone, buy, rules["deep"]) if zone else {}
+            for key, ticket in tickets.items():
+                if ticket["state"] not in ("open", "pending"):
+                    continue
+                if ticket["state"] == "pending" and key in plan:
+                    ticket["price"] = ticket["entry"] = plan[key]
+                new_sl = trader_sl(levels, ticket["entry"])
+                if new_sl is not None and not ticket["be"]:
+                    ticket["sl"] = ticket["orig_sl"] = new_sl
+                tp = _tp_for(key, levels["tps"], buy, ticket["entry"])
+                if tp is not None:
+                    ticket["tp"] = tp
+
+        # Ordini limite eseguiti o scaduti
+        for ticket in tickets.values():
+            if ticket["state"] != "pending":
+                continue
+            if bar_ts - ticket["since"] > rules["expiry"]:
+                ticket["state"] = "cancelled"
+            elif (ask_l <= ticket["price"]) if buy else (h >= ticket["price"]):
+                ticket["state"] = "open"
+
+        # SL e TP (nella stessa candela prima lo SL, per prudenza)
+        tp1_hit = False
+        for ticket in tickets.values():
+            if ticket["state"] != "open":
+                continue
+            if (l <= ticket["sl"]) if buy else (ask_h >= ticket["sl"]):
+                reason = "BE" if ticket["be"] else ("protezione" if ticket["sl"] != ticket["orig_sl"] else "SL")
+                close(ticket, ticket["sl"], reason)
+            elif ticket["tp"] is not None and ((h >= ticket["tp"]) if buy else (ask_l <= ticket["tp"])):
+                close(ticket, ticket["tp"], "TP")
+                tp1_hit = tp1_hit or ticket["key"] in ("e1", "e3")
+        if tp1_hit and rules["be_after_tp1"]:
+            be_wanted, be_all = True, True
+
+        # Comandi del trader arrivati durante questa candela, al prezzo di chiusura
+        while next_event < len(events) and events[next_event][0] < bar_ts + 60:
+            _t, kind, percentage = events[next_event]
+            next_event += 1
+            open_tickets = [t for t in tickets.values() if t["state"] == "open"]
+            if kind == "CLOSE":
+                for ticket in tickets.values():
+                    if ticket["state"] == "pending":
+                        ticket["state"] = "cancelled"
+                for ticket in open_tickets:
+                    close(ticket, c if buy else ask_c, "chiusura")
+            elif kind == "HALF":
+                for ticket in tickets.values():
+                    if ticket["state"] == "pending":
+                        ticket["state"] = "cancelled"
+                total = sum(t["lots"] for t in open_tickets)
+                left = total * (percentage or 50) / 100
+                far_first = sorted(open_tickets, key=lambda t: -abs((t["tp"] or (t["entry"] + 1000)) - t["entry"]))
+                for ticket in far_first:
+                    if left <= 1e-9 or not in_profit(ticket, c, ask_c):
+                        continue
+                    fraction = min(1.0, left / ticket["lots"])
+                    left -= ticket["lots"] * fraction
+                    close(ticket, c if buy else ask_c, "metà", fraction)
+            elif kind in ("TA", "BE") and rules["be"] == "trader":
+                for ticket in tickets.values():
+                    if ticket["state"] == "pending":
+                        ticket["state"] = "cancelled"
+                if kind == "TA" and not ta_done and rules["ta_close"] > 0:
+                    worst_first = sorted(open_tickets, key=lambda t: ((-t["entry"]) if buy else t["entry"],
+                                                                       t["key"] not in ("e1", "e3")))
+                    count = min(rules["ta_close"], len(open_tickets) - 1)
+                    for ticket in worst_first[:max(0, count)]:
+                        if in_profit(ticket, c, ask_c):
+                            close(ticket, c if buy else ask_c, "incasso TA")
+                            ta_done = True
+                be_wanted = True
+
+        # Pareggio (o stop di protezione) sui ticket aperti, ritentato a ogni candela
+        if be_wanted:
+            for ticket in tickets.values():
+                if ticket["state"] != "open" or ticket["be"] or (not be_all and ticket["key"] not in rules["be_keys"]):
+                    continue
+                be_price = ticket["entry"] + rules["be_offset"] if buy else ticket["entry"] - rules["be_offset"]
+                if rules["be_risk"] is not None and not be_all:
+                    reach = rules["be_risk"] * abs(ticket["entry"] - ticket["orig_sl"])
+                    be_price = ticket["entry"] - reach if buy else ticket["entry"] + reach
+                gain = (c - ticket["entry"]) if buy else (ticket["entry"] - ask_c)
+                if gain < rules["be_min"]:
+                    continue
+                if stop_valid(be_price, c, ask_c):
+                    if better(be_price, ticket["sl"]):
+                        ticket["sl"] = be_price
+                    ticket["be"] = True
+                    continue
+                distance = abs(ticket["entry"] - ticket["orig_sl"])
+                for step in rules["protect"]:
+                    candidate = ticket["entry"] - step * distance if buy else ticket["entry"] + step * distance
+                    if stop_valid(candidate, c, ask_c):
+                        if better(candidate, ticket["sl"]):
+                            ticket["sl"] = candidate
+                        break
+
+        if started and not any(t["state"] in ("open", "pending") for t in tickets.values()):
+            break
+
+    last_close = None
+    for bar in bars:
+        if bar[0] <= end:
+            last_close = bar
+    for ticket in tickets.values():
+        if ticket["state"] == "open" and last_close:
+            close(ticket, last_close[4] if buy else last_close[4] + last_close[5] * POINT, "fine")
+    result = sum(t["realized"] for t in tickets.values())
+    full_stop = any(t["reason"] == "SL" for t in tickets.values()) and result <= -0.5 * risk
+    return {"result": result, "started": started, "full_stop": full_stop, "tickets": tickets}
+
+
+def real_result(events: list) -> float:
+    return sum(e.get("profit") or 0.0 for e in events if e["event"] == "POSITION_CLOSED")
+
+
+def days_between(first: str, last: str) -> list:
+    day, stop = datetime.strptime(first, "%Y-%m-%d"), datetime.strptime(last, "%Y-%m-%d")
+    out = []
+    while day <= stop:
+        out.append(day.strftime("%Y-%m-%d"))
+        day += timedelta(days=1)
+    return out
+
+
+def main_rigioco(argv: list) -> None:
+    parser = argparse.ArgumentParser(
+        prog="prezzi.py rigioco",
+        description="Rigioca i segnali del trader sulle candele M1 con regole diverse e confronta i risultati.")
+    parser.add_argument("dal", help="AAAA-MM-GG")
+    parser.add_argument("al", nargs="?", help="AAAA-MM-GG (default: lo stesso giorno)")
+    parser.add_argument("--strategie", default="tutte",
+                        help="nomi separati da virgola, o 'tutte' (" + ", ".join(STRATEGIES) + ")")
+    parser.add_argument("--rischio", type=float, default=140.0, help="rischio per segnale in $ (default 140)")
+    parser.add_argument("--ore", type=float, default=8, help="ore massime di vita di un segnale (default 8)")
+    parser.add_argument("--dettaglio", action="store_true", help="risultato di ogni segnale per ogni strategia")
+    parser.add_argument("--offset-broker", type=float, help="ore del broker rispetto a UTC (default: stimate da MT5)")
+    args = parser.parse_args(argv)
+
+    names = list(STRATEGIES) if args.strategie == "tutte" else [n.strip() for n in args.strategie.split(",")]
+    unknown = [n for n in names if n not in STRATEGIES]
+    if unknown:
+        raise SystemExit(f"Strategie sconosciute: {', '.join(unknown)}")
+    rules = {n: {**BASE_RULES, **STRATEGIES[n]} for n in names}
+
+    mt5 = connect_mt5()
+    offset = int(args.offset_broker * 3600) if args.offset_broker is not None else estimate_broker_offset(mt5)
+    days = days_between(args.dal, args.al or args.dal)
+    print(f"Rigioco dal {days[0]} al {days[-1]} · rischio {args.rischio:g} $ per segnale · "
+          f"vita massima {args.ore:g} ore · orologio del broker UTC{offset / 3600:+.1f} h\n")
+
+    totals = {n: {"days": {}, "wins": [], "losses": [], "stops": 0, "signals": 0} for n in names}
+    real = {}
+    for day in days:
+        events = load_day_events(day)
+        signals = extract_signals(events)
+        if not signals:
+            continue
+        real[day] = real_result(events)
+        start = min(s["t"] for s in signals) - 120
+        stop = min(time.time(), max(s["t"] for s in signals) + args.ore * 3600)
+        bars = download_bars(mt5, start, stop, offset)
+        if args.dettaglio:
+            print(f"── {day} · {len(signals)} segnali")
+        for signal in signals:
+            row = []
+            for name in names:
+                outcome = simulate_signal(signal, bars, rules[name], args.rischio, args.ore)
+                tot = totals[name]
+                tot["days"][day] = tot["days"].get(day, 0.0) + outcome["result"]
+                if outcome["started"]:
+                    tot["signals"] += 1
+                    (tot["wins"] if outcome["result"] > 0 else tot["losses"]).append(outcome["result"])
+                    tot["stops"] += outcome["full_stop"]
+                row.append(outcome["result"] if outcome["started"] else None)
+            if args.dettaglio:
+                cells = " ".join(f"{v:>8.1f}" if v is not None else f"{'—':>8}" for v in row)
+                print(f"   {hm(signal['t'])} {'BUY' if signal['buy'] else 'SELL':4} {signal['label']:24} {cells}")
+        if args.dettaglio:
+            print("   " + " " * 35 + " ".join(f"{n[:8]:>8}" for n in names) + "\n")
+
+    shown = [d for d in days if d in real]
+    header = f"{'strategia':20}" + "".join(f"{d[8:10] + '/' + d[5:7]:>9}" for d in shown) + \
+             f"{'totale':>10}{'vinti':>7}{'persi':>7}{'stop':>6}{'media +':>9}{'media −':>9}"
+    print(header + "\n" + "─" * len(header))
+    print(f"{'reale (registrato)':20}" + "".join(f"{real[d]:>9.0f}" for d in shown) + f"{sum(real.values()):>10.0f}")
+    for name in names:
+        tot = totals[name]
+        wins, losses = tot["wins"], tot["losses"]
+        print(f"{name:20}" + "".join(f"{tot['days'].get(d, 0.0):>9.0f}" for d in shown)
+              + f"{sum(tot['days'].values()):>10.0f}{len(wins):>7}{len(losses):>7}{tot['stops']:>6}"
+              + f"{(sum(wins) / len(wins) if wins else 0):>9.1f}{(sum(losses) / len(losses) if losses else 0):>9.1f}")
+    print("\nstop = segnali chiusi allo SL pieno; media + / media − = risultato medio dei segnali vinti / persi.")
+    print("'reale' è la somma delle chiusure registrate dal bot (con le regole di quel giorno e i lotti veri).")
 
 
 if __name__ == "__main__":
