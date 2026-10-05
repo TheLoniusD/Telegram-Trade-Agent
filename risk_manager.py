@@ -50,6 +50,13 @@ ENTRY_MODE = os.getenv("ENTRY_MODE", "range")
 # Modalità 'range': quanti ticket entrano subito al prezzo del segnale (uno sul
 # TP1 e uno sul TP2); gli altri aspettano più dentro la zona.
 ENTRY_IMMEDIATE_TICKETS = int(os.getenv("ENTRY_IMMEDIATE_TICKETS", "2"))
+# Modalità 'range': lotto dei ticket più dentro la zona (e3/e4) rispetto ai
+# primi, come frazione della loro quota di rischio. Il 02 e il 05/10 i 6 stop
+# pieni avevano tutti i 4 ticket eseguiti, mentre nei trade vinti e3/e4 venivano
+# quasi sempre cancellati: entrano soprattutto quando il prezzo va contro.
+# Con 0,5 il rischio totale scende dal 2% all'1,5% (e1/e2 0,5% ciascuno,
+# e3/e4 0,25%). 1 = lotti uguali per tutti, come prima.
+ENTRY_DEEP_LOT_FACTOR = float(os.getenv("ENTRY_DEEP_LOT_FACTOR", "0.5"))
 ENTRY_ZONE_WIDTH = float(os.getenv("ENTRY_ZONE_WIDTH", "5.0"))
 
 # Gli ordini oltre il primo partono distribuiti su tutta la zona (5 $: segnale,
@@ -159,7 +166,8 @@ class RiskManager:
             else:
                 stop_loss = entry_price + DEFAULT_SL_DIST_GOLD
 
-        # 4. Lottaggio: il rischio diviso in parti uguali tra i ticket, misurata dal prezzo a cui
+        # 4. Lottaggio: il rischio diviso in parti uguali tra i ticket (e3/e4 ridotti, vedi
+        # ENTRY_DEEP_LOT_FACTOR), misurato dal prezzo a cui
         # quel ticket entrerà (il livello limite, o il prezzo corrente se a
         # mercato), poi limitata dal margine libero.
         step_lot = symbol_info.volume_step or 0.01
@@ -167,13 +175,16 @@ class RiskManager:
         # Lotti calcolati sul livello avvicinato (il prezzo peggiore a cui l'ordine
         # può entrare): anche dopo lo spostamento il rischio resta nel limite.
         tight = self.tight_levels(direction, entry_min, trade_data.get("entry_max"), keys)
-        for key in keys:
+        for i, key in enumerate(keys):
             level = entry_levels[key]
             if level is not None and tight.get(key) is not None:
                 # Peggiore = più alto per un BUY, più basso per un SELL
                 level = max(level, tight[key]) if direction == "BUY" else min(level, tight[key])
             price = level if level is not None else current_price
             lots[key] = self._calculate_lot_size(symbol, direction, price, stop_loss) / len(keys)
+            if ENTRY_MODE == "range" and i >= ENTRY_IMMEDIATE_TICKETS and entry_levels[key] is not None:
+                # Ticket più dentro la zona: lotto ridotto (vedi ENTRY_DEEP_LOT_FACTOR)
+                lots[key] *= ENTRY_DEEP_LOT_FACTOR
         margin_lots = self._max_lots_by_margin(symbol, direction, current_price)
         scale = min(1.0, margin_lots / sum(lots.values())) if sum(lots.values()) > 0 else 1.0
         # Per difetto allo step del broker: per eccesso si supererebbe il rischio

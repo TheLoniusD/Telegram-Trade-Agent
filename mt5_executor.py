@@ -245,6 +245,15 @@ class MT5Executor:
             return ("FILLED", position)
         return ("GONE", None)
 
+    def get_pending_order(self, ticket: int) -> Optional[dict]:
+        """Livelli di un ordine limite ancora in attesa, o None. MT5UnavailableError se MT5 non risponde."""
+        if self.test_mode:
+            return None
+        order = self._find_pending(ticket)
+        if order is None:
+            return None
+        return {"price": order.price_open, "stop_loss": order.sl, "take_profit": order.tp}
+
     def cancel_order(self, ticket: int) -> bool:
         """Cancella un ordine in attesa. True anche se non esiste più."""
         if self.test_mode:
