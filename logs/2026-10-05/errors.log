@@ -1,0 +1,17 @@
+2026-10-05 07:35:33 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58756027872: Invalid stops (retcode 10016)
+2026-10-05 07:35:33 | WARNING  | telegram_listener | 🔄 Ticket MT5 58756027872 ancora aperto: memoria riallineata al broker (SL 4142.0, TP 4122.0).
+2026-10-05 07:35:33 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58756027881: Invalid stops (retcode 10016)
+2026-10-05 07:35:33 | WARNING  | telegram_listener | 🔄 Ticket MT5 58756027881 ancora aperto: memoria riallineata al broker (SL 4142.0, TP 4112.0).
+2026-10-05 14:08:39 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58762722423: Invalid stops (retcode 10016)
+2026-10-05 14:08:39 | WARNING  | telegram_listener | 🔄 Ticket MT5 58762722423 ancora aperto: memoria riallineata al broker (SL 4150.0, TP 4170.0).
+2026-10-05 14:08:39 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58762722442: Invalid stops (retcode 10016)
+2026-10-05 14:08:39 | WARNING  | telegram_listener | 🔄 Ticket MT5 58762722442 ancora aperto: memoria riallineata al broker (SL 4150.0, TP 4180.0).
+2026-10-05 14:08:40 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58762722471: Invalid stops (retcode 10016)
+2026-10-05 14:08:40 | WARNING  | telegram_listener | 🔄 Ticket MT5 58762722471 ancora aperto: memoria riallineata al broker (SL 4150.0, TP 4170.0).
+2026-10-05 14:53:53 | WARNING  | telegram_listener | ⚠️ Livelli incoerenti con la posizione BUY #58764407100 (SL 4147.0, TP 4137.0): modifica NON inviata a MT5.
+2026-10-05 14:53:53 | WARNING  | telegram_listener | 🔄 Ticket MT5 58764407100 ancora aperto: memoria riallineata al broker (SL 4147.0, TP None).
+2026-10-05 14:53:53 | WARNING  | telegram_listener | ⚠️ Livelli incoerenti con la posizione BUY #58764407241 (SL 4147.0, TP 4127.0): modifica NON inviata a MT5.
+2026-10-05 14:53:53 | WARNING  | telegram_listener | 🔄 Ticket MT5 58764407241 ancora aperto: memoria riallineata al broker (SL 4147.0, TP None).
+2026-10-05 14:53:53 | WARNING  | telegram_listener | ⚠️ Livelli incoerenti con la posizione BUY #58764407364 (SL 4147.0, TP 4137.0): modifica NON inviata a MT5.
+2026-10-05 14:53:53 | WARNING  | telegram_listener | ⚠️ Livelli incoerenti con la posizione BUY #58764407420 (SL 4147.0, TP 4127.0): modifica NON inviata a MT5.
+2026-10-05 17:27:54 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
