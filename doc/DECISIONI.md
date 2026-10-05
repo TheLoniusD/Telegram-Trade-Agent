@@ -10,7 +10,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 01/10/2026)
+## Regole in vigore (aggiornato al 05/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
@@ -20,12 +20,13 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Una **modifica** vale solo per il proprio messaggio (o quello a cui risponde), mai per "l'ultima operazione aperta".
 
 ### Ingresso (`ENTRY_MODE=range`)
-- 4 ticket per segnale; rischio totale **2%** del saldo, diviso tra i ticket.
+- 4 ticket per segnale; rischio **2%** del saldo diviso in 4 quote, ma **e3/e4 a metà lotto** (`ENTRY_DEEP_LOT_FACTOR=0.5`): rischio effettivo **1,5%** (e1/e2 0,5% ciascuno, e3/e4 0,25%).
 - **e1 (TP1) ed e2 (TP2) al prezzo del segnale**: subito a mercato se il prezzo è nella zona del trader (o migliore); se è oltre il bordo dalla parte sbagliata restano limite al bordo ed entrano appena il prezzo torna nella zona. **Mai ingressi fuori zona dalla parte sbagliata.**
 - **e3 (TP1) ed e4 (TP2) limite a metà e a ¾ della zona**, eseguiti solo se il prezzo ci arriva.
 - Zona: quella scritta dal trader; nella fase rapida ("Gold buy 4186") si assume larga 5 $ a favore del trader.
 - SL provvisorio a 10 $ dal segnale finché il trader non scrive il suo; SL a meno di 3 $ o dalla parte sbagliata → provvisorio.
 - Ordini limite non eseguiti: cancellati dopo 30 minuti, o al primo comando di pareggio/Trade Active/chiusura.
+- Prima di eseguire un comando del trader (Trade Active, pareggio, chiusure) lo stato degli ordini limite viene **riletto da MT5**: un ordine già eseguito è gestito come posizione aperta, mai segnato come cancellato.
 
 ### "Trade Active … Running N+ Pips" (con BE+)
 - Si chiudono **al massimo 2 ticket, quelli entrati al prezzo peggiore**, e **ne resta sempre aperto almeno uno** (4 aperti → 2 chiusi, 2 → 1, 1 → nessuno). A parità di prezzo si chiude prima il TP1 (resta il TP2).
@@ -56,6 +57,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `ENTRY_MODE` | `range` | `zone` = ingresso in due fasi (30/09), `market` = tutto a mercato |
 | `ENTRY_TICKETS` | 4 | |
 | `ENTRY_IMMEDIATE_TICKETS` | 2 | ticket al prezzo del segnale in modalità `range` |
+| `ENTRY_DEEP_LOT_FACTOR` | 0.5 | lotto di e3/e4 rispetto alla quota piena (1 = lotti uguali, come fino al 05/10) |
 | `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
@@ -75,10 +77,26 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | 29/09 | −32 $ | mattina BE a metà zona (−62 $), pomeriggio BE a ingresso +0,5 (+29 $); laterale |
 | 30/09 | +45 $ | e1 a mercato entro 3 $, ordini nei primi 3 $; 1 stop pieno (−152 $) |
 | 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
+| 02/10 | −258 $ | ingresso `range`; 2 stop pieni (−285 $) con tutti e 4 i ticket eseguiti; segnale NFP solo immagine, non visto |
+| 05/10 | −640 $ (−105 $ non registrati) | 4 stop pieni (−554 $), tutti con 4 ticket eseguiti; bug ordini eseguiti segnati come cancellati (SELL 4151) |
 
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 05/10 — Ordini eseguiti mai più "cancellati", e3/e4 a metà lotto, script dei prezzi
+- **Decisioni**
+  - **Correzione**: prima di Trade Active, pareggio e chiusure gli ordini limite vengono riletti da MT5; se una cancellazione trova l'ordine già eseguito, il ticket resta aperto e viene gestito (incasso, pareggio o chiusura). Dopo una modifica scartata perché incoerente anche gli ordini in attesa riallineano SL/TP alla memoria.
+  - **e3/e4 a metà lotto** (`ENTRY_DEEP_LOT_FACTOR=0.5`): rischio totale 1,5% invece del 2%.
+  - **`prezzi.py`**: script in sola lettura sulle candele M1 (escursioni dopo ogni segnale, SL del trader toccato "per poco", ritorno contro dopo la richiesta di pareggio, effetto di un margine sullo SL).
+- **Perché**
+  - 05/10 SELL 4151: e1–e3 eseguiti tra due controlli (ogni 30 s); al Trade Active delle 08:22 il bot li ha "cancellati" (MT5 non li trovava più fra gli ordini in attesa e rispondeva ok) → 3 posizioni senza gestione finite allo stop 4161: **−104,87 $ mai registrati** (saldo −640 $ contro −535 $ delle schede).
+  - 02 e 05/10: i **6 stop pieni avevano tutti e 4 i ticket eseguiti**, mentre nei trade vinti e3/e4 venivano quasi sempre cancellati al pareggio: entrano soprattutto quando il prezzo va contro. A metà lotto quei 6 stop sarebbero costati circa 200 $ in meno; i guadagni persi sui trade vinti con e3/e4 eseguiti sarebbero stati circa 11 $ il 05/10.
+- **Scartato / rimandato**
+  - Eliminare e3/e4 (≈ −400 $ di perdite in meno, ma niente più riempimenti in zona).
+  - Primo gradino dello stop di protezione più largo (4 protezioni su 4 scattate il 02 e il 05/10 e poi prezzo tornato a favore): si decide con i dati di `prezzi.py`.
+  - Margine sullo SL del trader (BUY 4188 del 02/10 e BUY 4157 del 05/10: nostro stop, il trader dichiara vittoria): si decide con i dati di `prezzi.py`.
+- **Da verificare**: rischio effettivo per operazione (~1,5%); se e3/e4 a metà lotto riducono davvero le perdite degli stop pieni; nessun nuovo caso di ordini segnati come cancellati senza un CANCEL su MT5 nel diario.
 
 ### 01/10 (sera) — Pulizia del repository
 - `main` allineato al codice per Windows e usato per lo sviluppo; `claude-branch` eliminato; `server` = `main` + RPyC + log.
@@ -119,7 +137,10 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Questioni aperte
-- **Prezzi al minuto**: script da far girare sul server per scaricare le candele M1 e rigiocare le giornate con regole diverse (Trade Active, pareggio, ingresso). Serve per scegliere con i numeri.
+- **Prezzi al minuto**: `prezzi.py` scritto il 05/10 (escursioni, SL toccati per poco, ritorno dopo il pareggio); da far girare sul server su 02/10 e 05/10 per decidere margine sullo SL e primo gradino dello stop di protezione. Resta da fare il rigioco completo delle giornate con regole diverse.
+- **Stop di protezione**: primo gradino (¼ = 2,5 $) forse troppo stretto, 4 su 4 scattati e poi prezzo tornato a favore (02 e 05/10).
+- **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $ (−105 $ con e3/e4 a metà lotto).
+- **Segnali solo immagine** (NFP del 02/10): invisibili al bot; possibile lettura con visione, da valutare.
 - Pareggio stretto vs più largo nei giorni di trend.
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
