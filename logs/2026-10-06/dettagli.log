@@ -1,0 +1,23 @@
+2026-10-06 08:45:40 | WARNING  | telegram_listener | ⚠️ Risk Manager: prezzo del segnale 4331 lontano 200.42 $ dal mercato (4130.58): probabile errore di battitura, attendo la correzione
+2026-10-06 08:46:57 | WARNING  | order_manager | 🆕 [RECUPERO] Modifica del messaggio 58660 mai aperto come segnale: trattata come nuovo segnale.
+2026-10-06 15:11:40 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-06 15:12:02 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408403: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:12:02 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408482: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:12:02 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408514: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:12:02 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408601: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:14:03 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408403: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:14:03 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408482: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:14:03 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408514: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:14:03 | ERROR    | mt5_executor | ❌ Errore cancellazione ordine 58783408601: Request rejected due to absence of network connection (retcode 10031)
+2026-10-06 15:17:40 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-10-06 15:39:04 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58783584129: Invalid stops (retcode 10016)
+2026-10-06 15:39:04 | WARNING  | telegram_listener | 🔄 Ticket MT5 58783584129 ancora aperto: memoria riallineata al broker (SL 4155.0, TP 4175.0).
+2026-10-06 15:39:04 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58783584190: Invalid stops (retcode 10016)
+2026-10-06 15:39:04 | WARNING  | telegram_listener | 🔄 Ticket MT5 58783584190 ancora aperto: memoria riallineata al broker (SL 4155.0, TP 4185.0).
+2026-10-06 15:39:04 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58783584227: Invalid stops (retcode 10016)
+2026-10-06 15:39:04 | WARNING  | telegram_listener | 🔄 Ticket MT5 58783584227 ancora aperto: memoria riallineata al broker (SL 4155.0, TP 4175.0).
+2026-10-06 15:39:04 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58783584297: Invalid stops (retcode 10016)
+2026-10-06 15:39:04 | WARNING  | telegram_listener | 🔄 Ticket MT5 58783584297 ancora aperto: memoria riallineata al broker (SL 4155.0, TP 4185.0).
+2026-10-06 15:45:04 | ERROR    | mt5_executor | ❌ Errore ordine limite MT5: Invalid price (retcode 10015)
+2026-10-06 15:45:04 | WARNING  | telegram_listener | ⚠️ Apertura e1 non riuscita: Invalid price (retcode 10015)
+2026-10-06 15:45:04 | WARNING  | telegram_listener | ⚠️ Apertura PARZIALE: 3/4 ticket a mercato, l'operazione resta gestita.
