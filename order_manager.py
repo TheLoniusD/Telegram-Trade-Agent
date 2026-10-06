@@ -26,10 +26,13 @@ TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 # di un'operazione che non c'entra è maggiore del vantaggio.
 REENTRY_PARENT_MAX_AGE_SECONDS = 3600
 
-# Ticket aperti per ogni segnale, distribuiti nella zona del trader (vedi
-# RiskManager._entry_levels) e alternati sui suoi TP: con 4 ticket due vanno
-# al TP1 e due al TP2, uno alto e uno profondo nella zona per ciascun TP.
-ENTRY_TICKETS = max(1, int(os.getenv("ENTRY_TICKETS", "4")))
+# Ticket aperti per ogni segnale, alternati sui TP del trader: e1 sul TP1, e2
+# sul TP2 (con 4 ticket anche e3/e4 più dentro la zona, vedi
+# RiskManager._entry_levels). Dal 06/10 sono 2, con tutto il rischio: nel
+# rigioco 24/09–05/10 e3/e4 aggiungevano rischio senza rendere nulla (entrano
+# quasi solo quando il prezzo va contro); solo e1/e2 con lotti doppi ≈ +430 $
+# contro +214 $ delle regole del 05/10.
+ENTRY_TICKETS = max(1, int(os.getenv("ENTRY_TICKETS", "2")))
 
 
 def ticket_tp_index(key: str, ticket: dict) -> int:
