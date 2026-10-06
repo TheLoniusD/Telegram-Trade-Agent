@@ -157,7 +157,18 @@ class MT5Executor:
         # previsto, ordine limite in attesa; se è già lì o migliore, a mercato.
         limit_price = order_plan.get("limit_price")
         if limit_price is not None and ((price > limit_price) if direction == "BUY" else (price < limit_price)):
-            return self._place_limit(order_plan, limit_price, tp_primary)
+            placed = self._place_limit(order_plan, limit_price, tp_primary)
+            if placed["success"] or "10015" not in str(placed.get("error")):
+                return placed
+            # "Invalid price": il prezzo è arrivato al livello mentre l'ordine
+            # partiva (06/10 BUY 4158: e1 rifiutato, e2 un istante dopo a
+            # mercato). Se adesso è al livello o migliore si entra a mercato.
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is None:
+                return placed
+            price = tick.ask if direction == "BUY" else tick.bid
+            if (price > limit_price) if direction == "BUY" else (price < limit_price):
+                return placed
 
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
