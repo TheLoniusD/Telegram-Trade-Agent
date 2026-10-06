@@ -10,7 +10,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 05/10/2026)
+## Regole in vigore (aggiornato al 06/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
@@ -20,16 +20,16 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Una **modifica** vale solo per il proprio messaggio (o quello a cui risponde), mai per "l'ultima operazione aperta".
 
 ### Ingresso (`ENTRY_MODE=range`)
-- 4 ticket per segnale; rischio **2%** del saldo diviso in 4 quote, ma **e3/e4 a metà lotto** (`ENTRY_DEEP_LOT_FACTOR=0.5`): rischio effettivo **1,5%** (e1/e2 0,5% ciascuno, e3/e4 0,25%).
+- **2 ticket per segnale** (`ENTRY_TICKETS=2`), rischio **2%** del saldo: **1% ciascuno**.
 - **e1 (TP1) ed e2 (TP2) al prezzo del segnale**: subito a mercato se il prezzo è nella zona del trader (o migliore); se è oltre il bordo dalla parte sbagliata restano limite al bordo ed entrano appena il prezzo torna nella zona. **Mai ingressi fuori zona dalla parte sbagliata.**
-- **e3 (TP1) ed e4 (TP2) limite a metà e a ¾ della zona**, eseguiti solo se il prezzo ci arriva.
+- Niente più e3/e4 più dentro la zona (tolti il 06/10). Restano disponibili con `ENTRY_TICKETS=4`: limite a metà e a ¾ della zona, lotto ridotto da `ENTRY_DEEP_LOT_FACTOR`.
 - Zona: quella scritta dal trader; nella fase rapida ("Gold buy 4186") si assume larga 5 $ a favore del trader.
 - SL provvisorio a 10 $ dal segnale finché il trader non scrive il suo; SL a meno di 3 $ o dalla parte sbagliata → provvisorio.
 - Ordini limite non eseguiti: cancellati dopo 30 minuti, o al primo comando di pareggio/Trade Active/chiusura.
 - Prima di eseguire un comando del trader (Trade Active, pareggio, chiusure) lo stato degli ordini limite viene **riletto da MT5**: un ordine già eseguito è gestito come posizione aperta, mai segnato come cancellato.
 
 ### "Trade Active … Running N+ Pips" (con BE+)
-- Si chiudono **al massimo 2 ticket, quelli entrati al prezzo peggiore**, e **ne resta sempre aperto almeno uno** (4 aperti → 2 chiusi, 2 → 1, 1 → nessuno). A parità di prezzo si chiude prima il TP1 (resta il TP2).
+- Si chiudono **al massimo 2 ticket, quelli entrati al prezzo peggiore**, e **ne resta sempre aperto almeno uno** (con 2 ticket: 1 chiuso, 1 a pareggio; con 1 aperto nessuno). A parità di prezzo si chiude prima il TP1 (resta il TP2).
 - **Mai chiusure in perdita**; nessuna soglia sui pips. Una sola volta per operazione.
 - I ticket rimasti vanno a **pareggio**; gli ordini non eseguiti vengono cancellati.
 - Messaggio su più righe di pips: la regola vale per l'operazione a cui risponde (ultima riga); le altre operazioni aperte nella stessa direzione vanno solo a pareggio.
@@ -38,6 +38,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Pareggio = ingresso **± 0,50 $** dalla parte del guadagno (`BE_MODE=entry`, `BE_OFFSET=0.5`).
 - **Stop di protezione**: se MT5 rifiuta il pareggio (siamo in perdita o troppo vicini) lo stop si avvicina al primo gradino accettato tra ¼, ½, ¾ della distanza ingresso–stop; ogni 30 secondi si riprova il pareggio vero e si migliora la protezione.
 - Uno SL già più protettivo del pareggio non viene mai peggiorato.
+- **Pareggio subito quando lo chiede il trader**, senza guadagno minimo (`BE_MIN_PROFIT=0`), e **SL esattamente quello del trader**, senza margini: entrambe le alternative verificate e scartate il 06/10.
 
 ### Altri messaggi del trader
 - **HIT TP** (con BE+): pareggio, nessuna chiusura.
@@ -55,9 +56,10 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | Parametro | Default | Note |
 |---|---|---|
 | `ENTRY_MODE` | `range` | `zone` = ingresso in due fasi (30/09), `market` = tutto a mercato |
-| `ENTRY_TICKETS` | 4 | |
+| `ENTRY_TICKETS` | 2 | 4 = anche e3/e4 dentro la zona (fino al 05/10); **sul server non va impostato nel `.env`** |
 | `ENTRY_IMMEDIATE_TICKETS` | 2 | ticket al prezzo del segnale in modalità `range` |
-| `ENTRY_DEEP_LOT_FACTOR` | 0.5 | lotto di e3/e4 rispetto alla quota piena (1 = lotti uguali, come fino al 05/10) |
+| `ENTRY_DEEP_LOT_FACTOR` | 0.5 | solo con `ENTRY_TICKETS=4`: lotto di e3/e4 rispetto alla quota piena |
+| `BE_MIN_PROFIT` | 0 | guadagno minimo per il pareggio: deve restare 0 |
 | `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
@@ -83,6 +85,28 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 06/10 — Solo e1/e2 con tutto il rischio; nessun margine sullo SL né minimo sul pareggio
+- **Decisioni**
+  - **2 ticket per segnale** (`ENTRY_TICKETS=2`): e1 sul TP1 ed e2 sul TP2, al bordo della zona, **1% di rischio ciascuno** (prima 4 ticket, e3/e4 a metà lotto, rischio 1,5%).
+  - **Confermati e messi per iscritto**: pareggio subito alla richiesta del trader (nessun guadagno minimo) e SL esattamente quello del trader (nessun margine). Il codice era già così: nessuna modifica.
+- **Perché**: rigioco dei messaggi del trader dal 24/09 al 05/10 (`prezzi.py rigioco`, 86 segnali, rischio fisso 140 $ per segnale, candele M1 di MT5; `logs/rigioco.txt`). Il rigioco riproduce bene il reale del 02 e del 05/10 (a parte gli stop di protezione, su cui è più indulgente).
+
+  | Strategia | Totale | Rischio max per segnale | Resa per 1 $ rischiato |
+  |---|---|---|---|
+  | solo e1/e2 | +217 $ | 70 $ | 3,1 |
+  | regole del 05/10 (e3/e4 a metà lotto) | +214 $ | 105 $ | 2,0 |
+  | e3/e4 lotto pieno | +224 $ | 140 $ | 1,6 |
+
+  e3/e4 aggiungono rischio senza rendere (entrano quasi solo quando il prezzo va contro): con tutto il rischio su e1/e2 il periodo avrebbe reso circa **+430 $**.
+  - Pareggio con minimo: 3 $ → +60 $, 5 $ → +139 $ (peggio, come il 25/09). Margine sullo SL: +1 $ → +119 $, +2 $ → −63 $ (salva lo stop "per poco" del 02/10 BUY 4188, ma costa su tutti gli altri).
+  - Senza pareggio su richiesta: "mai BE" −749 $, "BE al TP1" −655 $, "TP1 senza BE" −272 $: **il pareggio su richiesta è la regola che conta di più**.
+- **Scartato / rimandato**
+  - BE +1 $ invece di +0,5 (+278 $, meglio in 7 giorni su 8 ma di poco; con +1 $ MT5 rifiuterebbe più pareggi): da riconsiderare dopo aver contato i rifiuti.
+  - BE a metà rischio (+380 $ ma tutto dal 24/09: senza quel giorno peggio in 6 giorni su 8).
+  - Stop di protezione da ½ o tolto: il rigioco non lo misura bene, resta com'è.
+- **Contro**: si entra solo al bordo (niente ingressi migliori dentro la zona); ogni stop pieno costa di nuovo il 2% (−140 $ invece di −105 $); in compenso i ticket entrano tutti al prezzo migliore della zona.
+- **Da verificare**: risultato per segnale con 2 ticket; numero di stop pieni rispetto ai giorni con 4 ticket.
 
 ### 05/10 — Ordini eseguiti mai più "cancellati", e3/e4 a metà lotto, script dei prezzi
 - **Decisioni**
@@ -137,9 +161,9 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Questioni aperte
-- **Prezzi al minuto**: `prezzi.py` scritto il 05/10 (escursioni, SL toccati per poco, ritorno dopo il pareggio); da far girare sul server su 02/10 e 05/10 per decidere margine sullo SL e primo gradino dello stop di protezione. Resta da fare il rigioco completo delle giornate con regole diverse.
+- **Prezzi al minuto**: `prezzi.py` (analisi di un giorno) e `prezzi.py rigioco` (confronto di strategie) disponibili; da rilanciare man mano che si aggiungono giornate, soprattutto per BE +1 $ e stop di protezione.
 - **Stop di protezione**: primo gradino (¼ = 2,5 $) forse troppo stretto, 4 su 4 scattati e poi prezzo tornato a favore (02 e 05/10).
-- **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $ (−105 $ con e3/e4 a metà lotto).
+- **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $.
 - **Segnali solo immagine** (NFP del 02/10): invisibili al bot; possibile lettura con visione, da valutare.
 - Pareggio stretto vs più largo nei giorni di trend.
 - Gestione dei Trade Active su più righe oltre al pareggio.
