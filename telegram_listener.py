@@ -222,8 +222,10 @@ def execute_trade_active(trade: dict, trader_pips: float) -> None:
               if t.get("mt5_ticket") and not t.get("closed") and not t.get("pending")]
     to_close = min(TRADE_ACTIVE_MAX_CLOSE, len(filled) - 1)
     if to_close <= 0:
+        note = ("un solo ticket aperto: resta per il TP, va a pareggio" if filled
+                else "nessun ticket aperto: gli ordini in attesa vengono cancellati")
         journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
-                       closed=[], in_loss=[], note="un solo ticket aperto: resta per il TP, va a pareggio")
+                       closed=[], in_loss=[], note=note)
         return
 
     buy = filled[0][1].get("direction") == "BUY"
@@ -477,6 +479,10 @@ def sync_pending_entries() -> None:
             token = journal.set_current_message(trade.get("msg_id"))
             try:
                 if refresh_pending_ticket(tp_config, trade) != "PENDING":
+                    changed = True
+                elif tp_config.get("be_pending"):
+                    # Pareggio chiesto mentre MT5 non rispondeva e ordine mai eseguito
+                    cancel_pending_ticket(tp_config, "il trader ha chiesto il BE prima che l'ordine venisse eseguito", trade)
                     changed = True
                 elif time.time() - (tp_config.get("pending_since") or time.time()) > ENTRY_ORDER_EXPIRY_SECONDS:
                     cancel_pending_ticket(tp_config, f"non eseguito entro {ENTRY_ORDER_EXPIRY_SECONDS // 60} minuti", trade)
@@ -779,7 +785,18 @@ def handle_message(event, is_edit: bool):
                     # mai entrato: il prezzo è andato senza di noi, lo cancelliamo.
                     cancel_pending_ticket(tp_config, "il trader ha chiesto il BE prima che l'ordine venisse eseguito",
                                           parent_trade)
-                    if tp_config.get("pending") or tp_config.get("closed"):
+                    if tp_config.get("closed"):
+                        continue
+                    if tp_config.get("pending"):
+                        # Cancellazione non riuscita (MT5 scollegato): la richiesta
+                        # di pareggio resta in memoria. Se l'ordine risulta poi
+                        # eseguito va a pareggio, se è ancora in attesa viene
+                        # cancellato (06/10 BUY 4170: MT5 scollegato per 6 minuti,
+                        # ordini eseguiti nel frattempo, pareggio perso, stop pieno).
+                        tp_config["be_pending"] = True
+                        journal.record("BE_PENDING", mt5_ticket=tp_config.get("mt5_ticket"),
+                                       entry_price=breakeven_price(tp_config, parent_trade),
+                                       reason="ordine in attesa non cancellato: MT5 non raggiungibile")
                         continue
                     # Eseguito proprio adesso: è una posizione aperta, va a pareggio
                 real_mt5_ticket = tp_config.get("mt5_ticket")

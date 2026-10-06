@@ -81,10 +81,19 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
 | 02/10 | −258 $ | ingresso `range`; 2 stop pieni (−285 $) con tutti e 4 i ticket eseguiti; segnale NFP solo immagine, non visto |
 | 05/10 | −640 $ (−105 $ non registrati) | 4 stop pieni (−554 $), tutti con 4 ticket eseguiti; bug ordini eseguiti segnati come cancellati (SELL 4151) |
+| 06/10 | −449 $ | ancora 4 ticket (e3/e4 a metà lotto); 5 stop pieni (−416 $): 4 anche per il trader ("hit risk"), 1 per MT5 scollegato 6 minuti (pareggio perso); 4 segnali mai entrati (prezzo oltre il bordo) |
 
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 06/10 (sera) — Pareggio non perso con MT5 scollegato, limite rifiutato → a mercato
+- **Correzioni**
+  - Se al Trade Active/pareggio un ordine in attesa non si può cancellare perché MT5 è scollegato, la richiesta di pareggio resta in memoria: se l'ordine risulta poi eseguito va a pareggio, se è ancora in attesa viene cancellato.
+  - Ordine limite rifiutato con "Invalid price" perché il prezzo è appena arrivato al livello: si entra a mercato.
+- **Perché**: 06/10 BUY 4170: MT5 scollegato dalle 15:11 alle 15:17, Trade Active e "Hold it with BE" arrivati in quei minuti, ordini eseguiti nel frattempo, al ritorno di MT5 nessun pareggio → stop pieno alle 15:39 (−83 $). BUY 4158 delle 15:45: e1 rifiutato ("Invalid price"), e2 entrato a mercato un istante dopo.
+- **Nota**: il 06/10 il server ha fatto un push forzato che ha cancellato da GitHub il merge dei 2 ticket (ripristinato con un nuovo merge). I push dal server vanno fatti solo con pull + push, mai forzati.
+- **Da verificare**: altre disconnessioni di MT5 durante un comando del trader; anche la chiusura totale ("Close all") con MT5 scollegato resta da gestire (oggi l'operazione resta "CLOSE_FAILED").
 
 ### 06/10 — Solo e1/e2 con tutto il rischio; nessun margine sullo SL né minimo sul pareggio
 - **Decisioni**
@@ -169,6 +178,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
 - Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
+- Rischio per segnale: il 2% è fisso nel codice. Con 4 ticket l'arrotondamento dei lotti lo riduceva a circa 1,2% effettivo (06/10: stop pieni da −83 $); con 2 ticket è circa 1,8% (−125 $). Valutare un parametro `RISK_PERCENT`.
 - Segnale rapido mai completato dal trader (nessuna modifica con SL e TP): oggi resta lo SL provvisorio a 10 $ e nessun TP. Decidere se chiudere o mettere a pareggio dopo un certo tempo.
 - Notizie ad alto impatto (NFP, CPI…): operare o no durante la pubblicazione.
 - "Cut loss if solid break X": oggi diventa uno SL rigido; valutare uno SL "morbido" che chiude solo a candela chiusa oltre il livello.
