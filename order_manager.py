@@ -34,6 +34,13 @@ REENTRY_PARENT_MAX_AGE_SECONDS = 3600
 # contro +214 $ delle regole del 05/10.
 ENTRY_TICKETS = max(1, int(os.getenv("ENTRY_TICKETS", "2")))
 
+# TP provvisori finché il trader non scrive i suoi, come lo SL provvisorio:
+# TP1 e TP2 a questa distanza dal prezzo del segnale (la struttura che il
+# trader usa sempre: TP a 10 e 20 $). Senza, un segnale mai completato restava
+# aperto con il solo SL (06/10 BUY 4158 allo stop; 07/10 SELL 4133 aperto per
+# 6 ore, chiuso a mano). "0" = nessun TP provvisorio.
+PROVISIONAL_TP_DISTANCES = [float(x) for x in os.getenv("PROVISIONAL_TP", "10,20").split(",") if float(x) > 0]
+
 
 def ticket_tp_index(key: str, ticket: dict) -> int:
     """Indice del TP del trader assegnato al ticket (0 = TP1, 1 = TP2)."""
@@ -62,6 +69,7 @@ class OrderManager:
 
         self.storage_path = storage_path
         self.archive_dir = archive_dir
+        self.missing_stops = []
         # Carica automaticamente lo stato esistente all'avvio
         self.load_state_from_file()
 
@@ -155,6 +163,9 @@ class OrderManager:
         Ritorna il numero di ticket il cui stato è stato corretto.
         """
         corrections = 0
+        # Posizioni che su MT5 risultano senza SL pur avendolo in memoria: il
+        # listener lo rimette (vedi restore_missing_stops).
+        self.missing_stops = []
 
         for trade in self.active_trades.values():
             if trade.get("status") not in CLOSABLE_STATUSES:
@@ -177,6 +188,9 @@ class OrderManager:
                     corrections += 1
                     logger.debug(f"🔄 [RICONCILIAZIONE] Ticket {mt5_ticket} non più aperto su MT5: segnato come chiuso.")
                     continue
+
+                if not state.get("stop_loss") and tp_config.get("stop_loss"):
+                    self.missing_stops.append((trade, tp_config))
 
                 # La posizione esiste ancora: i valori del broker vincono sempre
                 # su quelli in memoria (potrebbero essere stati modificati a mano).
@@ -405,6 +419,14 @@ class OrderManager:
                     index = ticket_tp_index(key, ticket)
                     if index < 2 and trader_tps[index] is None:
                         trader_tps[index] = ticket.get("take_profit")
+                # Fase rapida ("Gold sell 4133"): TP provvisori dal prezzo del
+                # segnale, sostituiti da quelli del trader alla sua modifica.
+                if entry_min is not None and PROVISIONAL_TP_DISTANCES:
+                    sign = 1 if direction == "BUY" else -1
+                    for index in range(2):
+                        if trader_tps[index] is None:
+                            distance = PROVISIONAL_TP_DISTANCES[min(index, len(PROVISIONAL_TP_DISTANCES) - 1)]
+                            trader_tps[index] = round(entry_min + sign * distance, 2)
 
             tickets = {}
             for i in range(ENTRY_TICKETS):

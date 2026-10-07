@@ -1035,6 +1035,27 @@ def retry_pending_breakeven() -> None:
         manager.save_state_to_file()
 
 
+def restore_missing_stops() -> None:
+    """
+    Una posizione del bot che su MT5 risulta senza SL (rimosso dal broker o a
+    mano, o un ordine aperto senza livelli) riceve di nuovo lo SL che ha in
+    memoria: nessuna posizione deve restare senza uscita (07/10: due posizioni
+    ritenute "senza SL né TP", chiuse a mano). Le trova la riconciliazione.
+    """
+    for trade, tp_config in getattr(manager, "missing_stops", []):
+        mt5_ticket, stop_loss, take_profit = tp_config.get("mt5_ticket"), tp_config.get("stop_loss"), tp_config.get("take_profit")
+        token = journal.set_current_message(trade.get("msg_id"))
+        try:
+            ok = mt5_agent.modify_order_levels(ticket=mt5_ticket, stop_loss=stop_loss,
+                                               take_profit=[take_profit] if take_profit is not None else [])
+            logger.warning(f"⚠️ Posizione {mt5_ticket} senza SL su MT5: SL {stop_loss} "
+                           f"{'rimesso' if ok else 'NON rimesso, verificare a mano'}.")
+            journal.record("STOP_RESTORED", mt5_ticket=mt5_ticket, stop_loss=stop_loss, take_profit=take_profit, ok=ok)
+        finally:
+            journal.clear_current_message(token)
+    manager.missing_stops = []
+
+
 def write_heartbeat(mt5_ok: bool, mt5_reason: str) -> None:
     """Battito periodico: conferma nel log che il bot è vivo e fotografa il conto."""
     account = mt5_agent.account_snapshot()
@@ -1074,6 +1095,7 @@ async def monitor_loop():
             if ok and not mt5_agent.test_mode:
                 sync_pending_entries()
                 manager.reconcile_with_broker(broker_position_lookup)
+                restore_missing_stops()
                 retry_pending_breakeven()
 
             if last_heartbeat is None or time.monotonic() - last_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
