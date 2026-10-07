@@ -10,7 +10,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 06/10/2026)
+## Regole in vigore (aggiornato al 07/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
@@ -25,6 +25,8 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Niente più e3/e4 più dentro la zona (tolti il 06/10). Restano disponibili con `ENTRY_TICKETS=4`: limite a metà e a ¾ della zona, lotto ridotto da `ENTRY_DEEP_LOT_FACTOR`.
 - Zona: quella scritta dal trader; nella fase rapida ("Gold buy 4186") si assume larga 5 $ a favore del trader.
 - SL provvisorio a 10 $ dal segnale finché il trader non scrive il suo; SL a meno di 3 $ o dalla parte sbagliata → provvisorio.
+- **TP provvisori** a 10 $ (TP1) e 20 $ (TP2) dal prezzo del segnale finché il trader non scrive i suoi (`PROVISIONAL_TP=10,20`): nessuna posizione resta senza uscita se il segnale non viene mai completato.
+- Se una posizione del bot risulta su MT5 **senza SL**, il controllo periodico (ogni 30 s) rimette lo SL che ha in memoria.
 - Ordini limite non eseguiti: cancellati dopo 30 minuti, o al primo comando di pareggio/Trade Active/chiusura.
 - Prima di eseguire un comando del trader (Trade Active, pareggio, chiusure) lo stato degli ordini limite viene **riletto da MT5**: un ordine già eseguito è gestito come posizione aperta, mai segnato come cancellato.
 
@@ -60,6 +62,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `ENTRY_IMMEDIATE_TICKETS` | 2 | ticket al prezzo del segnale in modalità `range` |
 | `ENTRY_DEEP_LOT_FACTOR` | 0.5 | solo con `ENTRY_TICKETS=4`: lotto di e3/e4 rispetto alla quota piena |
 | `BE_MIN_PROFIT` | 0 | guadagno minimo per il pareggio: deve restare 0 |
+| `PROVISIONAL_TP` | 10,20 | distanza dei TP provvisori dal segnale; `0` = nessun TP provvisorio |
 | `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
@@ -81,11 +84,21 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
 | 02/10 | −258 $ | ingresso `range`; 2 stop pieni (−285 $) con tutti e 4 i ticket eseguiti; segnale NFP solo immagine, non visto |
 | 05/10 | −640 $ (−105 $ non registrati) | 4 stop pieni (−554 $), tutti con 4 ticket eseguiti; bug ordini eseguiti segnati come cancellati (SELL 4151) |
+| 07/10 | +770 $ (+663 $ da chiusura manuale) | primo giorno con 2 ticket; nessuno stop pieno, 8 vinti su 9 gestiti dal bot (+108 $); SELL 4133 mai completato dal trader, chiuso a mano a +663 $ |
 | 06/10 | −449 $ | ancora 4 ticket (e3/e4 a metà lotto); 5 stop pieni (−416 $): 4 anche per il trader ("hit risk"), 1 per MT5 scollegato 6 minuti (pareggio perso); 4 segnali mai entrati (prezzo oltre il bordo) |
 
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 07/10 — TP provvisori e SL sempre presente
+- **Decisioni**
+  - **TP provvisori** a ±10/±20 $ dal prezzo del segnale rapido, sostituiti da quelli del trader alla sua modifica (come lo SL provvisorio).
+  - **SL rimesso** se una posizione del bot risulta su MT5 senza SL (evento `STOP_RESTORED` nel diario e riga nel racconto).
+- **Perché**: due segnali rapidi mai completati dal trader in due giorni. 06/10 BUY 4158: solo SL provvisorio, preso (−51 $). 07/10 SELL 4133 delle 09:32: aperto a 4136 con SL 4143 (accettato da MT5 secondo il diario) e senza TP, mai più seguito dal trader; resta aperto 6 ore finché non viene chiuso a mano a 4083 (+663 $). Il trader usa sempre TP a 10 e 20 $ dal segnale.
+- **Contro**: con i TP provvisori il SELL 4133 avrebbe chiuso a 4123/4113 (circa +225 $ invece di +663 $), ma senza bisogno di nessuno davanti allo schermo. Lo SL rimesso annulla anche una rimozione fatta a mano da MT5.
+- **Scartato**: lasciare le posizioni senza TP e chiuderle a mano (rischioso quando nessuno guarda).
+- **Da verificare**: quante volte il trader non completa un segnale; se i TP provvisori vengono presi prima della sua modifica.
 
 ### 06/10 (sera) — Pareggio non perso con MT5 scollegato, limite rifiutato → a mercato
 - **Correzioni**
@@ -179,7 +192,8 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
 - Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
 - Rischio per segnale: il 2% è fisso nel codice. Con 4 ticket l'arrotondamento dei lotti lo riduceva a circa 1,2% effettivo (06/10: stop pieni da −83 $); con 2 ticket è circa 1,8% (−125 $). Valutare un parametro `RISK_PERCENT`.
-- Segnale rapido mai completato dal trader (nessuna modifica con SL e TP): oggi resta lo SL provvisorio a 10 $ e nessun TP. Decidere se chiudere o mettere a pareggio dopo un certo tempo.
+- Segnale rapido mai completato dal trader: dal 07/10 ha SL e TP provvisori. Resta da decidere se gestirlo anche nel tempo (es. pareggio dopo un certo guadagno, visto che nessun Trade Active arriverà).
+- **MT5 scollegato spesso** (06/10 una volta, 07/10 quattro volte, da 1 a 7 minuti): controllare la connessione del terminale sul server.
 - Notizie ad alto impatto (NFP, CPI…): operare o no durante la pubblicazione.
 - "Cut loss if solid break X": oggi diventa uno SL rigido; valutare uno SL "morbido" che chiude solo a candela chiusa oltre il livello.
 - Più esempi reali nel prompt dell'agente, man mano che arrivano messaggi nuovi.

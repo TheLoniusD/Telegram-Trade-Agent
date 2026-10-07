@@ -347,6 +347,13 @@ class Narrator:
         self.say(f"🛟 {self.tag(trade)}{key} pareggio non ancora possibile (a {num(e.get('be_price'))}): "
                  f"stop di protezione da {num(e.get('previous_stop_loss'))} a {num(e.get('stop_loss'))}")
 
+    def on_stop_restored(self, e):
+        trade, key = self.trade_of(e.get("mt5_ticket"))
+        if e.get("ok"):
+            self.say(f"⚠️ {self.tag(trade)}{key} su MT5 era senza SL: rimesso a {num(e.get('stop_loss'))}")
+        else:
+            self.say(f"❌ {self.tag(trade)}{key} su MT5 è senza SL e non è stato possibile rimetterlo: verificare a mano")
+
     def on_be_pending_applied(self, e):
         trade, key = self.trade_of(e.get("mt5_ticket"))
         if trade and key in trade["snapshot"]:
