@@ -1,0 +1,10 @@
+2026-10-08 05:25:17 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58812691939: Invalid stops (retcode 10016)
+2026-10-08 05:25:17 | WARNING  | telegram_listener | 🔄 Ticket MT5 58812691939 ancora aperto: memoria riallineata al broker (SL 4124.0, TP 4154.0).
+2026-10-08 05:25:26 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58812691939: Invalid stops (retcode 10016)
+2026-10-08 13:38:25 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58819416878: Invalid stops (retcode 10016)
+2026-10-08 13:38:25 | WARNING  | telegram_listener | 🔄 Ticket MT5 58819416878 ancora aperto: memoria riallineata al broker (SL 4131.0, TP 4111.0).
+2026-10-08 13:38:26 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58819416906: Invalid stops (retcode 10016)
+2026-10-08 13:38:26 | WARNING  | telegram_listener | 🔄 Ticket MT5 58819416906 ancora aperto: memoria riallineata al broker (SL 4131.0, TP 4101.0).
+2026-10-08 14:17:25 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58820518961: Invalid stops (retcode 10016)
+2026-10-08 14:17:25 | WARNING  | telegram_listener | 🔄 Ticket MT5 58820518961 ancora aperto: memoria riallineata al broker (SL 4134.0, TP 4104.0).
+2026-10-08 16:26:45 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker

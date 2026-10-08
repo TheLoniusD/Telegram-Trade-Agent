@@ -1,0 +1,223 @@
+Operazioni del 2026-10-08 · 16 segnali · risultato delle operazioni chiuse: +129,17 $ · aggiornato alle 15:12
+
+═══ BUY 4134 · aperto 04:54 · CHIUSO −15,57 $ ═══
+Zona 4129–4134 · SL 4.124,00 · TP 4.144,00 / 4.154,00
+
+Trader
+  04:54  Gold buy 4134
+  04:55  (modifica) GOLD BUY NOW · Buy @ 4134 - 4129 · SL🔴4124 · TP✅4144 · TP✅4154
+  05:25  Trade Active ✅ · Gold Buy Running 85+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  05:54  Trade Active ✅ · Gold Buy Running 115+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.134,00     4.144,00   incasso TA 05:25      +2,29 $     58812691930
+  e2    4.134,00     4.154,00   protezione 05:26     −17,86 $     58812691939
+
+Stop di protezione 05:25 → e2 SL 4.131,50 (pareggio rifiutato da MT5)
+
+═══ SELL 4134 · aperto 06:53 · CHIUSO +13,35 $ ═══
+Zona 4134–4139 · SL 4.144,00 · TP 4.124,00 / 4.114,00
+
+Trader
+  06:53  Gold sell 4134
+  06:54  (modifica) GOLD SELL NOW · Sell @ 4134 - 4139 · SL🔴4144 · TP✅4124 · TP✅4114
+  07:02  Trade Active ✅ · Gold Sell Running 45+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.134,00     4.124,00   incasso TA 07:02      +9,78 $     58814056437
+  e2    4.134,00     4.114,00   pareggio 07:03      +3,57 $       58814056442
+
+Pareggio 07:02 → e2 SL 4.133,50
+
+═══ SELL 4133 · aperto 07:07 · CHIUSO +15,92 $ ═══
+Zona 4133–4138 · SL 4.143,00 · TP 4.123,00 / 4.113,00
+
+Trader
+  07:07  Gold sell 4133
+  07:08  (modifica) GOLD SELL NOW · Sell @ 4133 - 4138 · SL🔴4143 · TP✅4123 · TP✅4113
+  07:19  Trade Active ✅ · Gold Sell Running 50+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  07:32  Trade Active ✅ · Gold Sell Running 110+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.133,67     4.123,00   incasso TA 07:19     +12,35 $     58814201457
+  e2    4.133,71     4.113,00   pareggio 07:36      +3,57 $       58814201510
+
+Pareggio 07:19 → e2 SL 4.133,21
+
+═══ SELL 4129 · aperto 07:34 · CHIUSO +18,28 $ ═══
+Zona 4130–4135 · SL 4.140,00 · TP 4.120,00 / 4.110,00
+
+Trader
+  07:34  Gold sell 4129
+  07:34  (modifica) GOLD SELL NOW · Sell @ 4130 - 4135 · SL🔴4140 · TP✅4120 · TP✅4110
+  07:40  Trade Active ✅ · Gold Sell Running 65+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.131,87     4.120,00   pareggio 07:43      +3,57 $       58814471409
+  e2    4.131,77     4.110,00   incasso TA 07:40     +14,71 $     58814471433
+
+Pareggio 07:40 → e1 SL 4.131,37
+
+═══ SELL 4130 · aperto 07:44 · CHIUSO +0,00 $ ═══
+Zona 4130–4135 · SL 4.140,00 · TP 4.120,00 / 4.110,00
+
+Trader
+  07:44  Gold sell 4130
+  07:44  (modifica) GOLD SELL NOW · Sell @ 4130 - 4135 · SL🔴4140 · TP✅4120 · TP✅4110
+  07:50  HIT TP⚡️⚡️ · Gold Sell 125+ Pips ✔️ · Gold Sell 110+ Pips · Gold Sell 80+ Pips · Collect …
+  08:00  HIT TP⚡️⚡️ · Gold Sell 200+ Pips ✔️ · Gold Sell 180+ Pips ✔️ · Gold Sell 150+ Pips ✔️ · C…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    (4.130,00)   4.120,00   cancellato al pareggio            58814591389
+  e2    (4.130,00)   4.110,00   cancellato al pareggio            58814591420
+
+═══ SELL re-entry · aperto 07:44 · CHIUSO +38,32 $ ═══
+SL 4.140,00 · TP 4.120,00 / 4.110,00
+
+Trader
+  07:44  Lets sell One more time
+  07:50  HIT TP⚡️⚡️ · Gold Sell 125+ Pips ✔️ · Gold Sell 110+ Pips · Gold Sell 80+ Pips · Collect …
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.126,65     4.120,00   TP 07:52     +35,64 $             58814592917
+  e2    4.126,60     4.110,00   pareggio 08:45      +2,68 $       58814593038
+
+Pareggio 07:50 → e1 SL 4.126,15 · e2 SL 4.126,10
+
+═══ SELL 4119 · aperto 08:20 · CHIUSO +0,00 $ ═══
+Zona 4119–4124 · SL 4.129,00 · TP 4.109,00 / 4.099,00
+
+Trader
+  08:20  Gold sell 4119
+  08:21  (modifica) GOLD SELL NOW · Sell @ 4119 - 4124 · SL🔴4129 · TP✅4109 · TP✅4099
+  08:29  HIT TP⚡️⚡️ · Gold Sell 215+ Pips ✔️ · Gold Sell 195+ Pips ✔️ · Gold Sell 165+ Pips ✔️ · G…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    (4.119,00)   4.109,00   cancellato al pareggio            58815093730
+  e2    (4.119,00)   4.099,00   cancellato al pareggio            58815093738
+
+═══ SELL 4126 · aperto 08:46 · CHIUSO +11,36 $ ═══
+Zona 4126–4131 · SL 4.136,00 · TP 4.116,00 / 4.106,00
+
+Trader
+  08:46  Gold sell 4126
+  08:47  (modifica) GOLD SELL NOW · Sell @ 4126 - 4131 · SL🔴4136 · TP✅4116 · TP✅4106
+  08:48  Trade Active ✅ · Gold Sell Running 45+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.126,00     4.116,00   incasso TA 08:48      +7,79 $     58815449774
+  e2    4.126,00     4.106,00   pareggio 08:49      +3,57 $       58815449829
+
+Pareggio 08:48 → e2 SL 4.125,50
+
+═══ SELL 4125 · aperto 08:52 · CHIUSO +31,62 $ ═══
+Zona 4125–4130 · SL 4.135,00 · TP 4.115,00 / 4.105,00
+
+Trader
+  08:52  Gold sell 4125
+  08:53  (modifica) GOLD SELL NOW · Sell @ 4125 - 4130 · SL🔴4135 · TP✅4115 · TP✅4105
+  09:03  Trade Active ✅ · Gold Sell Running 70+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.125,00     4.115,00   incasso TA 09:03     +28,04 $     58815538159
+  e2    4.125,00     4.105,00   pareggio 09:07      +3,58 $       58815538174
+
+Pareggio 09:03 → e2 SL 4.124,50
+
+═══ SELL 4125 · aperto 09:15 · IN CORSO (+3,57 $ già chiusi) ═══
+Zona 4125–4130 · SL 4.135,00 · TP 4.115,00 / 4.105,00
+
+Trader
+  09:15  Gold sell 4125
+  09:16  (modifica) GOLD SELL NOW · Sell @ 4125 - 4130 · SL🔴4135 · TP✅4115 · TP✅4105
+  09:28  Secure first layer now
+  09:36  Trade Active ✅ · Gold Sell Running 115+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.125,26     4.115,00   aperto                            58815854563
+  e2    4.125,25     4.105,00   pareggio 10:04      +3,57 $       58815854726
+
+Pareggio 09:36 → e2 SL 4.124,75
+
+═══ SELL 4120 · aperto 13:02 · CHIUSO +0,00 $ ═══
+Zona 4120–4125 · SL 4.130,00 · TP 4.110,00 / 4.100,00
+
+Trader
+  13:02  Gold sell 4120
+  13:02  (modifica) GOLD SELL NOW · Sell @ 4120 - 4125 · SL🔴4130 · TP✅4110 · TP✅4100
+  13:09  Trade Active ✅ · Gold Sell Running 60+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    (4.120,00)   4.110,00   cancellato al pareggio            58819119689
+  e2    (4.120,00)   4.100,00   cancellato al pareggio            58819120047
+
+═══ SELL 4121 · aperto 13:17 · CHIUSO −35,22 $ ═══
+Zona 4121–4126 · SL 4.131,00 · TP 4.111,00 / 4.101,00
+
+Trader
+  13:17  Gold sell 4121
+  13:18  (modifica) GOLD SELL NOW · Sell @ 4121 - 4126 · SL🔴4131 · TP✅4111 · TP✅4101
+  13:38  Trade Active ✅ · Gold Sell Running 50+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.121,15     4.111,00   protezione 13:39     −17,61 $     58819416878
+  e2    4.121,15     4.101,00   protezione 13:39     −17,61 $     58819416906
+
+Stop di protezione 13:38 → e1 SL 4.123,61 (pareggio rifiutato da MT5)
+Stop di protezione 13:38 → e2 SL 4.123,61 (pareggio rifiutato da MT5)
+
+═══ SELL 4125 · aperto 13:47 · CHIUSO +8,09 $ ═══
+Zona 4125–4130 · SL 4.135,00 · TP 4.115,00 / 4.105,00
+
+Trader
+  13:47  Gold sell 4125
+  13:48  (modifica) GOLD SELL NOW · Sell @ 4125 - 4130 · SL🔴4135 · TP✅4115 · TP✅4105
+  14:01  Trade Active ✅ · Gold Sell Running 50+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.125,00     4.115,00   incasso TA 14:01      +4,51 $     58820059594
+  e2    4.125,00     4.105,00   pareggio 14:02      +3,58 $       58820059636
+
+Pareggio 14:01 → e2 SL 4.124,50
+
+═══ SELL 4124 · aperto 14:11 · CHIUSO +3,86 $ ═══
+Zona 4124–4129 · SL 4.134,00 · TP 4.114,00 / 4.104,00
+
+Trader
+  14:11  Gold sell 4124
+  14:11  (modifica) GOLD SELL NOW · Sell @ 4124 - 4129 · SL🔴4134 · TP✅4114 · TP✅4104
+  14:17  Trade Active ✅ · Gold Sell Running 45+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.124,00     4.114,00   incasso TA 14:17      +0,29 $     58820518892
+  e2    4.124,00     4.104,00   pareggio 14:19      +3,57 $       58820518961
+
+Pareggio 14:17 → e2 SL 4.123,50
+Stop di protezione 14:17 → e2 SL 4.126,50 (pareggio rifiutato da MT5)
+
+═══ SELL 4127 · aperto 14:21 · CHIUSO +0,00 $ ═══
+Zona 4127–4132 · SL 4.137,00 · TP 4.117,00 / 4.107,00
+
+Trader
+  14:21  Gold sell 4127
+  14:21  (modifica) GOLD SELL NOW · Sell @ 4127 - 4132 · SL🔴4137 · TP✅4117 · TP✅4107
+  14:24  Trade Active ✅ · Gold Sell Running 40+ Pips · Scalpers secure ur Profits & BE+ ur entries
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    (4.127,00)   4.117,00   cancellato al pareggio            58820734862
+  e2    (4.127,00)   4.107,00   cancellato al pareggio            58820734889
+
+═══ SELL 4129 · aperto 14:27 · CHIUSO +39,16 $ ═══
+Zona 4129–4134 · SL 4.139,00 · TP 4.119,00 / 4.109,00
+
+Trader
+  14:27  Gold sell 4129
+  14:28  (modifica) GOLD SELL NOW · Sell @ 4129 - 4134 · SL🔴4139 · TP✅4119 · TP✅4109
+  14:32  Trade Active ✅ · Gold Sell Running 110+ Pips · Scalpers secure ur Profits & BE+ ur entries
+  14:55  HIT TP⚡️⚡️ · Gold Sell 190+ Pips ✔️ · Collect all or half & BE+ ur entries · Lets see who…
+
+Ticket  ingresso     TP         esito                             MT5
+  e1    4.129,31     4.119,00   incasso TA 14:32     +35,59 $     58820868879
+  e2    4.129,31     4.109,00   pareggio 15:12      +3,57 $       58820868908
+
+Pareggio 14:32 → e2 SL 4.128,81
