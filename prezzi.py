@@ -18,16 +18,18 @@ che il TP1 si assume prima lo SL, per prudenza); lato BUY si usa il bid, lato
 SELL l'ask (bid + spread della candela), come fa il broker per SL e TP.
 
 Rigioco ("python prezzi.py rigioco DAL AL"): i segnali e i comandi del trader
-di più giornate rigiocati sulle candele con regole diverse (pareggio,
-Trade Active, protezione, e3/e4, margine sullo SL: vedi STRATEGIES), con il
-totale per giorno e per strategia accanto al risultato reale del bot.
+di più giornate rigiocati con le regole attuali e con varianti (protezione,
+Trade Active, pareggio, tolleranza d'ingresso, TP provvisori: vedi
+STRATEGIES), con il totale per giorno e per strategia accanto al risultato
+reale del bot. Usa le candele M1 e, attorno a ogni segnale e comando del
+trader, i tick reali (prezzo esatto del momento, stop toccati nei secondi dopo).
 
 Uso (dove MT5 è raggiungibile, cioè sul server o sul PC con MT5):
     python prezzi.py 2026-10-05
     python prezzi.py 2026-10-02 --ore 3 --margini 0.5,1,2,3
     python prezzi.py 2026-10-05 --offset-broker 3   # ore del broker rispetto a UTC
     python prezzi.py rigioco 2026-09-24 2026-10-05
-    python prezzi.py rigioco 2026-10-02 --dettaglio --strategie "attuale,BE +2 $,BE al TP1"
+    python prezzi.py rigioco 2026-10-02 --dettaglio --strategie "attuale,senza protezione"
 """
 import argparse
 import glob
@@ -42,7 +44,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from logger_config import LOG_DIR, to_local
-from verifica_be import POINT, download_bars, estimate_broker_offset, load_events
+from verifica_be import POINT, SYMBOL, download_bars, estimate_broker_offset, load_events
 
 PIPS_PER_DOLLAR = 10  # oro: 1 $ = 10 pips, come li conta il trader
 
@@ -249,38 +251,46 @@ COMMAND_LINK_SECONDS = 6 * 3600
 RE_TRADE_ACTIVE = re.compile(r"trade active|running|zero float", re.I)
 RE_HIT_TP = re.compile(r"hit\s*tp", re.I)
 
+# Tick reali dopo il segnale e dopo ogni comando del trader: le candele da un
+# minuto non dicono a che prezzo il bot ha trovato il mercato, né se lo stop di
+# protezione è stato toccato nei secondi successivi (06–08/10: protezioni
+# colpite in 14–40 secondi). Fuori da queste finestre si usano le candele.
+TICK_WINDOW_SECONDS = 180
+BE_RETRY_SECONDS = 30      # il bot riprova pareggio e protezione ogni 30 secondi
+
 BASE_RULES = dict(
-    deep=0.5,                  # lotto di e3/e4 rispetto a e1/e2 (0 = niente e3/e4)
+    tickets=2,                 # 2 = e1/e2 con il rischio diviso a metà (dal 06/10); 4 = anche e3/e4
+    deep=0.5,                  # con 4 ticket: lotto di e3/e4 rispetto a e1/e2
+    entry_tol=0.0,             # e1/e2 a mercato anche se il prezzo è oltre il bordo di non più di tanto
+    provisional_tp=(10.0, 20.0),  # TP provvisori dal prezzo del segnale finché il trader non scrive i suoi
     ta_close=2,                # ticket incassati al Trade Active (ne resta sempre 1)
+    ta_min_gain=0.0,           # incasso al Trade Active solo con almeno questo guadagno (in $ di prezzo)
     be="trader",               # "trader" = pareggio quando lo chiede il trader, "none" = mai
     be_after_tp1=False,        # pareggio di tutti i ticket appena uno prende il TP1
     be_keys=("e1", "e2", "e3", "e4"),  # ticket che vanno a pareggio quando lo chiede il trader
     be_offset=0.5,             # pareggio = ingresso ± questo
-    be_risk=None,              # invece del pareggio: stop a questa frazione della distanza dallo SL (0.5 = metà rischio)
+    be_risk=None,              # invece del pareggio: stop a questa frazione della distanza dallo SL
     be_min=0.0,                # pareggio solo con almeno questo guadagno (altrimenti si aspetta)
     protect=(0.25, 0.5, 0.75), # gradini dello stop di protezione se il pareggio non è possibile
     sl_margin=0.0,             # margine oltre lo SL del trader
     expiry=30 * 60,            # ordini limite non eseguiti cancellati dopo
 )
 
+# nome: (sigla per il dettaglio, regole diverse da quelle attuali)
 STRATEGIES = {
-    "attuale":            {},
-    "e3/e4 lotto pieno":  dict(deep=1.0),
-    "solo e1/e2":         dict(deep=0.0),
-    "senza protezione":   dict(protect=()),
-    "protezione da 1/2":  dict(protect=(0.5, 0.75)),
-    "TA senza incasso":   dict(ta_close=0),
-    "TA incassa 1":       dict(ta_close=1),
-    "BE +1 $":            dict(be_offset=1.0),
-    "BE +2 $":            dict(be_offset=2.0),
-    "BE con 3 $ minimo":  dict(be_min=3.0),
-    "BE con 5 $ minimo":  dict(be_min=5.0),
-    "BE a metà rischio":  dict(be_risk=0.5),
-    "TP1 senza BE":       dict(be_keys=("e2", "e4"), be_after_tp1=True, ta_close=0),
-    "BE al TP1":          dict(be="none", be_after_tp1=True, ta_close=0),
-    "mai BE":             dict(be="none", ta_close=0, protect=()),
-    "SL +1 $":            dict(sl_margin=1.0),
-    "SL +2 $":            dict(sl_margin=2.0),
+    "attuale":                    ("attuale", {}),
+    "4 ticket (fino al 06/10)":   ("4 ticket", dict(tickets=4)),
+    "senza protezione":           ("no prot", dict(protect=())),
+    "protezione da 1/2":          ("prot 1/2", dict(protect=(0.5, 0.75))),
+    "protezione solo 3/4":        ("prot 3/4", dict(protect=(0.75,))),
+    "TA senza incasso":           ("TA no", dict(ta_close=0)),
+    "TA incasso da +1 $":         ("TA +1$", dict(ta_min_gain=1.0)),
+    "BE +1 $":                    ("BE +1$", dict(be_offset=1.0)),
+    "ingresso fino a 0,5 $ oltre": ("ingr .5", dict(entry_tol=0.5)),
+    "ingresso fino a 1 $ oltre":  ("ingr 1", dict(entry_tol=1.0)),
+    "ingresso fino a 2 $ oltre":  ("ingr 2", dict(entry_tol=2.0)),
+    "senza TP provvisori":        ("no TPprv", dict(provisional_tp=())),
+    "mai BE":                     ("mai BE", dict(be="none", ta_close=0, protect=())),
 }
 
 
@@ -397,6 +407,8 @@ def extract_signals(events: list) -> list:
             kind = "HALF"
         elif details.get("move_sl_to_be"):
             kind = "TA" if (data.get("running_pips") or RE_TRADE_ACTIVE.search(text)) else "BE"
+        elif details.get("layer_target"):
+            kind = "LAYER"  # "Secure first layer now"
         else:
             continue
         if (msg_id, kind) in done:
@@ -452,14 +464,88 @@ def _tp_for(key: str, tps: list, buy: bool, entry: float):
     return valid[0] if key in ("e1", "e3") else valid[-1]
 
 
-def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: float) -> dict:
-    """Rigioca un segnale con una strategia. Ritorna il risultato e i dettagli dei ticket."""
+def download_ticks(mt5, start_utc: float, end_utc: float, offset: int) -> list:
+    """
+    Tick reali (tempo UTC, bid, ask) tra due istanti, o [] se il broker non li
+    ha più (lo storico dei tick è più corto di quello delle candele).
+    """
+    copy_ticks = getattr(mt5, "copy_ticks_range", None)
+    if copy_ticks is None:
+        return []
+    ticks = copy_ticks(SYMBOL, int(start_utc + offset), int(end_utc + offset) + 1, getattr(mt5, "COPY_TICKS_ALL", -1))
+    if ticks is None or len(ticks) == 0:
+        return []
+    rows = ticks.tolist()
+    try:  # via RPyC la lista è remota: la trasferiamo in un colpo solo
+        import rpyc
+        if isinstance(rows, rpyc.core.netref.BaseNetref):
+            rows = rpyc.classic.obtain(rows)
+    except ImportError:
+        pass
+    # campi: time, bid, ask, last, volume, time_msc, flags, volume_real
+    out = []
+    for r in rows:
+        t = (r[5] / 1000.0 if r[5] else r[0]) - offset
+        if r[1] > 0 and r[2] > 0 and start_utc <= t <= end_utc:
+            out.append((t, r[1], r[2]))
+    return out
+
+
+def tick_windows(signals: list) -> list:
+    """
+    Finestre (inizio, fine) in cui servono i tick: dal minuto del segnale e di
+    ogni comando del trader fino a TICK_WINDOW_SECONDS dopo, allineate ai minuti
+    (la candela che contiene il comando viene sostituita per intero) e unite.
+    """
+    raw = []
+    for signal in signals:
+        for t in [signal["t"]] + [et for et, _, _ in signal["events"]]:
+            start = t - t % 60
+            end = (t + TICK_WINDOW_SECONDS) - (t + TICK_WINDOW_SECONDS) % 60 + 60
+            raw.append((start, end))
+    merged = []
+    for start, end in sorted(raw):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def build_timeline(bars: list, windows_ticks: list) -> list:
+    """
+    Punti di prezzo in ordine di tempo: le candele M1, sostituite dai tick reali
+    nelle finestre in cui ci sono. Ogni punto è (tempo, durata, bid apertura,
+    bid massimo, bid minimo, bid chiusura, spread): un tick ha durata 0 e i
+    quattro bid uguali, con lo spread reale del momento.
+    """
+    covered = [(start, end) for (start, end), ticks in windows_ticks if ticks]
+    points = []
+    for bar_ts, o, h, l, c, spread in bars:
+        if any(start <= bar_ts < end for start, end in covered):
+            continue
+        points.append((bar_ts, 60, o, h, l, c, spread * POINT))
+    for (start, end), ticks in windows_ticks:
+        for t, bid, ask in ticks:
+            points.append((t, 0, bid, bid, bid, bid, ask - bid))
+    points.sort(key=lambda p: p[0])
+    return points
+
+
+def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours: float) -> dict:
+    """
+    Rigioca un segnale con una strategia sui punti di prezzo (candele e tick).
+    Su un tick i comandi del trader si applicano al prezzo esatto del momento;
+    su una candela al prezzo di chiusura. Ritorna il risultato e i ticket.
+    """
     buy = signal["buy"]
     end = signal["t"] + hours * 3600
     tickets, started, ta_done, applied = {}, False, False, 0
     events = sorted(signal["events"])
     next_event = 0
     be_wanted = be_all = False
+    last_retry = None
+    ticked_events = 0
 
     def pnl(ticket, exit_price):
         move = (exit_price - ticket["entry"]) if buy else (ticket["entry"] - exit_price)
@@ -472,8 +558,8 @@ def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: f
         else:
             ticket["lots"] *= (1 - fraction)
 
-    def in_profit(ticket, bid, ask):
-        return ((bid - ticket["entry"]) if buy else (ticket["entry"] - ask)) > 0
+    def gain(ticket, bid, ask):
+        return (bid - ticket["entry"]) if buy else (ticket["entry"] - ask)
 
     def stop_valid(sl, bid, ask):
         return (bid - sl >= STOPS_DISTANCE) if buy else (sl - ask >= STOPS_DISTANCE)
@@ -487,50 +573,98 @@ def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: f
             return sl - rules["sl_margin"] if buy else sl + rules["sl_margin"]
         return None
 
-    for bar_ts, o, h, l, c, spread in bars:
-        if bar_ts < signal["t"] - signal["t"] % 60 + 60 or bar_ts > end:
+    def take_profits(levels):
+        # TP del trader o, finché non li scrive, quelli provvisori dal prezzo del segnale
+        if levels["tps"] or levels["entry_min"] is None or not rules["provisional_tp"]:
+            return levels["tps"]
+        sign = 1 if buy else -1
+        return [levels["entry_min"] + sign * d for d in rules["provisional_tp"]]
+
+    def try_breakeven(bid, ask):
+        for ticket in tickets.values():
+            if ticket["state"] != "open" or ticket["be"] or (not be_all and ticket["key"] not in rules["be_keys"]):
+                continue
+            be_price = ticket["entry"] + rules["be_offset"] if buy else ticket["entry"] - rules["be_offset"]
+            if rules["be_risk"] is not None and not be_all:
+                reach = rules["be_risk"] * abs(ticket["entry"] - ticket["orig_sl"])
+                be_price = ticket["entry"] - reach if buy else ticket["entry"] + reach
+            if gain(ticket, bid, ask) < rules["be_min"]:
+                continue
+            if stop_valid(be_price, bid, ask):
+                if better(be_price, ticket["sl"]):
+                    ticket["sl"] = be_price
+                ticket["be"] = True
+                continue
+            distance = abs(ticket["entry"] - ticket["orig_sl"])
+            for step in rules["protect"]:
+                candidate = ticket["entry"] - step * distance if buy else ticket["entry"] + step * distance
+                if stop_valid(candidate, bid, ask):
+                    if better(candidate, ticket["sl"]):
+                        ticket["sl"] = candidate
+                    break
+
+    for t, duration, o, h, l, c, sp in points:
+        if t > end:
+            break
+        is_tick = duration == 0
+        # Su una candela si entra all'apertura della prima candela intera dopo il
+        # segnale; su un tick al primo prezzo dopo che il bot ha letto il messaggio.
+        if t < (signal["t"] if is_tick else signal["t"] - signal["t"] % 60 + 60):
             continue
-        sp = spread * POINT
         ask_o, ask_h, ask_l, ask_c = o + sp, h + sp, l + sp, c + sp
 
         if not started:
-            levels = levels_at(signal, bar_ts)
+            levels = levels_at(signal, t)
             market = ask_o if buy else o
             zone = _zone(levels, buy)
             if zone is not None and min(abs(market - zone[0]), abs(market - zone[1])) > MAX_SIGNAL_DISTANCE:
-                if bar_ts - signal["t"] > 600:
+                if t - signal["t"] > 600:
                     break  # errore di battitura mai corretto
                 continue
-            # Re-entry (nessun prezzo): 4 ticket a mercato, lotto pieno
-            plan = ({k: None for k in ("e1", "e2", "e3", "e4")} if zone is None
-                    else _plan_levels(zone, buy, rules["deep"]))
-            # A mercato se il prezzo è già al livello o migliore, altrimenti limite
-            prices = {k: (market if v is None or ((market <= v) if buy else (market >= v)) else v)
-                      for k, v in plan.items()}
+            keys = ("e1", "e2", "e3", "e4") if rules["tickets"] == 4 else ("e1", "e2")
+            if zone is None:  # re-entry: tutti a mercato, lotto pieno
+                plan = {k: None for k in keys}
+            else:
+                plan = _plan_levels(zone, buy, rules["deep"] if rules["tickets"] == 4 else 0)
+            tol = rules["entry_tol"]
+
+            def at_market(key, level):
+                if level is None:
+                    return True
+                if (market <= level) if buy else (market >= level):
+                    return True  # al livello o migliore
+                # e1/e2 oltre il bordo dalla parte sbagliata, entro la tolleranza
+                return key in ("e1", "e2") and ((market - level) if buy else (level - market)) <= tol
+
+            prices = {k: (market if at_market(k, v) else v) for k, v in plan.items()}
             worst = min(prices.values()) if buy else max(prices.values())
             edge = (zone[1] if buy else zone[0]) if zone else market
             sl = trader_sl(levels, worst)
             if sl is None:
                 sl = edge - PROVISIONAL_SL if buy else edge + PROVISIONAL_SL
-            weights = {k: (1.0 if k in ("e1", "e2") or zone is None else rules["deep"]) for k in prices}
+            tps = take_profits(levels)
             for key, price in prices.items():
                 distance = abs(price - sl)
                 if distance <= 0:
                     continue
-                at_market = price == market
-                tickets[key] = {"key": key, "state": "open" if at_market else "pending", "price": price,
-                                "entry": price, "sl": sl, "orig_sl": sl, "tp": _tp_for(key, levels["tps"], buy, price),
-                                "lots": risk * weights[key] / 4 / distance, "realized": 0.0, "be": False,
-                                "since": bar_ts, "reason": None, "exit": None}
+                if rules["tickets"] == 4:
+                    share = 0.25 * (1.0 if key in ("e1", "e2") or zone is None else rules["deep"])
+                else:
+                    share = 0.5
+                tickets[key] = {"key": key, "state": "open" if price == market else "pending", "price": price,
+                                "entry": price, "sl": sl, "orig_sl": sl, "tp": _tp_for(key, tps, buy, price),
+                                "lots": risk * share / distance, "realized": 0.0, "be": False,
+                                "since": t, "reason": None, "exit": None}
             started = True
-            applied = sum(1 for vt, _ in signal["versions"] if vt <= bar_ts)
+            applied = sum(1 for vt, _ in signal["versions"] if vt <= t)
 
         # Modifiche del trader arrivate dopo l'ingresso (fase completa, correzioni)
-        while applied < len(signal["versions"]) and signal["versions"][applied][0] <= bar_ts:
+        while applied < len(signal["versions"]) and signal["versions"][applied][0] <= t:
             applied += 1
-            levels = levels_at(signal, bar_ts)
+            levels = levels_at(signal, t)
             zone = _zone(levels, buy)
-            plan = _plan_levels(zone, buy, rules["deep"]) if zone else {}
+            plan = _plan_levels(zone, buy, rules["deep"] if rules["tickets"] == 4 else 0) if zone else {}
+            tps = take_profits(levels)
             for key, ticket in tickets.items():
                 if ticket["state"] not in ("open", "pending"):
                     continue
@@ -539,7 +673,7 @@ def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: f
                 new_sl = trader_sl(levels, ticket["entry"])
                 if new_sl is not None and not ticket["be"]:
                     ticket["sl"] = ticket["orig_sl"] = new_sl
-                tp = _tp_for(key, levels["tps"], buy, ticket["entry"])
+                tp = _tp_for(key, tps, buy, ticket["entry"])
                 if tp is not None:
                     ticket["tp"] = tp
 
@@ -547,7 +681,7 @@ def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: f
         for ticket in tickets.values():
             if ticket["state"] != "pending":
                 continue
-            if bar_ts - ticket["since"] > rules["expiry"]:
+            if t - ticket["since"] > rules["expiry"]:
                 ticket["state"] = "cancelled"
             elif (ask_l <= ticket["price"]) if buy else (h >= ticket["price"]):
                 ticket["state"] = "open"
@@ -566,11 +700,13 @@ def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: f
         if tp1_hit and rules["be_after_tp1"]:
             be_wanted, be_all = True, True
 
-        # Comandi del trader arrivati durante questa candela, al prezzo di chiusura
-        while next_event < len(events) and events[next_event][0] < bar_ts + 60:
+        # Comandi del trader: su un tick quelli arrivati fino a quell'istante, al
+        # suo prezzo; su una candela quelli arrivati durante la candela, alla chiusura.
+        while next_event < len(events) and (events[next_event][0] <= t if is_tick else events[next_event][0] < t + 60):
             _t, kind, percentage = events[next_event]
             next_event += 1
-            open_tickets = [t for t in tickets.values() if t["state"] == "open"]
+            ticked_events += is_tick
+            open_tickets = [x for x in tickets.values() if x["state"] == "open"]
             if kind == "CLOSE":
                 for ticket in tickets.values():
                     if ticket["state"] == "pending":
@@ -581,67 +717,59 @@ def simulate_signal(signal: dict, bars: list, rules: dict, risk: float, hours: f
                 for ticket in tickets.values():
                     if ticket["state"] == "pending":
                         ticket["state"] = "cancelled"
-                total = sum(t["lots"] for t in open_tickets)
+                total = sum(x["lots"] for x in open_tickets)
                 left = total * (percentage or 50) / 100
-                far_first = sorted(open_tickets, key=lambda t: -abs((t["tp"] or (t["entry"] + 1000)) - t["entry"]))
+                far_first = sorted(open_tickets, key=lambda x: -abs((x["tp"] or (x["entry"] + 1000)) - x["entry"]))
                 for ticket in far_first:
-                    if left <= 1e-9 or not in_profit(ticket, c, ask_c):
+                    if left <= 1e-9 or gain(ticket, c, ask_c) <= 0:
                         continue
                     fraction = min(1.0, left / ticket["lots"])
                     left -= ticket["lots"] * fraction
                     close(ticket, c if buy else ask_c, "metà", fraction)
+            elif kind == "LAYER":
+                # "Secure first layer": i ticket sul TP1, solo se in guadagno
+                for ticket in open_tickets:
+                    if ticket["key"] in ("e1", "e3") and gain(ticket, c, ask_c) > 0:
+                        close(ticket, c if buy else ask_c, "layer")
             elif kind in ("TA", "BE") and rules["be"] == "trader":
                 for ticket in tickets.values():
                     if ticket["state"] == "pending":
                         ticket["state"] = "cancelled"
                 if kind == "TA" and not ta_done and rules["ta_close"] > 0:
-                    worst_first = sorted(open_tickets, key=lambda t: ((-t["entry"]) if buy else t["entry"],
-                                                                       t["key"] not in ("e1", "e3")))
+                    # Peggiore per primo; ingressi entro 0,50 $ = stesso prezzo, prima il TP1
+                    worst_first = sorted(open_tickets, key=lambda x: (-x["entry"]) if buy else x["entry"])
+                    if worst_first:
+                        worst_entry = worst_first[0]["entry"]
+                        worst_first.sort(key=lambda x: (0, x["key"] not in ("e1", "e3"))
+                                         if abs(x["entry"] - worst_entry) <= 0.5 else (1, 0))
                     count = min(rules["ta_close"], len(open_tickets) - 1)
                     for ticket in worst_first[:max(0, count)]:
-                        if in_profit(ticket, c, ask_c):
+                        if gain(ticket, c, ask_c) > rules["ta_min_gain"]:
                             close(ticket, c if buy else ask_c, "incasso TA")
                             ta_done = True
                 be_wanted = True
+                try_breakeven(c, ask_c)  # primo tentativo subito, come il bot
+                last_retry = t
 
-        # Pareggio (o stop di protezione) sui ticket aperti, ritentato a ogni candela
-        if be_wanted:
-            for ticket in tickets.values():
-                if ticket["state"] != "open" or ticket["be"] or (not be_all and ticket["key"] not in rules["be_keys"]):
-                    continue
-                be_price = ticket["entry"] + rules["be_offset"] if buy else ticket["entry"] - rules["be_offset"]
-                if rules["be_risk"] is not None and not be_all:
-                    reach = rules["be_risk"] * abs(ticket["entry"] - ticket["orig_sl"])
-                    be_price = ticket["entry"] - reach if buy else ticket["entry"] + reach
-                gain = (c - ticket["entry"]) if buy else (ticket["entry"] - ask_c)
-                if gain < rules["be_min"]:
-                    continue
-                if stop_valid(be_price, c, ask_c):
-                    if better(be_price, ticket["sl"]):
-                        ticket["sl"] = be_price
-                    ticket["be"] = True
-                    continue
-                distance = abs(ticket["entry"] - ticket["orig_sl"])
-                for step in rules["protect"]:
-                    candidate = ticket["entry"] - step * distance if buy else ticket["entry"] + step * distance
-                    if stop_valid(candidate, c, ask_c):
-                        if better(candidate, ticket["sl"]):
-                            ticket["sl"] = candidate
-                        break
+        # Pareggio (o stop di protezione) ritentato ogni 30 secondi, come il bot
+        if be_wanted and (last_retry is None or not is_tick or t - last_retry >= BE_RETRY_SECONDS):
+            try_breakeven(c, ask_c)
+            last_retry = t
 
-        if started and not any(t["state"] in ("open", "pending") for t in tickets.values()):
+        if started and not any(x["state"] in ("open", "pending") for x in tickets.values()):
             break
 
-    last_close = None
-    for bar in bars:
-        if bar[0] <= end:
-            last_close = bar
+    last = None
+    for point in points:
+        if point[0] <= end:
+            last = point
     for ticket in tickets.values():
-        if ticket["state"] == "open" and last_close:
-            close(ticket, last_close[4] if buy else last_close[4] + last_close[5] * POINT, "fine")
-    result = sum(t["realized"] for t in tickets.values())
-    full_stop = any(t["reason"] == "SL" for t in tickets.values()) and result <= -0.5 * risk
-    return {"result": result, "started": started, "full_stop": full_stop, "tickets": tickets}
+        if ticket["state"] == "open" and last:
+            close(ticket, last[5] if buy else last[5] + last[6], "fine")
+    result = sum(x["realized"] for x in tickets.values())
+    full_stop = any(x["reason"] == "SL" for x in tickets.values()) and result <= -0.5 * risk
+    return {"result": result, "started": started, "full_stop": full_stop, "tickets": tickets,
+            "ticked_events": ticked_events, "events": len(events)}
 
 
 def real_result(events: list) -> float:
@@ -660,13 +788,15 @@ def days_between(first: str, last: str) -> list:
 def main_rigioco(argv: list) -> None:
     parser = argparse.ArgumentParser(
         prog="prezzi.py rigioco",
-        description="Rigioca i segnali del trader sulle candele M1 con regole diverse e confronta i risultati.")
+        description="Rigioca i segnali del trader sulle candele M1 (e sui tick reali attorno ai comandi) "
+                    "con regole diverse e confronta i risultati.")
     parser.add_argument("dal", help="AAAA-MM-GG")
     parser.add_argument("al", nargs="?", help="AAAA-MM-GG (default: lo stesso giorno)")
     parser.add_argument("--strategie", default="tutte",
                         help="nomi separati da virgola, o 'tutte' (" + ", ".join(STRATEGIES) + ")")
     parser.add_argument("--rischio", type=float, default=140.0, help="rischio per segnale in $ (default 140)")
     parser.add_argument("--ore", type=float, default=8, help="ore massime di vita di un segnale (default 8)")
+    parser.add_argument("--senza-tick", action="store_true", help="solo candele M1, senza scaricare i tick")
     parser.add_argument("--dettaglio", action="store_true", help="risultato di ogni segnale per ogni strategia")
     parser.add_argument("--offset-broker", type=float, help="ore del broker rispetto a UTC (default: stimate da MT5)")
     args = parser.parse_args(argv)
@@ -675,16 +805,18 @@ def main_rigioco(argv: list) -> None:
     unknown = [n for n in names if n not in STRATEGIES]
     if unknown:
         raise SystemExit(f"Strategie sconosciute: {', '.join(unknown)}")
-    rules = {n: {**BASE_RULES, **STRATEGIES[n]} for n in names}
+    rules = {n: {**BASE_RULES, **STRATEGIES[n][1]} for n in names}
 
     mt5 = connect_mt5()
     offset = int(args.offset_broker * 3600) if args.offset_broker is not None else estimate_broker_offset(mt5)
     days = days_between(args.dal, args.al or args.dal)
     print(f"Rigioco dal {days[0]} al {days[-1]} · rischio {args.rischio:g} $ per segnale · "
-          f"vita massima {args.ore:g} ore · orologio del broker UTC{offset / 3600:+.1f} h\n")
+          f"vita massima {args.ore:g} ore · orologio del broker UTC{offset / 3600:+.1f} h")
+    print("Regole attuali: 2 ticket (1% ciascuno), ingresso al bordo della zona, TP provvisori 10/20 $, "
+          "Trade Active incassa 1 ticket, pareggio +0,5 $, protezione 1/4-1/2-3/4\n")
 
     totals = {n: {"days": {}, "wins": [], "losses": [], "stops": 0, "signals": 0} for n in names}
-    real = {}
+    real, tick_stats = {}, {}
     for day in days:
         events = load_day_events(day)
         signals = extract_signals(events)
@@ -694,12 +826,16 @@ def main_rigioco(argv: list) -> None:
         start = min(s["t"] for s in signals) - 120
         stop = min(time.time(), max(s["t"] for s in signals) + args.ore * 3600)
         bars = download_bars(mt5, start, stop, offset)
+        windows = [] if args.senza_tick else tick_windows(signals)
+        windows_ticks = [((a, b), download_ticks(mt5, a, b, offset)) for a, b in windows]
+        tick_stats[day] = (sum(1 for _, ticks in windows_ticks if ticks), len(windows_ticks))
+        points = build_timeline(bars, windows_ticks)
         if args.dettaglio:
-            print(f"── {day} · {len(signals)} segnali")
+            print(f"── {day} · {len(signals)} segnali · tick in {tick_stats[day][0]} finestre su {tick_stats[day][1]}")
         for signal in signals:
             row = []
             for name in names:
-                outcome = simulate_signal(signal, bars, rules[name], args.rischio, args.ore)
+                outcome = simulate_signal(signal, points, rules[name], args.rischio, args.ore)
                 tot = totals[name]
                 tot["days"][day] = tot["days"].get(day, 0.0) + outcome["result"]
                 if outcome["started"]:
@@ -711,21 +847,28 @@ def main_rigioco(argv: list) -> None:
                 cells = " ".join(f"{v:>8.1f}" if v is not None else f"{'—':>8}" for v in row)
                 print(f"   {hm(signal['t'])} {'BUY' if signal['buy'] else 'SELL':4} {signal['label']:24} {cells}")
         if args.dettaglio:
-            print("   " + " " * 35 + " ".join(f"{n[:8]:>8}" for n in names) + "\n")
+            print("   " + " " * 35 + " ".join(f"{STRATEGIES[n][0][:8]:>8}" for n in names) + "\n")
 
     shown = [d for d in days if d in real]
-    header = f"{'strategia':20}" + "".join(f"{d[8:10] + '/' + d[5:7]:>9}" for d in shown) + \
-             f"{'totale':>10}{'vinti':>7}{'persi':>7}{'stop':>6}{'media +':>9}{'media −':>9}"
+    header = f"{'strategia':28}" + "".join(f"{d[8:10] + '/' + d[5:7]:>8}" for d in shown) + \
+             f"{'totale':>9}{'vinti':>7}{'persi':>7}{'stop':>6}{'media +':>9}{'media −':>9}"
     print(header + "\n" + "─" * len(header))
-    print(f"{'reale (registrato)':20}" + "".join(f"{real[d]:>9.0f}" for d in shown) + f"{sum(real.values()):>10.0f}")
+    print(f"{'reale (registrato)':28}" + "".join(f"{real[d]:>8.0f}" for d in shown) + f"{sum(real.values()):>9.0f}")
     for name in names:
         tot = totals[name]
         wins, losses = tot["wins"], tot["losses"]
-        print(f"{name:20}" + "".join(f"{tot['days'].get(d, 0.0):>9.0f}" for d in shown)
-              + f"{sum(tot['days'].values()):>10.0f}{len(wins):>7}{len(losses):>7}{tot['stops']:>6}"
+        print(f"{name:28}" + "".join(f"{tot['days'].get(d, 0.0):>8.0f}" for d in shown)
+              + f"{sum(tot['days'].values()):>9.0f}{len(wins):>7}{len(losses):>7}{tot['stops']:>6}"
               + f"{(sum(wins) / len(wins) if wins else 0):>9.1f}{(sum(losses) / len(losses) if losses else 0):>9.1f}")
     print("\nstop = segnali chiusi allo SL pieno; media + / media − = risultato medio dei segnali vinti / persi.")
     print("'reale' è la somma delle chiusure registrate dal bot (con le regole di quel giorno e i lotti veri).")
+    with_ticks = sum(a for a, _ in tick_stats.values())
+    all_windows = sum(b for _, b in tick_stats.values())
+    print(f"Tick reali disponibili in {with_ticks} finestre su {all_windows} (segnali e comandi del trader); "
+          f"altrove candele M1.")
+    for d in shown:
+        if tick_stats[d][1] and not tick_stats[d][0]:
+            print(f"   {d}: nessun tick dal broker, solo candele")
 
 
 if __name__ == "__main__":
