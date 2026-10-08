@@ -211,6 +211,62 @@ class OrderManager:
         return corrections
 
 
+    def adopt_orphans(self, positions: list) -> tuple:
+        """
+        Posizioni aperte dal bot su MT5 che la memoria considera chiuse,
+        cancellate o non segue più: tornano in gestione (pareggio, Trade Active,
+        registrazione della chiusura). Il 05/10 tre ordini eseguiti erano stati
+        segnati come cancellati, l'08/10 un ticket come chiuso: in entrambi i
+        casi la posizione è rimasta aperta senza controllo. Cerca il ticket fra
+        le operazioni vive e, se serve, nello storico di oggi e di ieri (e in
+        quel caso rimette l'operazione fra quelle vive).
+        Ritorna (riprese: [(operazione, chiave, posizione)], sconosciute: [posizione]).
+        """
+        tracked = {t.get("mt5_ticket") for trade in self.active_trades.values()
+                   if trade.get("status") in CLOSABLE_STATUSES
+                   for t in trade.get("tickets", {}).values()
+                   if t.get("mt5_ticket") and not t.get("closed") and not t.get("pending")}
+        adopted, unknown, archive = [], [], None
+
+        def owner_in(trades):
+            for trade in trades:
+                for key, t in (trade.get("tickets") or {}).items():
+                    if t.get("mt5_ticket") == pos["ticket"]:
+                        return trade, key
+            return None
+
+        for pos in positions:
+            if pos["ticket"] in tracked:
+                continue
+            found = owner_in(self.active_trades.values())
+            if found is None:
+                if archive is None:
+                    archive = self._recent_archive()
+                found = owner_in(reversed(archive))
+                if found is not None:
+                    record = dict(found[0])
+                    record.pop("archived_at", None)
+                    msg_id = record.get("msg_id")
+                    self.active_trades[msg_id] = record
+                    found = (record, found[1])
+            if found is None:
+                unknown.append(pos)
+                continue
+            trade, key = found
+            ticket = trade["tickets"][key]
+            ticket.update(closed=False, pending=False, entry_price=pos["price_open"], volume=pos["volume"])
+            if pos.get("stop_loss"):
+                ticket["stop_loss"] = pos["stop_loss"]
+            if pos.get("take_profit"):
+                ticket["take_profit"] = pos["take_profit"]
+            trade["status"] = "ACTIVE"
+            adopted.append((trade, key, pos))
+            logger.warning(f"⚠️ [ORFANA] Posizione {pos['ticket']} ({key}) aperta su MT5 ma non seguita: ripresa in gestione.")
+        if adopted:
+            self.save_state_to_file()
+        return adopted, unknown
+
+
     def _get_latest_trade(self) -> Optional[dict]:
         """Recupera l'operazione più recente contrassegnata come attiva."""
         if self.latest_msg_id and self.latest_msg_id in self.active_trades:
@@ -506,6 +562,7 @@ class OrderManager:
 
             updated_trades = []
             be_candidates = []  # ticket ancora da proteggere in Breakeven
+            layer_closes = []   # ticket del layer indicato dal trader, da chiudere su MT5
 
             for trade in trades_to_update:
                 modified = False
@@ -534,16 +591,15 @@ class OrderManager:
                             tp_config["take_profit"] = new_tp_list[index]
                     modified = True
 
-                # D. Marcatura del layer colpito, SOLO se il messaggio lo indica
-                #    esplicitamente (es. "close lowest layer"). Il mapping è basato
-                #    sulla distanza take_profit-entry, non sull'ordine dei ticket (che
-                #    dipende solo dall'ordine in cui il trader ha scritto i TP).
+                # D. Layer indicato dal trader ("Secure first layer now", "close
+                #    lowest layer"): la chiusura la fa il listener su MT5, solo se
+                #    in guadagno. Mai segnare 'closed' in memoria leggendo il testo:
+                #    l'08/10 e1 risultava chiuso ma era ancora aperto su MT5, senza
+                #    pareggio né controllo, fino al suo TP. Il mapping è basato
+                #    sulla distanza take_profit-entry, non sull'ordine dei ticket.
                 if layer_target:
                     for target_key in self._resolve_layer_target(trade, layer_target):
-                        ticket_info = trade["tickets"][target_key]
-                        if not ticket_info.get("closed"):
-                            ticket_info["closed"] = True
-                            modified = True
+                        layer_closes.append({"trade": trade, "key": target_key})
 
                 # E. Candidati al Breakeven: SEMPRE valutato, indipendentemente da
                 #    new_tp_list/layer_target (prima era annidato lì dentro e un
@@ -575,7 +631,7 @@ class OrderManager:
                         if tp_config.get("mt5_ticket") and not tp_config.get("be_active") and not tp_config.get("closed"):
                             be_candidates.append({"trade": other, "ticket": tp_config})
 
-            if updated_trades or be_candidates or partial_close or trade_active:
+            if updated_trades or be_candidates or partial_close or trade_active or layer_closes:
                 self.save_state_to_file()
                 logger.debug(f"🔄 [UPDATE_SIGNAL] Applicati aggiornamenti a {len(updated_trades)} posizioni, {len(be_candidates)} candidati a BE.")
                 return {
@@ -586,6 +642,7 @@ class OrderManager:
                     "sl_changed": new_sl is not None,
                     "close_percentage": close_percentage if partial_close else None,
                     "trade_active_pips": running_pips[-1] if trade_active else None,
+                    "layer_closes": layer_closes,
                 }
 
             return {"action": "IGNORE", "reason": "Nessuna modifica applicabile (nessun trade idoneo)."}

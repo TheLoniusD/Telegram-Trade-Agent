@@ -347,6 +347,20 @@ class Narrator:
         self.say(f"🛟 {self.tag(trade)}{key} pareggio non ancora possibile (a {num(e.get('be_price'))}): "
                  f"stop di protezione da {num(e.get('previous_stop_loss'))} a {num(e.get('stop_loss'))}")
 
+    def on_orphan_adopted(self, e):
+        trade, key = self.trade_of(e.get("mt5_ticket"))
+        self.say(f"⚠️ {self.tag(trade)}{key or '#' + str(e.get('mt5_ticket'))} era aperto su MT5 ma non più seguito: "
+                 f"ripreso in gestione (SL {num(e.get('stop_loss'))}, TP {num(e.get('take_profit'))})")
+
+    def on_orphan_unknown(self, e):
+        self.say(f"❌ Posizione #{e.get('mt5_ticket')} del bot aperta su MT5 ma sconosciuta: "
+                 f"{e.get('direction')} {num(e.get('volume'))} lotti a {num(e.get('price_open'))}, SL {num(e.get('stop_loss'))}")
+
+    def on_layer_close(self, e):
+        trade, key = self.trade_of(e.get("mt5_ticket"))
+        if not e.get("closed"):
+            self.say(f"✋ {self.tag(trade)}{key} non chiuso su richiesta del trader: {e.get('reason')}")
+
     def on_stop_restored(self, e):
         trade, key = self.trade_of(e.get("mt5_ticket"))
         if e.get("ok"):
@@ -397,6 +411,8 @@ class Narrator:
         reason = e.get("close_reason")
         if e.get("closed_by") == "TRADE_ACTIVE":
             how = "incassato al Trade Active a"
+        elif e.get("closed_by") == "LAYER":
+            how = "incassato su richiesta del trader (layer) a"
         elif reason == "STOP_LOSS":
             snapshot = trade["snapshot"].get(key, {}) if trade else {}
             if snapshot.get("be_active"):
@@ -513,7 +529,7 @@ def build_sheets(day: str) -> str:
     for e in events:
         kind = e.get("event")
         owner = None
-        if kind in ("POSITION_CLOSED", "PENDING_CANCELLED", "PENDING_FILLED"):
+        if kind in ("POSITION_CLOSED", "PENDING_CANCELLED", "PENDING_FILLED", "ORPHAN_ADOPTED"):
             owner = ticket_owner.get(e.get("mt5_ticket"))
         elif kind == "MT5_ORDER" and e.get("operation") in ("BREAKEVEN", "PROTECTIVE_SL") and e.get("ok"):
             owner = ticket_owner.get((e.get("request") or {}).get("position"))
@@ -526,6 +542,10 @@ def build_sheets(day: str) -> str:
             trade["cancels"][key] = e
         elif kind == "PENDING_FILLED":
             trade["fills"][key] = e
+        elif kind == "ORPHAN_ADOPTED":
+            # Ripresa in gestione: non era davvero cancellata/chiusa
+            trade["cancels"].pop(key, None)
+            trade["fills"][key] = {"price": e.get("price_open")}
         elif e.get("operation") == "PROTECTIVE_SL":
             trade["protect"].append((hhmm(e["ts"]), key, (e.get("request") or {}).get("sl")))
         else:
@@ -599,6 +619,8 @@ def build_sheets(day: str) -> str:
                     how = {"TAKE_PROFIT": "TP", "BOT": "bot"}.get(reason, reason or "chiuso")
                 if close.get("closed_by") == "TRADE_ACTIVE":
                     how = "incasso TA"
+                elif close.get("closed_by") == "LAYER":
+                    how = "incasso layer"
                 outcome = f"{how} {hhmm(close['ts'])} {money(close.get('profit')):>12}"
             elif cancel:
                 outcome = short_reason(cancel.get("reason"))

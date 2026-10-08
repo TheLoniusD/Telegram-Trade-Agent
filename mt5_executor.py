@@ -20,6 +20,9 @@ TEST_MODE = False
 # Codice di esito "nessun errore" restituito da mt5.last_error()
 MT5_RESULT_OK = 1
 
+# Magic number degli ordini del bot: distingue le sue posizioni da quelle aperte a mano
+BOT_MAGIC = 990011
+
 
 def broker_time_str(broker_epoch) -> Optional[str]:
     """
@@ -114,6 +117,30 @@ class MT5Executor:
                 raise MT5UnavailableError(f"positions_get({ticket}) fallita: {code} {description}")
         return positions[0] if positions else None
 
+    def list_bot_positions(self) -> list:
+        """
+        Tutte le posizioni aperte dal bot su MT5 (riconosciute dal magic number),
+        per scoprire quelle che la memoria non segue più. Solleva
+        MT5UnavailableError se MT5 non risponde.
+        """
+        if self.test_mode:
+            return []
+        positions = mt5.positions_get()
+        if positions is None:
+            code, description = mt5.last_error()
+            if code != MT5_RESULT_OK:
+                raise MT5UnavailableError(f"positions_get() fallita: {code} {description}")
+            return []
+        result = []
+        for pos in positions:
+            if pos.magic != BOT_MAGIC:
+                continue
+            result.append({"ticket": pos.ticket, "symbol": pos.symbol,
+                           "direction": "BUY" if pos.type == mt5.ORDER_TYPE_BUY else "SELL",
+                           "volume": pos.volume, "price_open": pos.price_open,
+                           "stop_loss": pos.sl or None, "take_profit": pos.tp or None})
+        return result
+
     def execute_open(self, order_plan: dict) -> dict:
         """
         Apre una posizione a mercato.
@@ -179,7 +206,7 @@ class MT5Executor:
             "sl": float(sl) if sl is not None else 0.0,
             "tp": float(tp_primary),
             "deviation": 20,
-            "magic": 990011,
+            "magic": BOT_MAGIC,
             "comment": f"TB_{order_plan.get('ticket_id')}",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
@@ -211,7 +238,7 @@ class MT5Executor:
             "price": float(limit_price),
             "sl": float(sl) if sl is not None else 0.0,
             "tp": float(tp),
-            "magic": 990011,
+            "magic": BOT_MAGIC,
             "comment": f"TB_{order_plan.get('ticket_id')}",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_RETURN,
@@ -363,7 +390,7 @@ class MT5Executor:
             "type": close_type,
             "price": price,
             "deviation": 20,
-            "magic": 990011,
+            "magic": BOT_MAGIC,
             "comment": "Close by Bot",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
@@ -421,7 +448,7 @@ class MT5Executor:
             "type": close_type,
             "price": tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask,
             "deviation": 20,
-            "magic": 990011,
+            "magic": BOT_MAGIC,
             "comment": "Partial close by Bot",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
