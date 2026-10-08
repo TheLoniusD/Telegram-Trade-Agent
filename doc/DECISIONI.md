@@ -10,7 +10,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 07/10/2026)
+## Regole in vigore (aggiornato al 08/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
@@ -27,11 +27,12 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - SL provvisorio a 10 $ dal segnale finché il trader non scrive il suo; SL a meno di 3 $ o dalla parte sbagliata → provvisorio.
 - **TP provvisori** a 10 $ (TP1) e 20 $ (TP2) dal prezzo del segnale finché il trader non scrive i suoi (`PROVISIONAL_TP=10,20`): nessuna posizione resta senza uscita se il segnale non viene mai completato.
 - Se una posizione del bot risulta su MT5 **senza SL**, il controllo periodico (ogni 30 s) rimette lo SL che ha in memoria.
+- **Posizioni orfane**: ogni 30 s le posizioni del bot su MT5 (magic number) vengono confrontate con la memoria; quelle segnate chiuse o cancellate per errore tornano in gestione, quelle sconosciute vengono segnalate.
 - Ordini limite non eseguiti: cancellati dopo 30 minuti, o al primo comando di pareggio/Trade Active/chiusura.
 - Prima di eseguire un comando del trader (Trade Active, pareggio, chiusure) lo stato degli ordini limite viene **riletto da MT5**: un ordine già eseguito è gestito come posizione aperta, mai segnato come cancellato.
 
 ### "Trade Active … Running N+ Pips" (con BE+)
-- Si chiudono **al massimo 2 ticket, quelli entrati al prezzo peggiore**, e **ne resta sempre aperto almeno uno** (con 2 ticket: 1 chiuso, 1 a pareggio; con 1 aperto nessuno). A parità di prezzo si chiude prima il TP1 (resta il TP2).
+- Si chiudono **al massimo 2 ticket, quelli entrati al prezzo peggiore**, e **ne resta sempre aperto almeno uno** (con 2 ticket: 1 chiuso, 1 a pareggio; con 1 aperto nessuno). A parità di prezzo si chiude prima il TP1 (resta il TP2); ingressi entro **0,50 $** contano come lo stesso prezzo (`TRADE_ACTIVE_TIE`).
 - **Mai chiusure in perdita**; nessuna soglia sui pips. Una sola volta per operazione.
 - I ticket rimasti vanno a **pareggio**; gli ordini non eseguiti vengono cancellati.
 - Messaggio su più righe di pips: la regola vale per l'operazione a cui risponde (ultima riga); le altre operazioni aperte nella stessa direzione vanno solo a pareggio.
@@ -45,6 +46,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ### Altri messaggi del trader
 - **HIT TP** (con BE+): pareggio, nessuna chiusura.
 - **HIT TP MAX**: è il tabellone della serie → **pareggio su tutto, nessuna chiusura**. Chiusura totale solo per comandi espliciti ("Close all", "Close now").
+- **"Secure first layer now" / "close lowest layer"**: chiude su MT5 il ticket del layer indicato (il TP1) **solo se in guadagno**; mai segnato chiuso solo in memoria.
 - **"Close half" e simili**: chiude la percentuale chiesta, prima i ticket con il TP più lontano, **mai ticket in perdita**; ripetizione entro 15 minuti = stesso comando.
 - **Re-entry** ("Try buy again", senza prezzo): eredita SL e TP *scritti dal trader* dall'ultima operazione nella stessa direzione (aperta, o chiusa nell'ultima ora), entra a mercato; i messaggi sul segnale padre valgono anche per lui.
 - Un segnale con prezzo non è mai un re-entry, anche se vicino a uno aperto.
@@ -63,6 +65,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `ENTRY_DEEP_LOT_FACTOR` | 0.5 | solo con `ENTRY_TICKETS=4`: lotto di e3/e4 rispetto alla quota piena |
 | `BE_MIN_PROFIT` | 0 | guadagno minimo per il pareggio: deve restare 0 |
 | `PROVISIONAL_TP` | 10,20 | distanza dei TP provvisori dal segnale; `0` = nessun TP provvisorio |
+| `TRADE_ACTIVE_TIE` | 0.5 | ingressi entro questa distanza = stesso prezzo al Trade Active (si chiude il TP1) |
 | `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
@@ -84,12 +87,24 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
 | 02/10 | −258 $ | ingresso `range`; 2 stop pieni (−285 $) con tutti e 4 i ticket eseguiti; segnale NFP solo immagine, non visto |
 | 05/10 | −640 $ (−105 $ non registrati) | 4 stop pieni (−554 $), tutti con 4 ticket eseguiti; bug ordini eseguiti segnati come cancellati (SELL 4151) |
+| 08/10 | +206 $ (+73 $ da una posizione persa dal bot e chiusa al TP) | 2 ticket; nessuno stop pieno, nessun "hit risk" del trader; 2 stop di protezione (−53 $); 4 segnali mai entrati (prezzo 0,2–2 $ oltre il bordo) |
 | 07/10 | +770 $ (+663 $ da chiusura manuale) | primo giorno con 2 ticket; nessuno stop pieno, 8 vinti su 9 gestiti dal bot (+108 $); SELL 4133 mai completato dal trader, chiuso a mano a +663 $ |
 | 06/10 | −449 $ | ancora 4 ticket (e3/e4 a metà lotto); 5 stop pieni (−416 $): 4 anche per il trader ("hit risk"), 1 per MT5 scollegato 6 minuti (pareggio perso); 4 segnali mai entrati (prezzo oltre il bordo) |
 
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 08/10 — Layer chiuso su MT5, posizioni orfane riprese, parità al Trade Active entro 0,50 $
+- **Correzioni**
+  - "Secure first layer now" (classificato come layer LOWEST) segnava e1 come chiuso **solo in memoria**: su MT5 la posizione restava aperta, senza pareggio al Trade Active successivo e senza registrazione. È finita al TP (+73 $ mai registrati), ma con lo SL pieno ancora attivo per ore. Ora il layer viene chiuso su MT5 se in guadagno, mai in perdita.
+  - **Controllo delle posizioni orfane** ogni 30 s: confronto tra le posizioni del bot su MT5 (magic number) e la memoria; quelle che la memoria non segue più tornano in gestione (anche dallo storico di oggi e di ieri), quelle sconosciute vengono segnalate. Avrebbe intercettato anche il caso del 05/10 (ordini eseguiti segnati come cancellati) e quello di oggi (alle 11:57 MT5 aveva 1 posizione aperta, il bot 0).
+- **Regola**: al Trade Active ingressi entro 0,50 $ contano come lo stesso prezzo, quindi si chiude il TP1 e resta il TP2. Oggi SELL 4129: e2 entrato 10 centesimi peggio di e1 è stato chiuso al posto del TP1.
+- **Rigioco aggiornato** alle regole attuali (2 ticket, TP provvisori) e con i **tick reali** attorno a ogni segnale e comando del trader: prezzo esatto del momento e stop toccati nei secondi dopo, che le candele da un minuto non vedono. Nuove varianti: protezione (senza, da ½, solo ¾), incasso al Trade Active solo da +1 $, tolleranza d'ingresso oltre il bordo (0,5 / 1 / 2 $), senza TP provvisori.
+- **Da decidere con il rigioco**:
+  - **Stop di protezione**: oggi 2 casi (BUY 4134: Trade Active arrivato con il prezzo già tornato all'ingresso, protezione colpita in 1 minuto, poi il prezzo sale di 11 $; SELL 4121: colpita in 14 secondi). In totale 8 protezioni colpite dal 02/10: in 6 il prezzo è poi andato a favore, in 1 (06/10 BUY 4165) ha evitato uno stop pieno, 1 incerta (08/10 SELL 4121).
+  - **Ingresso con il prezzo appena oltre il bordo**: oggi 3 segnali vinti persi con il prezzo 0,19 / 0,69 / 0,91 $ oltre il bordo (SELL 4119, 4120, 4127). La regola "mai fuori zona" del 01/10 nasceva da un ingresso 2,32 $ oltre.
+  - **Incasso al Trade Active quasi a zero**: e1 chiusi a +0,04 $ e +0,32 $ di prezzo (il Trade Active arriva quando il prezzo è già tornato indietro).
 
 ### 07/10 — TP provvisori e SL sempre presente
 - **Decisioni**
@@ -184,7 +199,8 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ## Questioni aperte
 - **Prezzi al minuto**: `prezzi.py` (analisi di un giorno) e `prezzi.py rigioco` (confronto di strategie) disponibili; da rilanciare man mano che si aggiungono giornate, soprattutto per BE +1 $ e stop di protezione.
-- **Stop di protezione**: primo gradino (¼ = 2,5 $) forse troppo stretto, 4 su 4 scattati e poi prezzo tornato a favore (02 e 05/10).
+- **Stop di protezione**: 8 colpiti dal 02/10, in 6 casi il prezzo è poi andato a favore; da decidere con il rigioco sui tick (vedi 08/10).
+- **Tolleranza d'ingresso** oltre il bordo della zona (0,5–2 $): da decidere con il rigioco (vedi 08/10).
 - **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $.
 - **Segnali solo immagine** (NFP del 02/10): invisibili al bot; possibile lettura con visione, da valutare.
 - Pareggio stretto vs più largo nei giorni di trend.
