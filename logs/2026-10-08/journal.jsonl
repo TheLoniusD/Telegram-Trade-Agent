@@ -660,3 +660,4 @@
 {"ts": "2026-10-08T16:26:45+02:00", "event": "MT5_CONNECTION", "ok": false, "reason": "terminale MT5 non collegato al server del broker"}
 {"ts": "2026-10-08T16:33:45+02:00", "event": "MT5_CONNECTION", "ok": true, "reason": "MT5 operativo"}
 {"ts": "2026-10-08T16:49:00+02:00", "event": "MESSAGE_SKIPPED", "msg_id": 58856, "reason": "messaggio senza testo", "sender_id": -1001222394814}
+{"ts": "2026-10-08T16:55:24+02:00", "event": "MESSAGE_SKIPPED", "msg_id": 58856, "reason": "messaggio senza testo", "sender_id": -1001222394814}
