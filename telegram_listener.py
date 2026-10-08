@@ -69,6 +69,10 @@ ENTRY_TIGHTEN_AFTER_SECONDS = int(float(os.getenv("ENTRY_TIGHTEN_AFTER_MINUTES",
 
 # "Trade Active": quanti ticket al massimo si incassano (ne resta sempre almeno 1).
 TRADE_ACTIVE_MAX_CLOSE = int(os.getenv("TRADE_ACTIVE_MAX_CLOSE", "2"))
+# Ingressi entro questa distanza dal peggiore contano come lo stesso prezzo:
+# si chiude prima il ticket sul TP1 e resta quello sul TP2 (08/10 SELL 4129:
+# e2 entrato 10 centesimi peggio di e1 veniva chiuso al posto del TP1).
+TRADE_ACTIVE_TIE_DOLLARS = float(os.getenv("TRADE_ACTIVE_TIE", "0.5"))
 
 # Dove va lo SL quando il trader chiede il BE.
 # 'entry' = ingresso + BE_OFFSET (default). Il 29/09 il pareggio a metà zona
@@ -232,6 +236,10 @@ def execute_trade_active(trade: dict, trader_pips: float) -> None:
     # Peggiore = ingresso più alto per un BUY, più basso per un SELL; a parità prima il TP1
     worst_first = sorted(filled, key=lambda kt: ((-(kt[1].get("entry_price") or 0)) if buy else (kt[1].get("entry_price") or 0),
                                                  ticket_tp_index(*kt)))
+    # Differenze di pochi centesimi (slippage) = stesso prezzo: prima il TP1
+    worst_entry = worst_first[0][1].get("entry_price") or 0
+    worst_first.sort(key=lambda kt: (0, ticket_tp_index(*kt))
+                     if abs((kt[1].get("entry_price") or 0) - worst_entry) <= TRADE_ACTIVE_TIE_DOLLARS else (1, 0))
     closed, in_loss = [], []
     for key, tp_config in worst_first[:to_close]:
         mt5_ticket = tp_config["mt5_ticket"]
@@ -251,6 +259,48 @@ def execute_trade_active(trade: dict, trader_pips: float) -> None:
     journal.record("TRADE_ACTIVE_PLAN", ticket_id=trade.get("ticket_id"), trader_pips=trader_pips,
                    closed=closed, in_loss=in_loss)
     mark_closed_if_complete(trade)
+
+
+def execute_layer_close(layer_closes: list) -> None:
+    """
+    "Secure first layer now", "close lowest layer": chiude su MT5 i ticket del
+    layer indicato, solo se in guadagno (come al Trade Active, mai in perdita).
+    Un ordine non ancora eseguito viene cancellato; una posizione già chiusa dal
+    broker (TP preso) viene solo registrata. Prima dell'08/10 il ticket veniva
+    soltanto segnato chiuso in memoria e restava aperto su MT5 senza controllo.
+    """
+    touched = {}
+    for item in layer_closes:
+        trade, key = item["trade"], item["key"]
+        touched[id(trade)] = trade
+        tp_config = trade["tickets"][key]
+        mt5_ticket = tp_config.get("mt5_ticket")
+        if tp_config.get("closed") or not mt5_ticket:
+            continue
+        if tp_config.get("pending"):
+            cancel_pending_ticket(tp_config, "il trader ha chiesto di chiudere il layer prima che l'ordine venisse eseguito", trade)
+            continue
+        try:
+            position = mt5_agent.get_open_position(mt5_ticket)
+            move = mt5_agent.favorable_move(mt5_ticket) if position else None
+        except MT5UnavailableError as e:
+            logger.error(f"❌ Chiusura del layer {key} ({mt5_ticket}) non eseguita: MT5 non raggiungibile ({e}).")
+            journal.record("LAYER_CLOSE", ticket_id=trade.get("ticket_id"), key=key, mt5_ticket=mt5_ticket,
+                           closed=False, reason="MT5 non raggiungibile")
+            continue
+        if position is None:
+            sync_ticket_with_broker(tp_config, mt5_ticket)  # già chiusa dal broker: la registra
+            continue
+        if move is None or move <= 0:
+            journal.record("LAYER_CLOSE", ticket_id=trade.get("ticket_id"), key=key, mt5_ticket=mt5_ticket,
+                           closed=False, reason="in perdita: resta aperto")
+            continue
+        if mt5_agent.close_position(ticket=mt5_ticket, symbol=tp_config.get("symbol")):
+            tp_config["closed"] = True
+            record_position_closed(mt5_ticket, closed_by="LAYER", trade=trade)
+            journal.record("LAYER_CLOSE", ticket_id=trade.get("ticket_id"), key=key, mt5_ticket=mt5_ticket, closed=True)
+    for trade in touched.values():
+        mark_closed_if_complete(trade)
 
 
 def ticket_in_profit(tp_config: dict) -> bool:
@@ -766,6 +816,11 @@ def handle_message(event, is_edit: bool):
             if manager_result.get("close_percentage"):
                 execute_partial_close(trades, manager_result["close_percentage"])
 
+            # 2.0a "Secure first layer", "close lowest layer": chiusura su MT5 del
+            # layer indicato (solo se in guadagno).
+            if manager_result.get("layer_closes"):
+                execute_layer_close(manager_result["layer_closes"])
+
             # 2.0b "Trade Active": incassa i ticket peggiori dell'operazione a
             # cui risponde, prima del BE che protegge gli altri.
             if manager_result.get("trade_active_pips"):
@@ -1056,6 +1111,41 @@ def restore_missing_stops() -> None:
     manager.missing_stops = []
 
 
+_unknown_orphans = set()
+
+
+def adopt_orphan_positions() -> None:
+    """
+    Confronta le posizioni del bot aperte su MT5 con la memoria: quelle che la
+    memoria non segue più (segnate chiuse o cancellate per errore) tornano in
+    gestione; quelle sconosciute vengono segnalate una volta. Così nessuna
+    posizione resta aperta senza pareggio, Trade Active e registrazione.
+    """
+    try:
+        positions = mt5_agent.list_bot_positions()
+    except MT5UnavailableError:
+        return
+    adopted, unknown = manager.adopt_orphans(positions)
+    for trade, key, pos in adopted:
+        token = journal.set_current_message(trade.get("msg_id"))
+        try:
+            journal.record("ORPHAN_ADOPTED", mt5_ticket=pos["ticket"], key=key, ticket_id=trade.get("ticket_id"),
+                           price_open=pos.get("price_open"), stop_loss=pos.get("stop_loss"),
+                           take_profit=pos.get("take_profit"))
+            journal.record("TRADE_STATUS", **trade_summary(trade))
+        finally:
+            journal.clear_current_message(token)
+    for pos in unknown:
+        if pos["ticket"] in _unknown_orphans:
+            continue
+        _unknown_orphans.add(pos["ticket"])
+        logger.error(f"❌ Posizione {pos['ticket']} del bot aperta su MT5 ma sconosciuta alla memoria "
+                     f"({pos.get('direction')} {pos.get('volume')} lotti, SL {pos.get('stop_loss')}).")
+        journal.record("ORPHAN_UNKNOWN", **{k: pos.get(k) for k in ("symbol", "direction", "volume", "price_open",
+                                                                   "stop_loss", "take_profit")},
+                       mt5_ticket=pos["ticket"])
+
+
 def write_heartbeat(mt5_ok: bool, mt5_reason: str) -> None:
     """Battito periodico: conferma nel log che il bot è vivo e fotografa il conto."""
     account = mt5_agent.account_snapshot()
@@ -1094,6 +1184,7 @@ async def monitor_loop():
 
             if ok and not mt5_agent.test_mode:
                 sync_pending_entries()
+                adopt_orphan_positions()
                 manager.reconcile_with_broker(broker_position_lookup)
                 restore_missing_stops()
                 retry_pending_breakeven()
