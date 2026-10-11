@@ -1,0 +1,950 @@
+2026-10-10 12:14:08 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-10 12:19:38 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-10-10 15:29:17 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-10 15:34:47 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-10-10 15:35:47 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-10 15:36:17 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-10-10 17:30:22 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-10 17:31:17 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1221, in main
+    await tg_client.run_until_disconnected()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/updates.py", line 521, in _keepalive_loop
+    await asyncio.wait_for(
+  File "/usr/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:31:35 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:31:35 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:31:35 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:31:35 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:31:41 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:31:58 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:31:58 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:31:58 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:31:58 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:32:04 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:32:22 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:32:22 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:32:22 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:32:22 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:32:28 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:32:46 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:32:46 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:32:46 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:32:46 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:32:52 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:33:10 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:33:10 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:33:10 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:33:10 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:33:16 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:33:33 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:33:33 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:33:33 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:33:33 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:33:39 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:33:57 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:33:57 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:33:57 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:33:57 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:34:03 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:34:21 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:34:21 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:34:21 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:34:21 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:34:27 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:34:44 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:34:44 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:34:44 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:34:44 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:34:50 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:35:08 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:35:08 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:35:08 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:35:08 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:35:14 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:35:32 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:35:32 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:35:32 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:35:32 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:35:38 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:35:55 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:35:55 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:35:55 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:35:55 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:36:01 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:36:19 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:36:19 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:36:19 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:36:19 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:36:25 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:36:42 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:36:43 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:36:43 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:36:43 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:36:49 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:37:06 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:37:06 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:37:06 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:37:06 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:37:12 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:37:30 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:37:30 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:37:30 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:37:30 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:37:36 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:37:53 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:37:54 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:37:54 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:37:54 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:38:00 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:38:17 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:38:17 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:38:17 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:38:17 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:38:23 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:38:40 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:38:41 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:38:41 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:38:41 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:38:47 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:39:04 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:39:04 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:39:04 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:39:04 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:39:10 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:39:28 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:39:28 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:39:28 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:39:28 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:39:34 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:39:51 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:39:52 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:39:52 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:39:52 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:39:58 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:40:14 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:40:15 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:40:15 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:40:15 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:40:21 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:40:37 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:40:37 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:40:37 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:40:37 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:41:43 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:42:00 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:42:00 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-10-10 17:42:00 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:42:00 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:43:06 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:43:23 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:43:23 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:43:23 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:43:23 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:44:29 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:44:46 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:44:46 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:44:46 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:44:46 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:45:52 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:46:09 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:46:09 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:46:09 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:46:09 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:47:15 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:47:32 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:47:32 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:47:32 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:47:32 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:48:38 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:48:55 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:48:55 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:48:55 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:48:55 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:50:01 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:50:18 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:50:18 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:50:18 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:50:18 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:51:24 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:51:41 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:51:41 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:51:41 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:51:41 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:52:47 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:53:04 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:53:04 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:53:04 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:53:04 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:54:10 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:54:27 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:54:27 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:54:27 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:54:27 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:55:33 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:55:49 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:55:49 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:55:49 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:55:49 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:56:56 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:57:12 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:57:12 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:57:12 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:57:12 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:58:18 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:58:35 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:58:35 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:58:35 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:58:35 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 17:59:41 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 17:59:58 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 17:59:58 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 17:59:58 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 17:59:58 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 18:01:04 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 18:01:21 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 18:01:21 | ERROR    | mt5_executor | ❌ Impossibile connettersi a MT5: (-6, 'Terminal: Authorization failed')
+2026-10-10 18:01:21 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 18:01:21 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 18:02:27 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 18:02:44 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 18:02:44 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-10-10 18:02:44 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 18:02:44 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 18:03:47 | ERROR    | telegram_listener | ❌ Il bot si è fermato per un errore imprevisto
+Traceback (most recent call last):
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1266, in <module>
+    tg_client.loop.run_until_complete(main())
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/telegram_listener.py", line 1215, in main
+    await tg_client.start()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/auth.py", line 135, in _start
+    await self.connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/client/telegrambaseclient.py", line 560, in connect
+    if not await self._sender.connect(self._connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 138, in connect
+    await self._connect()
+  File "/home/trader/telegram-trade-agent/venv/lib/python3.12/site-packages/telethon/network/mtprotosender.py", line 277, in _connect
+    raise ConnectionError('Connection to Telegram failed {} time(s)'.format(self._retries))
+ConnectionError: Connection to Telegram failed 5 time(s)
+2026-10-10 18:04:04 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-10 18:04:04 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-10-10 18:04:04 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-10 18:04:04 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-10 18:04:54 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-10-10 18:04:54 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-10-10 21:26:02 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-10 21:30:03 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.

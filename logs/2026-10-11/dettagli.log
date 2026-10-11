@@ -1,0 +1,4 @@
+2026-10-11 03:33:50 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-11 03:35:20 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
+2026-10-11 12:07:16 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-11 12:11:17 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
