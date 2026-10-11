@@ -34,7 +34,7 @@ OPERATION_NAMES = {
     "PARTIAL_CLOSE": "la chiusura parziale", "BREAKEVEN": "il pareggio", "MODIFY_SL_TP": "la modifica di SL/TP",
     "MODIFY_PENDING": "la modifica dell'ordine in attesa", "CANCEL": "la cancellazione",
     "MOVE_PENDING": "lo spostamento dell'ordine in attesa",
-    "PROTECTIVE_SL": "lo stop di protezione",
+    "PROTECTIVE_SL": "lo stop di protezione", "BREAKEVEN_REDUCED": "il pareggio ridotto",
 }
 
 CLOSE_REASONS = {
@@ -345,6 +345,12 @@ class Narrator:
 
     def on_protective_stop(self, e):
         trade, key = self.trade_of(e.get("mt5_ticket"))
+        if e.get("reduced_be"):
+            if trade and key in trade["snapshot"]:
+                trade["snapshot"][key].update(stop_loss=e.get("stop_loss"), be_active=True)
+            self.say(f"🛡️ {self.tag(trade)}{key} pareggio pieno non ancora possibile (a {num(e.get('be_price'))}): "
+                     f"pareggio ridotto, SL da {num(e.get('previous_stop_loss'))} a {num(e.get('stop_loss'))}")
+            return
         if trade and key in trade["snapshot"]:
             trade["snapshot"][key].update(stop_loss=e.get("stop_loss"), protected=True)
         self.say(f"🛟 {self.tag(trade)}{key} pareggio non ancora possibile (a {num(e.get('be_price'))}): "
@@ -534,7 +540,7 @@ def build_sheets(day: str) -> str:
         owner = None
         if kind in ("POSITION_CLOSED", "PENDING_CANCELLED", "PENDING_FILLED", "ORPHAN_ADOPTED"):
             owner = ticket_owner.get(e.get("mt5_ticket"))
-        elif kind == "MT5_ORDER" and e.get("operation") in ("BREAKEVEN", "PROTECTIVE_SL") and e.get("ok"):
+        elif kind == "MT5_ORDER" and e.get("operation") in ("BREAKEVEN", "BREAKEVEN_REDUCED", "PROTECTIVE_SL") and e.get("ok"):
             owner = ticket_owner.get((e.get("request") or {}).get("position"))
         if not owner or owner[0] not in trades:
             continue

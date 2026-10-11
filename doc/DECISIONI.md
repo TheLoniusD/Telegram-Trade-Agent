@@ -39,7 +39,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ### Pareggio (BE) e protezione
 - Pareggio = ingresso **± 1,00 $** dalla parte del guadagno (`BE_MODE=entry`, `BE_OFFSET=1.0`; fino all'11/10 era 0,50 $).
-- **Stop di protezione**: se MT5 rifiuta il pareggio (siamo in perdita o troppo vicini) lo stop si avvicina al primo gradino accettato tra ¼, ½, ¾ della distanza ingresso–stop; ogni 30 secondi si riprova il pareggio vero e si migliora la protezione.
+- **Se MT5 rifiuta il pareggio** (siamo in perdita o troppo vicini) lo stop va al primo gradino che MT5 accetta: **pareggio ridotto a ± 0,50 $** (`BE_FALLBACK_OFFSET`), poi **stop di protezione** a ¼, ½, ¾ della distanza ingresso–stop. Ogni 30 secondi si riprova il pareggio pieno e intanto si sale di gradino appena il prezzo lo permette; lo stop non viene mai peggiorato. Si continua finché il pareggio entra, la posizione si chiude o il trader scrive un nuovo SL.
 - Uno SL già più protettivo del pareggio non viene mai peggiorato.
 - **Pareggio subito quando lo chiede il trader**, senza guadagno minimo (`BE_MIN_PROFIT=0`), e **SL esattamente quello del trader**, senza margini: entrambe le alternative verificate e scartate il 06/10.
 
@@ -76,6 +76,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
 | `BE_MODE` / `BE_OFFSET` | `entry` / 1.0 | sul server il `.env` contiene anche `BE_MODE=entry`; `BE_OFFSET` **non va impostato nel `.env`** (vale il default) |
+| `BE_FALLBACK_OFFSET` | 0.5 | pareggio ridotto quando quello pieno è rifiutato, prima dello stop di protezione; `0` = nessun gradino ridotto |
 | `MAX_SIGNAL_DISTANCE` | 20 | |
 | `LOG_TIMEZONE` / `LOG_DETAILS_LEVEL` | Europe/Rome / INFO | |
 
@@ -103,7 +104,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ## Registro delle decisioni (dal più recente)
 
 ### 11/10 (rigioco) — Pareggio a +1 $; protezione, ingresso al bordo, incasso al Trade Active e TP provvisori confermati
-- **Decisione**: pareggio a ingresso **± 1 $** invece di ± 0,50 $ (`BE_OFFSET` di default 1.0, nessuna modifica al `.env`). Tutto il resto resta com'è: stop di protezione ¼-½-¾, mai ingressi fuori zona, incasso al Trade Active con qualsiasi guadagno, TP provvisori 10/20 $, 2 ticket.
+- **Decisione**: pareggio a ingresso **± 1 $** invece di ± 0,50 $ (`BE_OFFSET` di default 1.0, nessuna modifica al `.env`); se MT5 lo rifiuta, **prima della protezione si prova il pareggio ridotto a ± 0,50 $** (`BE_FALLBACK_OFFSET=0.5`). Tutto il resto resta com'è: stop di protezione ¼-½-¾, mai ingressi fuori zona, incasso al Trade Active con qualsiasi guadagno, TP provvisori 10/20 $, 2 ticket.
 - **Perché**: rigioco dei messaggi del trader dal 24/09 al 09/10 **con i tick reali** (`logs/rigioco_tick.txt` e `rigioco_tick_dettaglio.txt`): 134 segnali, rischio fisso 140 $ per segnale, orologio del broker UTC+3 in tutti i giorni, tick in 263 finestre su 264. Coincide con il reale delle regole attuali a pochi dollari: 08/10 SELL 4121 −35,0 (reale −35,22), BUY 4134 −16,9 (−15,57); 09/10 BUY 4194 −35,0 (−35,62), BUY 4181 +24,5 (+22,71), BUY 4182 +16,5 (+16,77), SELL 4172 +7,0 (+7,12).
 
   | Variante | Totale | Rispetto alle regole del 09/10 | Dettaglio |
@@ -118,10 +119,11 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
   | senza TP provvisori | +493 $ | +228 $ | tutta la differenza da un'operazione (07/10 SELL 4133: +585 invece di +358), le altre 133 identiche |
   | 4 ticket (regole fino al 06/10) | +165 $ | −100 $ | meglio in 8 giorni su 12: il vantaggio dei 2 ticket viene dal 28/09 (+1.409 contro +718); più esposizione, non più resa (perdita media −60 contro −42 $) |
   | mai pareggio | −1.083 $ | −1.348 $ | 71 stop pieni |
-- **Contro**: con +1 $ MT5 rifiuta il pareggio più spesso (il prezzo deve essere oltre l'ingresso di almeno 1 $ più la distanza minima del broker): in quei casi entra lo stop di protezione (nel rigioco 4 volte, −84 $). Lo stop sta 0,5 $ più vicino al prezzo: in 12 giorni non ha mai chiuso un'operazione che con +0,5 $ sarebbe arrivata al TP, ma può succedere.
+- **Gradino a +0,5 $** (deciso dopo il rigioco): nei 4 segnali peggiorati il pareggio a +1 $ era rifiutato mentre +0,5 $ sarebbe passato; con il gradino tornano come con la regola di prima. Stima: circa +84 $ in più (+256 $ invece di +172 $ rispetto alla regola di prima). È una stima, non misurata: nei casi in cui +1 $ è rifiutato il bot si comporta come la regola di prima finché +1 $ non diventa possibile; sui prezzi sintetici di prova il gradino a volte peggiora (lo stop a +0,5 $ è più vicino al prezzo e viene preso dove ¼ avrebbe tenuto), sui dati veri il confronto pareggio +0,5 / +1 $ non ha mai mostrato differenze oltre 7 $ per segnale. Da confermare con il prossimo rigioco ("attuale" contro "BE +1 $ senza gradino +0,5"); se peggiora, `BE_FALLBACK_OFFSET` di default torna a 0.
+- **Contro**: con +1 $ MT5 rifiuta il pareggio più spesso (il prezzo deve essere oltre l'ingresso di almeno 1 $ più la distanza minima del broker): in quei casi entra il pareggio ridotto o, se non passa nemmeno quello, lo stop di protezione (nel rigioco senza gradino 4 volte, −84 $). Lo stop sta 0,5 $ più vicino al prezzo: in 12 giorni non ha mai chiuso un'operazione che con +0,5 $ sarebbe arrivata al TP, ma può succedere.
 - **Nota**: il periodo è positivo solo grazie al 28/09 (+1.409 $, 11 SELL in un calo continuo). Negli altri 11 giorni le regole attuali fanno −1.144 $ (con il pareggio +1 $: −962 $). Le regole spostano centinaia di dollari, la qualità dei segnali del trader migliaia.
 - **Scartato**: tolleranza d'ingresso oltre il bordo; protezione da ½ o solo ¾; incasso al Trade Active solo da +1 $; togliere o allargare i TP provvisori (un solo caso); tornare a 4 ticket (vedi *Questioni aperte*).
-- **Da verificare**: quante volte MT5 rifiuta il pareggio a +1 $ (righe di protezione nel racconto); nel prossimo rigioco pareggio +1,5 $ e +2 $ (aggiunti a `prezzi.py`: "attuale" usa ora +1 $, "BE +0,5 $" è la regola di prima).
+- **Da verificare**: quante volte MT5 rifiuta il pareggio a +1 $ (righe di protezione nel racconto); nel prossimo rigioco pareggio +1,5 $ e +2 $ (aggiunti a `prezzi.py`: "attuale" usa ora +1 $ con il gradino a +0,5 $, "BE +0,5 $" è la regola di prima, "BE +1 $ senza gradino +0,5" quella senza gradino).
 
 ### 11/10 — "Again" subito dopo un segnale = stesso setup; ordini solo su conto DEMO
 - **Decisioni**

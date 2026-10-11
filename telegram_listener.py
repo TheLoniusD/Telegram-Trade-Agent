@@ -62,9 +62,14 @@ IGNORE_FORWARDED_MESSAGES = True
 # ingresso chiude con un piccolo guadagno invece che a zero. 0 = BE esatto.
 # Il 23/09 un SELL portato a BE esatto si è chiuso a 0,00 due minuti dopo.
 # 1 $ dall'11/10: nel rigioco con i tick 24/09-09/10 +172 $ rispetto a 0,5 $,
-# meglio in 9 giorni su 12; se MT5 lo rifiuta (prezzo troppo vicino) entra lo
-# stop di protezione, come prima.
+# meglio in 9 giorni su 12; se MT5 lo rifiuta (prezzo troppo vicino) si prova
+# il pareggio ridotto (BE_FALLBACK_OFFSET) e poi lo stop di protezione.
 BE_OFFSET = float(os.getenv("BE_OFFSET", "1.0"))
+# Pareggio ridotto: se MT5 rifiuta il pareggio pieno (prezzo troppo vicino), si
+# prova ingresso ± questo prima dello stop di protezione. Nel rigioco i 4 casi
+# in cui +1 $ veniva rifiutato chiudevano con la protezione a 1/4 (-21 $
+# ciascuno) mentre +0,5 $ sarebbe stato accettato. 0 = nessun gradino ridotto.
+BE_FALLBACK_OFFSET = float(os.getenv("BE_FALLBACK_OFFSET", "0.5"))
 
 # Seconda fase dell'ingresso: dopo questi minuti gli ordini limite non eseguiti
 # vengono avvicinati al prezzo del segnale (vedi ENTRY_ZONE_DEPTH in risk_manager).
@@ -177,6 +182,16 @@ def breakeven_price(tp_config: dict, trade: dict = None):
         # Il più lontano dal prezzo tra i due: sotto per un BUY, sopra per un SELL
         be = min(be, mid) if direction == "BUY" else max(be, mid)
     return round(be, 2)
+
+
+def reduced_breakeven_price(tp_config: dict, trade: dict = None):
+    """Pareggio ridotto (ingresso ± BE_FALLBACK_OFFSET), solo se meno stretto del pareggio pieno."""
+    entry, be_price = tp_config.get("entry_price"), breakeven_price(tp_config, trade)
+    if entry is None or be_price is None or BE_FALLBACK_OFFSET <= 0:
+        return None
+    buy = tp_config.get("direction") == "BUY"
+    level = round(entry + BE_FALLBACK_OFFSET if buy else entry - BE_FALLBACK_OFFSET, 2)
+    return level if (level < be_price if buy else level > be_price) else None
 
 
 def sl_already_protective(tp_config: dict, be_price) -> bool:
@@ -1021,14 +1036,18 @@ def protective_stop_levels(trade: dict, tp_config: dict) -> list:
 
 def apply_protective_stop(trade: dict, tp_config: dict) -> bool:
     """
-    Pareggio rifiutato da MT5: porta lo stop al gradino più vicino all'ingresso
-    che MT5 accetta adesso, solo se protegge più dello stop attuale. Il
-    pareggio vero resta in attesa e viene applicato appena possibile.
+    Pareggio rifiutato da MT5: porta lo stop al primo gradino che MT5 accetta
+    adesso (pareggio ridotto a +0,5 $, poi 1/4, 1/2, 3/4 della distanza dallo
+    stop), solo se protegge più dello stop attuale. Il pareggio pieno resta in
+    attesa e viene applicato appena possibile.
     """
     mt5_ticket = tp_config.get("mt5_ticket")
     current = tp_config.get("stop_loss")
     buy = tp_config.get("direction") == "BUY"
-    for level in protective_stop_levels(trade, tp_config):
+    reduced = reduced_breakeven_price(tp_config, trade)
+    steps = ([(reduced, "BREAKEVEN_REDUCED")] if reduced is not None else []) + \
+        [(level, "PROTECTIVE_SL") for level in protective_stop_levels(trade, tp_config)]
+    for level, operation in steps:
         if current is not None and (level <= current if buy else level >= current):
             continue  # non migliorerebbe la protezione attuale
         try:
@@ -1036,10 +1055,10 @@ def apply_protective_stop(trade: dict, tp_config: dict) -> bool:
                 continue
         except MT5UnavailableError:
             return False
-        if mt5_agent.set_sl_to_be(ticket=mt5_ticket, entry_price=level, operation="PROTECTIVE_SL"):
+        if mt5_agent.set_sl_to_be(ticket=mt5_ticket, entry_price=level, operation=operation):
             tp_config["stop_loss"] = level
             journal.record("PROTECTIVE_STOP", mt5_ticket=mt5_ticket, stop_loss=level, previous_stop_loss=current,
-                           be_price=breakeven_price(tp_config, trade))
+                           be_price=breakeven_price(tp_config, trade), reduced_be=operation == "BREAKEVEN_REDUCED")
             return True
         return False
     return False
