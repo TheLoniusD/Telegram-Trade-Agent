@@ -347,6 +347,7 @@ BASE_RULES = dict(
     be_after_tp1=False,        # pareggio di tutti i ticket appena uno prende il TP1
     be_keys=("e1", "e2", "e3", "e4"),  # ticket che vanno a pareggio quando lo chiede il trader
     be_offset=1.0,             # pareggio = ingresso ± questo (0,5 fino all'11/10)
+    be_fallback=0.5,           # pareggio rifiutato: prima della protezione prova ingresso ± questo (0 = no)
     be_risk=None,              # invece del pareggio: stop a questa frazione della distanza dallo SL
     be_min=0.0,                # pareggio solo con almeno questo guadagno (altrimenti si aspetta)
     protect=(0.25, 0.5, 0.75), # gradini dello stop di protezione se il pareggio non è possibile
@@ -364,6 +365,7 @@ STRATEGIES = {
     "TA senza incasso":           ("TA no", dict(ta_close=0)),
     "TA incasso da +1 $":         ("TA +1$", dict(ta_min_gain=1.0)),
     "BE +0,5 $ (fino all'11/10)":  ("BE +.5$", dict(be_offset=0.5)),
+    "BE +1 $ senza gradino +0,5": ("BE1 no.5", dict(be_fallback=0.0)),
     "BE +1,5 $":                  ("BE +1.5$", dict(be_offset=1.5)),
     "BE +2 $":                    ("BE +2$", dict(be_offset=2.0)),
     "ingresso fino a 0,5 $ oltre": ("ingr .5", dict(entry_tol=0.5)),
@@ -682,8 +684,13 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
             if first and not margin_ok:
                 continue
             distance = abs(ticket["entry"] - ticket["orig_sl"])
-            for step in rules["protect"]:
-                candidate = ticket["entry"] - step * distance if buy else ticket["entry"] + step * distance
+            candidates = [ticket["entry"] - step * distance if buy else ticket["entry"] + step * distance
+                          for step in rules["protect"]]
+            # Pareggio ridotto prima della protezione, se meno stretto del pareggio pieno
+            fallback = rules["be_fallback"]
+            if 0 < fallback < rules["be_offset"] and rules["be_risk"] is None:
+                candidates.insert(0, ticket["entry"] + fallback if buy else ticket["entry"] - fallback)
+            for candidate in candidates:
                 if stop_valid(candidate, bid, ask):
                     if better(candidate, ticket["sl"]):
                         ticket["sl"] = candidate
@@ -900,7 +907,7 @@ def main_rigioco(argv: list) -> None:
     print(f"Rigioco dal {days[0]} al {days[-1]} · rischio {args.rischio:g} $ per segnale · "
           f"vita massima {args.ore:g} ore · orologio del broker {describe_offsets(offsets)}")
     print("Regole attuali: 2 ticket (1% ciascuno), ingresso al bordo della zona, TP provvisori 10/20 $, "
-          "Trade Active incassa 1 ticket, pareggio +1 $, protezione 1/4-1/2-3/4\n")
+          "Trade Active incassa 1 ticket, pareggio +1 $ (se rifiutato +0,5 $), protezione 1/4-1/2-3/4\n")
 
     totals = {n: {"days": {}, "wins": [], "losses": [], "stops": 0, "signals": 0} for n in names}
     real, tick_stats = {}, {}
