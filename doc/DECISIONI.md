@@ -38,7 +38,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Messaggio su più righe di pips: la regola vale per l'operazione a cui risponde (ultima riga); le altre operazioni aperte nella stessa direzione vanno solo a pareggio.
 
 ### Pareggio (BE) e protezione
-- Pareggio = ingresso **± 0,50 $** dalla parte del guadagno (`BE_MODE=entry`, `BE_OFFSET=0.5`).
+- Pareggio = ingresso **± 1,00 $** dalla parte del guadagno (`BE_MODE=entry`, `BE_OFFSET=1.0`; fino all'11/10 era 0,50 $).
 - **Stop di protezione**: se MT5 rifiuta il pareggio (siamo in perdita o troppo vicini) lo stop si avvicina al primo gradino accettato tra ¼, ½, ¾ della distanza ingresso–stop; ogni 30 secondi si riprova il pareggio vero e si migliora la protezione.
 - Uno SL già più protettivo del pareggio non viene mai peggiorato.
 - **Pareggio subito quando lo chiede il trader**, senza guadagno minimo (`BE_MIN_PROFIT=0`), e **SL esattamente quello del trader**, senza margini: entrambe le alternative verificate e scartate il 06/10.
@@ -75,7 +75,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
-| `BE_MODE` / `BE_OFFSET` | `entry` / 0.5 | sul server il `.env` contiene anche `BE_MODE=entry` |
+| `BE_MODE` / `BE_OFFSET` | `entry` / 1.0 | sul server il `.env` contiene anche `BE_MODE=entry`; `BE_OFFSET` **non va impostato nel `.env`** (vale il default) |
 | `MAX_SIGNAL_DISTANCE` | 20 | |
 | `LOG_TIMEZONE` / `LOG_DETAILS_LEVEL` | Europe/Rome / INFO | |
 
@@ -102,6 +102,27 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ## Registro delle decisioni (dal più recente)
 
+### 11/10 (rigioco) — Pareggio a +1 $; protezione, ingresso al bordo, incasso al Trade Active e TP provvisori confermati
+- **Decisione**: pareggio a ingresso **± 1 $** invece di ± 0,50 $ (`BE_OFFSET` di default 1.0, nessuna modifica al `.env`). Tutto il resto resta com'è: stop di protezione ¼-½-¾, mai ingressi fuori zona, incasso al Trade Active con qualsiasi guadagno, TP provvisori 10/20 $, 2 ticket.
+- **Perché**: rigioco dei messaggi del trader dal 24/09 al 09/10 **con i tick reali** (`logs/rigioco_tick.txt` e `rigioco_tick_dettaglio.txt`): 134 segnali, rischio fisso 140 $ per segnale, orologio del broker UTC+3 in tutti i giorni, tick in 263 finestre su 264. Coincide con il reale delle regole attuali a pochi dollari: 08/10 SELL 4121 −35,0 (reale −35,22), BUY 4134 −16,9 (−15,57); 09/10 BUY 4194 −35,0 (−35,62), BUY 4181 +24,5 (+22,71), BUY 4182 +16,5 (+16,77), SELL 4172 +7,0 (+7,12).
+
+  | Variante | Totale | Rispetto alle regole del 09/10 | Dettaglio |
+  |---|---|---|---|
+  | regole del 09/10 | +265 $ | — | reale registrato nello stesso periodo −747 $ (regole e lotti di quei giorni, bug compresi) |
+  | **pareggio +1 $** | **+437 $** | **+172 $** | meglio in 9 giorni su 12; 65 segnali migliorano (quasi sempre +3,5 $: il ticket chiuso a pareggio incassa 7 $ invece di 3,5), 4 peggiorano di 21 $ (pareggio rifiutato perché il prezzo era troppo vicino, protezione a ¼ colpita); nessun vincente tagliato |
+  | senza protezione | +83 $ | −182 $ | la protezione evita lo stop pieno in 6 segnali (+542 $) e chiude 8 posizioni che poi si sarebbero riprese (−360 $) |
+  | protezione da ½ / solo ¾ | +236 / +275 $ | −29 / +10 $ | "solo ¾" è rumore e le perdite peggiori diventano −105 $ invece di −35 $ |
+  | ingresso fino a 0,5 / 1 / 2 $ oltre il bordo | +207 / −55 / −3 $ | −58 / −320 / −268 $ | con 0,5 $: 4 segnali recuperati (+58 $), 22 peggiorati (−116 $) perché si entra subito a un prezzo peggiore quando il prezzo sarebbe tornato al bordo |
+  | Trade Active senza incasso | −72 $ | −337 $ | meglio in 12 segnali (+388 $), peggio in 54 (−725 $) |
+  | incasso al Trade Active solo da +1 $ | +241 $ | −24 $ | |
+  | senza TP provvisori | +493 $ | +228 $ | tutta la differenza da un'operazione (07/10 SELL 4133: +585 invece di +358), le altre 133 identiche |
+  | 4 ticket (regole fino al 06/10) | +165 $ | −100 $ | meglio in 8 giorni su 12: il vantaggio dei 2 ticket viene dal 28/09 (+1.409 contro +718); più esposizione, non più resa (perdita media −60 contro −42 $) |
+  | mai pareggio | −1.083 $ | −1.348 $ | 71 stop pieni |
+- **Contro**: con +1 $ MT5 rifiuta il pareggio più spesso (il prezzo deve essere oltre l'ingresso di almeno 1 $ più la distanza minima del broker): in quei casi entra lo stop di protezione (nel rigioco 4 volte, −84 $). Lo stop sta 0,5 $ più vicino al prezzo: in 12 giorni non ha mai chiuso un'operazione che con +0,5 $ sarebbe arrivata al TP, ma può succedere.
+- **Nota**: il periodo è positivo solo grazie al 28/09 (+1.409 $, 11 SELL in un calo continuo). Negli altri 11 giorni le regole attuali fanno −1.144 $ (con il pareggio +1 $: −962 $). Le regole spostano centinaia di dollari, la qualità dei segnali del trader migliaia.
+- **Scartato**: tolleranza d'ingresso oltre il bordo; protezione da ½ o solo ¾; incasso al Trade Active solo da +1 $; togliere o allargare i TP provvisori (un solo caso); tornare a 4 ticket (vedi *Questioni aperte*).
+- **Da verificare**: quante volte MT5 rifiuta il pareggio a +1 $ (righe di protezione nel racconto); nel prossimo rigioco pareggio +1,5 $ e +2 $ (aggiunti a `prezzi.py`: "attuale" usa ora +1 $, "BE +0,5 $" è la regola di prima).
+
 ### 11/10 — "Again" subito dopo un segnale = stesso setup; ordini solo su conto DEMO
 - **Decisioni**
   - Un re-entry ("Lets buy again") scritto entro **5 minuti** da un segnale nuovo nella stessa direzione **ancora aperto** non apre nuove posizioni: è il commento del trader a quel segnale. Se il segnale è già chiuso (stop) o sono passati più di 5 minuti, resta un re-entry vero (a mercato, con SL e TP del segnale).
@@ -119,7 +140,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
   - **Controllo delle posizioni orfane** ogni 30 s: confronto tra le posizioni del bot su MT5 (magic number) e la memoria; quelle che la memoria non segue più tornano in gestione (anche dallo storico di oggi e di ieri), quelle sconosciute vengono segnalate. Avrebbe intercettato anche il caso del 05/10 (ordini eseguiti segnati come cancellati) e quello di oggi (alle 11:57 MT5 aveva 1 posizione aperta, il bot 0).
 - **Regola**: al Trade Active ingressi entro 0,50 $ contano come lo stesso prezzo, quindi si chiude il TP1 e resta il TP2. Oggi SELL 4129: e2 entrato 10 centesimi peggio di e1 è stato chiuso al posto del TP1.
 - **Rigioco aggiornato** alle regole attuali (2 ticket, TP provvisori) e con i **tick reali** attorno a ogni segnale e comando del trader: prezzo esatto del momento e stop toccati nei secondi dopo, che le candele da un minuto non vedono. Nuove varianti: protezione (senza, da ½, solo ¾), incasso al Trade Active solo da +1 $, tolleranza d'ingresso oltre il bordo (0,5 / 1 / 2 $), senza TP provvisori.
-- **Da decidere con il rigioco**:
+- **Da decidere con il rigioco** (decisi l'11/10, vedi sopra: tutto confermato):
   - **Stop di protezione**: oggi 2 casi (BUY 4134: Trade Active arrivato con il prezzo già tornato all'ingresso, protezione colpita in 1 minuto, poi il prezzo sale di 11 $; SELL 4121: colpita in 14 secondi). In totale 8 protezioni colpite dal 02/10: in 6 il prezzo è poi andato a favore, in 1 (06/10 BUY 4165) ha evitato uno stop pieno, 1 incerta (08/10 SELL 4121).
   - **Ingresso con il prezzo appena oltre il bordo**: oggi 3 segnali vinti persi con il prezzo 0,19 / 0,69 / 0,91 $ oltre il bordo (SELL 4119, 4120, 4127). La regola "mai fuori zona" del 01/10 nasceva da un ingresso 2,32 $ oltre.
   - **Incasso al Trade Active quasi a zero**: e1 chiusi a +0,04 $ e +0,32 $ di prezzo (il Trade Active arriva quando il prezzo è già tornato indietro).
@@ -157,7 +178,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
   - Pareggio con minimo: 3 $ → +60 $, 5 $ → +139 $ (peggio, come il 25/09). Margine sullo SL: +1 $ → +119 $, +2 $ → −63 $ (salva lo stop "per poco" del 02/10 BUY 4188, ma costa su tutti gli altri).
   - Senza pareggio su richiesta: "mai BE" −749 $, "BE al TP1" −655 $, "TP1 senza BE" −272 $: **il pareggio su richiesta è la regola che conta di più**.
 - **Scartato / rimandato**
-  - BE +1 $ invece di +0,5 (+278 $, meglio in 7 giorni su 8 ma di poco; con +1 $ MT5 rifiuterebbe più pareggi): da riconsiderare dopo aver contato i rifiuti.
+  - BE +1 $ invece di +0,5 (+278 $, meglio in 7 giorni su 8 ma di poco; con +1 $ MT5 rifiuterebbe più pareggi): da riconsiderare dopo aver contato i rifiuti. **Adottato l'11/10** con il rigioco sui tick.
   - BE a metà rischio (+380 $ ma tutto dal 24/09: senza quel giorno peggio in 6 giorni su 8).
   - Stop di protezione da ½ o tolto: il rigioco non lo misura bene, resta com'è.
 - **Contro**: si entra solo al bordo (niente ingressi migliori dentro la zona); ogni stop pieno costa di nuovo il 2% (−140 $ invece di −105 $); in compenso i ticket entrano tutti al prezzo migliore della zona.
@@ -216,12 +237,12 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Questioni aperte
-- **Prezzi al minuto**: `prezzi.py` (analisi di un giorno) e `prezzi.py rigioco` (confronto di strategie) disponibili; da rilanciare man mano che si aggiungono giornate, soprattutto per BE +1 $ e stop di protezione.
-- **Stop di protezione**: 8 colpiti dal 02/10, in 6 casi il prezzo è poi andato a favore; da decidere con il rigioco sui tick (vedi 08/10).
-- **Tolleranza d'ingresso** oltre il bordo della zona (0,5–2 $): da decidere con il rigioco (vedi 08/10).
+- **Rigioco** (`prezzi.py rigioco`, con i tick): da rilanciare man mano che si aggiungono giornate; il prossimo con il pareggio a +1,5 $ e +2 $.
+- **Risultato legato ai giorni di trend**: dal 24/09 al 09/10 tutto il guadagno viene dal 28/09; negli altri giorni le regole perdono (vedi 11/10).
+- **2 o 4 ticket**: i 2 ticket rendono di più in totale ma solo per il 28/09; i 4 ticket sono andati meglio in 8 giorni su 12 (meno esposti). Da rivedere con più giorni.
 - **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $.
 - **Segnali solo immagine** (NFP del 02/10): invisibili al bot; possibile lettura con visione, da valutare.
-- Pareggio stretto vs più largo nei giorni di trend.
+- Pareggio più largo di +1 $ (+1,5 / +2 $): da provare nel rigioco.
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
 - Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
