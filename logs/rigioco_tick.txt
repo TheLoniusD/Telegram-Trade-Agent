@@ -1,4 +1,23 @@
-Rigioco dal 2026-09-24 al 2026-10-09 · rischio 140 $ per segnale · vita massima 8 ore · orologio del broker UTC-37.0 h
+Rigioco dal 2026-09-24 al 2026-10-09 · rischio 140 $ per segnale · vita massima 8 ore · orologio del broker UTC+3.0 h
 Regole attuali: 2 ticket (1% ciascuno), ingresso al bordo della zona, TP provvisori 10/20 $, Trade Active incassa 1 ticket, pareggio +0,5 $, protezione 1/4-1/2-3/4
 
-MT5 non ha restituito candele: (1, 'Success')
+strategia                      24/09   25/09   28/09   29/09   30/09   01/10   02/10   05/10   06/10   07/10   08/10   09/10   totale  vinti  persi  stop  media +  media −
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+reale (registrato)               -29    -638     728     -32      45    -231    -258    -535    -449     770     133    -250     -747
+attuale                          223    -278    1409     -43     177    -198    -221    -646    -631     477     101    -105      265     79     55    20     45.4    -60.4
+4 ticket (fino al 06/10)         217    -151     718       7      63    -137    -160    -447    -498     364     239     -49      165     80     54    18     30.3    -41.8
+senza protezione                 160    -359    1409    -148     219    -198    -179    -604    -701     519      17     -54       83     87     47    25     42.0    -75.9
+protezione da 1/2                230    -331    1409     -78     219    -198    -179    -681    -631     442      87     -54      236     84     50    20     43.2    -67.8
+protezione solo 3/4              195    -306    1409    -113     219    -198    -179    -604    -666     519      52     -54      275     87     47    20     42.0    -71.8
+TA senza incasso                 246    -377    1507    -125     140    -178    -280    -707    -672     374      64     -63      -72     79     55    20     41.6    -61.1
+TA incasso da +1 $               217    -296    1413     -43     177    -200    -221    -647    -631     473      85     -85      241     79     55    20     45.6    -61.1
+BE +1 $                          231    -281    1399     -15     195    -177    -196    -657    -616     502     135     -83      437     75     59    20     50.8    -57.2
+ingresso fino a 0,5 $ oltre      222    -282    1363     -45     173    -189    -221    -672    -616     472      86     -84      207     82     52    20     43.4    -64.5
+ingresso fino a 1 $ oltre        217    -328    1216     -59     145    -190    -278    -723    -606     472     111     -33      -55     84     50    20     40.7    -69.5
+ingresso fino a 2 $ oltre        157    -335    1184    -101     307    -117    -278    -723    -650     472     113     -33       -3     87     47    20     40.7    -75.4
+senza TP provvisori              223    -278    1409     -43     177    -198    -221    -646    -631     704     101    -105      493     79     55    20     48.3    -60.4
+mai BE                          1797   -1109    1618   -1079     831    -980    -630   -1400   -1465    2145     150    -962    -1083     44     90    71    202.9   -111.2
+
+stop = segnali chiusi allo SL pieno; media + / media − = risultato medio dei segnali vinti / persi.
+'reale' è la somma delle chiusure registrate dal bot (con le regole di quel giorno e i lotti veri).
+Tick reali disponibili in 263 finestre su 264 (segnali e comandi del trader); altrove candele M1.
