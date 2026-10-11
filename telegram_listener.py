@@ -61,7 +61,10 @@ IGNORE_FORWARDED_MESSAGES = True
 # per un BUY e a ingresso - BE_OFFSET per un SELL, così un ritorno al prezzo di
 # ingresso chiude con un piccolo guadagno invece che a zero. 0 = BE esatto.
 # Il 23/09 un SELL portato a BE esatto si è chiuso a 0,00 due minuti dopo.
-BE_OFFSET = float(os.getenv("BE_OFFSET", "0.5"))
+# 1 $ dall'11/10: nel rigioco con i tick 24/09-09/10 +172 $ rispetto a 0,5 $,
+# meglio in 9 giorni su 12; se MT5 lo rifiuta (prezzo troppo vicino) entra lo
+# stop di protezione, come prima.
+BE_OFFSET = float(os.getenv("BE_OFFSET", "1.0"))
 
 # Seconda fase dell'ingresso: dopo questi minuti gli ordini limite non eseguiti
 # vengono avvicinati al prezzo del segnale (vedi ENTRY_ZONE_DEPTH in risk_manager).

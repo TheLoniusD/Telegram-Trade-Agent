@@ -34,7 +34,7 @@ from logger_config import LOG_DIR, to_local
 
 SYMBOL = "XAUUSD"
 POINT = 0.01
-BE_OFFSET_DEFAULT = 0.5
+BE_OFFSET_DEFAULT = 1.0
 
 
 
@@ -192,7 +192,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("giorno", help="AAAA-MM-GG")
     parser.add_argument("--minimi", default="0,2,3,5", help="guadagni minimi in $ da provare (default 0,2,3,5)")
-    parser.add_argument("--be-offset", type=float, default=BE_OFFSET_DEFAULT, help="margine del BE in $ (default 0.5)")
+    parser.add_argument("--be-offset", type=float, default=BE_OFFSET_DEFAULT, help="margine del BE in $ (default 1.0, come il bot)")
     parser.add_argument("--offset-broker", type=float, help="ore del broker rispetto a UTC (default: stimate da MT5)")
     args = parser.parse_args()
 
