@@ -38,13 +38,13 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from logger_config import LOG_DIR, to_local
-from verifica_be import POINT, SYMBOL, download_bars, estimate_broker_offset, load_events
+from verifica_be import POINT, SYMBOL, download_bars, load_events
 
 PIPS_PER_DOLLAR = 10  # oro: 1 $ = 10 pips, come li conta il trader
 
@@ -159,6 +159,82 @@ def connect_mt5():
     return mt5
 
 
+def broker_offset_from_events(events: list):
+    """
+    Offset (secondi) dell'orologio del broker rispetto a UTC, dagli orari del
+    broker che il diario registra per ogni ordine e chiusura (dal 25/09).
+    None se il diario non ne ha.
+    """
+    counts = {}
+    for e in events:
+        broker_time = e.get("broker_time") or e.get("close_time_broker")
+        if not broker_time:
+            continue
+        try:
+            broker = datetime.strptime(broker_time, "%Y-%m-%d %H:%M:%S")
+        except (TypeError, ValueError):
+            continue
+        utc = datetime.fromisoformat(e["ts"]).astimezone(timezone.utc).replace(tzinfo=None)
+        offset = round((broker - utc).total_seconds() / 1800) * 1800
+        counts[offset] = counts.get(offset, 0) + 1
+    return max(counts, key=counts.get) if counts else None
+
+
+def live_broker_offset(mt5):
+    """
+    Offset dall'ultimo tick di MT5, solo se il tick è recente: a mercato chiuso
+    (weekend) l'ultimo tick è di venerdì e darebbe un orologio sbagliato di
+    decine di ore (11/10: "UTC-37 h", nessuna candela trovata).
+    """
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if tick is None:
+        return None
+    offset = round((tick.time - time.time()) / 1800) * 1800
+    return offset if -12 * 3600 <= offset <= 14 * 3600 else None
+
+
+def resolve_offsets(days: list, events_by_day: dict, mt5, forced=None) -> dict:
+    """
+    Orologio del broker per ogni giorno: quello indicato (--offset-broker), o
+    quello del diario del giorno, o del giorno più vicino che ce l'ha, o
+    l'ultimo tick se recente. Il broker cambia ora con l'ora legale (fine
+    ottobre): per questo si ricava giorno per giorno.
+    """
+    if forced is not None:
+        return {day: int(forced * 3600) for day in days}
+    known = {day: broker_offset_from_events(events_by_day[day]) for day in days}
+    known = {day: off for day, off in known.items() if off is not None}
+    live = None if known else live_broker_offset(mt5)
+    offsets = {}
+    for day in days:
+        if day in known:
+            offsets[day] = known[day]
+        elif known:
+            nearest = min(known, key=lambda d: abs((datetime.strptime(d, "%Y-%m-%d")
+                                                    - datetime.strptime(day, "%Y-%m-%d")).days))
+            offsets[day] = known[nearest]
+        elif live is not None:
+            offsets[day] = live
+        else:
+            raise SystemExit("Orologio del broker non ricavabile: il diario non ha orari del broker e il mercato "
+                             "è chiuso. Indica le ore con --offset-broker (es. --offset-broker 3).")
+    return offsets
+
+
+def describe_offsets(offsets: dict) -> str:
+    """'UTC+3 h' o, se cambia nel periodo, 'UTC+3 h fino al 24/10, UTC+2 h dal 26/10'."""
+    parts, last = [], None
+    for day in sorted(offsets):
+        if offsets[day] != last:
+            parts.append([offsets[day], day, day])
+            last = offsets[day]
+        else:
+            parts[-1][2] = day
+    if len(parts) == 1:
+        return f"UTC{parts[0][0] / 3600:+.1f} h"
+    return ", ".join(f"UTC{off / 3600:+.1f} h dal {a[8:10]}/{a[5:7]} al {b[8:10]}/{b[5:7]}" for off, a, b in parts)
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "rigioco":
         return main_rigioco(sys.argv[2:])
@@ -169,12 +245,13 @@ def main():
     parser.add_argument("--offset-broker", type=float, help="ore del broker rispetto a UTC (default: stimate da MT5)")
     args = parser.parse_args()
 
-    trades = collect_trades(load_events(args.giorno))
+    events = load_events(args.giorno)
+    trades = collect_trades(events)
     if not trades:
         raise SystemExit("Nessuna operazione con prezzo di ingresso in questo giorno.")
 
     mt5 = connect_mt5()
-    offset = int(args.offset_broker * 3600) if args.offset_broker is not None else estimate_broker_offset(mt5)
+    offset = resolve_offsets([args.giorno], {args.giorno: events}, mt5, args.offset_broker)[args.giorno]
     start = min(t["open_ts"] for t in trades) - 120
     end = min(time.time(), max(t["open_ts"] for t in trades) + args.ore * 3600)
     bars = download_bars(mt5, start, end, offset)
@@ -815,24 +892,31 @@ def main_rigioco(argv: list) -> None:
     rules = {n: {**BASE_RULES, **STRATEGIES[n][1]} for n in names}
 
     mt5 = connect_mt5()
-    offset = int(args.offset_broker * 3600) if args.offset_broker is not None else estimate_broker_offset(mt5)
     days = days_between(args.dal, args.al or args.dal)
+    events_by_day = {day: load_day_events(day) for day in days}
+    offsets = resolve_offsets(days, events_by_day, mt5, args.offset_broker)
     print(f"Rigioco dal {days[0]} al {days[-1]} · rischio {args.rischio:g} $ per segnale · "
-          f"vita massima {args.ore:g} ore · orologio del broker UTC{offset / 3600:+.1f} h")
+          f"vita massima {args.ore:g} ore · orologio del broker {describe_offsets(offsets)}")
     print("Regole attuali: 2 ticket (1% ciascuno), ingresso al bordo della zona, TP provvisori 10/20 $, "
           "Trade Active incassa 1 ticket, pareggio +0,5 $, protezione 1/4-1/2-3/4\n")
 
     totals = {n: {"days": {}, "wins": [], "losses": [], "stops": 0, "signals": 0} for n in names}
     real, tick_stats = {}, {}
+    skipped = []
     for day in days:
-        events = load_day_events(day)
+        events = events_by_day[day]
         signals = extract_signals(events)
         if not signals:
             continue
-        real[day] = real_result(events)
+        offset = offsets[day]
         start = min(s["t"] for s in signals) - 120
         stop = min(time.time(), max(s["t"] for s in signals) + args.ore * 3600)
-        bars = download_bars(mt5, start, stop, offset)
+        try:
+            bars = download_bars(mt5, start, stop, offset)
+        except SystemExit as e:  # nessuna candela per quel giorno: lo si salta, non si ferma tutto
+            skipped.append((day, str(e)))
+            continue
+        real[day] = real_result(events)
         windows = [] if args.senza_tick else tick_windows(signals)
         windows_ticks = [((a, b), download_ticks(mt5, a, b, offset)) for a, b in windows]
         tick_stats[day] = (sum(1 for _, ticks in windows_ticks if ticks), len(windows_ticks))
@@ -869,6 +953,8 @@ def main_rigioco(argv: list) -> None:
               + f"{(sum(wins) / len(wins) if wins else 0):>9.1f}{(sum(losses) / len(losses) if losses else 0):>9.1f}")
     print("\nstop = segnali chiusi allo SL pieno; media + / media − = risultato medio dei segnali vinti / persi.")
     print("'reale' è la somma delle chiusure registrate dal bot (con le regole di quel giorno e i lotti veri).")
+    for day, reason in skipped:
+        print(f"   {day}: saltato ({reason})")
     with_ticks = sum(a for a, _ in tick_stats.values())
     all_windows = sum(b for _, b in tick_stats.values())
     print(f"Tick reali disponibili in {with_ticks} finestre su {all_windows} (segnali e comandi del trader); "
