@@ -580,7 +580,10 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
         sign = 1 if buy else -1
         return [levels["entry_min"] + sign * d for d in rules["provisional_tp"]]
 
-    def try_breakeven(bid, ask):
+    def try_breakeven(bid, ask, first=False):
+        # Come il bot: pareggio se MT5 lo accetta, altrimenti stop di protezione,
+        # anche con la posizione in perdita. Solo con un guadagno minimo
+        # (BE_MIN_PROFIT > 0) il primo tentativo aspetta senza protezione.
         for ticket in tickets.values():
             if ticket["state"] != "open" or ticket["be"] or (not be_all and ticket["key"] not in rules["be_keys"]):
                 continue
@@ -588,12 +591,13 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
             if rules["be_risk"] is not None and not be_all:
                 reach = rules["be_risk"] * abs(ticket["entry"] - ticket["orig_sl"])
                 be_price = ticket["entry"] - reach if buy else ticket["entry"] + reach
-            if gain(ticket, bid, ask) < rules["be_min"]:
-                continue
-            if stop_valid(be_price, bid, ask):
+            margin_ok = rules["be_min"] <= 0 or gain(ticket, bid, ask) >= rules["be_min"]
+            if margin_ok and stop_valid(be_price, bid, ask):
                 if better(be_price, ticket["sl"]):
                     ticket["sl"] = be_price
                 ticket["be"] = True
+                continue
+            if first and not margin_ok:
                 continue
             distance = abs(ticket["entry"] - ticket["orig_sl"])
             for step in rules["protect"]:
@@ -748,7 +752,7 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
                             close(ticket, c if buy else ask_c, "incasso TA")
                             ta_done = True
                 be_wanted = True
-                try_breakeven(c, ask_c)  # primo tentativo subito, come il bot
+                try_breakeven(c, ask_c, first=True)  # primo tentativo subito, come il bot
                 last_retry = t
 
         # Pareggio (o stop di protezione) ritentato ogni 30 secondi, come il bot
