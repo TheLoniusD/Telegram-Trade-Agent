@@ -119,11 +119,12 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
   | senza TP provvisori | +493 $ | +228 $ | tutta la differenza da un'operazione (07/10 SELL 4133: +585 invece di +358), le altre 133 identiche |
   | 4 ticket (regole fino al 06/10) | +165 $ | −100 $ | meglio in 8 giorni su 12: il vantaggio dei 2 ticket viene dal 28/09 (+1.409 contro +718); più esposizione, non più resa (perdita media −60 contro −42 $) |
   | mai pareggio | −1.083 $ | −1.348 $ | 71 stop pieni |
-- **Gradino a +0,5 $** (deciso dopo il rigioco): nei 4 segnali peggiorati il pareggio a +1 $ era rifiutato mentre +0,5 $ sarebbe passato; con il gradino tornano come con la regola di prima. Stima: circa +84 $ in più (+256 $ invece di +172 $ rispetto alla regola di prima). È una stima, non misurata: nei casi in cui +1 $ è rifiutato il bot si comporta come la regola di prima finché +1 $ non diventa possibile; sui prezzi sintetici di prova il gradino a volte peggiora (lo stop a +0,5 $ è più vicino al prezzo e viene preso dove ¼ avrebbe tenuto), sui dati veri il confronto pareggio +0,5 / +1 $ non ha mai mostrato differenze oltre 7 $ per segnale. Da confermare con il prossimo rigioco ("attuale" contro "BE +1 $ senza gradino +0,5"); se peggiora, `BE_FALLBACK_OFFSET` di default torna a 0.
+- **Gradino a +0,5 $** (deciso dopo il rigioco, **verificato con un secondo rigioco lo stesso giorno**): pareggio +1 $ con gradino **+497 $**, senza gradino +437 $, regola di prima (+0,5 $) +265 $. Il gradino recupera i 4 segnali che finivano sulla protezione a ¼ (+84 $) e ne peggiora 5 di 3,5–7 $ (−24 $: lo stop a +0,5 $ preso dove senza gradino sarebbe arrivato il pareggio pieno). **Rispetto alla regola di prima: meglio in 60 segnali (+231 $), peggio in nessuno.**
+- **Pareggio più largo** (secondo rigioco, sempre con il gradino a +0,5 $): +1,5 $ → +520 $ (+23 $), meglio in 11 giorni su 12 ma il 28/09 lo stop a +1,5 $ chiude in anticipo un SELL che andava al TP2 (SELL 4179: +80 $ invece di +210 $); +2 $ → +324 $ (−173 $), tre vincenti del 28/09 tagliati (−434 $ quel giorno). Ogni 0,5 $ in più rende 3,5 $ a ticket nei giorni normali ma taglia i vincenti nei giorni di trend, che sono quelli che fanno il guadagno: **resta +1 $**, l'unico livello che nel periodo non ha tagliato nessun vincente.
 - **Contro**: con +1 $ MT5 rifiuta il pareggio più spesso (il prezzo deve essere oltre l'ingresso di almeno 1 $ più la distanza minima del broker): in quei casi entra il pareggio ridotto o, se non passa nemmeno quello, lo stop di protezione (nel rigioco senza gradino 4 volte, −84 $). Lo stop sta 0,5 $ più vicino al prezzo: in 12 giorni non ha mai chiuso un'operazione che con +0,5 $ sarebbe arrivata al TP, ma può succedere.
 - **Nota**: il periodo è positivo solo grazie al 28/09 (+1.409 $, 11 SELL in un calo continuo). Negli altri 11 giorni le regole attuali fanno −1.144 $ (con il pareggio +1 $: −962 $). Le regole spostano centinaia di dollari, la qualità dei segnali del trader migliaia.
 - **Scartato**: tolleranza d'ingresso oltre il bordo; protezione da ½ o solo ¾; incasso al Trade Active solo da +1 $; togliere o allargare i TP provvisori (un solo caso); tornare a 4 ticket (vedi *Questioni aperte*).
-- **Da verificare**: quante volte MT5 rifiuta il pareggio a +1 $ (righe di protezione nel racconto); nel prossimo rigioco pareggio +1,5 $ e +2 $ (aggiunti a `prezzi.py`: "attuale" usa ora +1 $ con il gradino a +0,5 $, "BE +0,5 $" è la regola di prima, "BE +1 $ senza gradino +0,5" quella senza gradino).
+- **Da verificare**: quante volte MT5 rifiuta il pareggio a +1 $ e quante volte entra il pareggio ridotto (righe "pareggio ridotto" e "stop di protezione" nel racconto); pareggio +1,5 $ di nuovo quando ci saranno più giorni di trend nel rigioco.
 
 ### 11/10 — "Again" subito dopo un segnale = stesso setup; ordini solo su conto DEMO
 - **Decisioni**
@@ -239,12 +240,12 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Questioni aperte
-- **Rigioco** (`prezzi.py rigioco`, con i tick): da rilanciare man mano che si aggiungono giornate; il prossimo con il pareggio a +1,5 $ e +2 $.
-- **Risultato legato ai giorni di trend**: dal 24/09 al 09/10 tutto il guadagno viene dal 28/09; negli altri giorni le regole perdono (vedi 11/10).
+- **Rigioco** (`prezzi.py rigioco`, con i tick): da rilanciare man mano che si aggiungono giornate (secondo rigioco dell'11/10: regole attuali +497 $ dal 24/09 al 09/10, `logs/rigioco_tick.txt`).
+- **Risultato legato ai giorni di trend**: dal 24/09 al 09/10 tutto il guadagno viene dal 28/09 (+1.420 $ con le regole attuali); negli altri 11 giorni le regole perdono 923 $ (vedi 11/10).
 - **2 o 4 ticket**: i 2 ticket rendono di più in totale ma solo per il 28/09; i 4 ticket sono andati meglio in 8 giorni su 12 (meno esposti). Da rivedere con più giorni.
 - **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $.
 - **Segnali solo immagine** (NFP del 02/10): invisibili al bot; possibile lettura con visione, da valutare.
-- Pareggio più largo di +1 $ (+1,5 / +2 $): da provare nel rigioco.
+- Pareggio più largo di +1 $: +1,5 $ quasi uguale in totale (+23 $) ma taglia i vincenti nei giorni di trend, +2 $ peggio (vedi 11/10); da rivedere con più giorni di trend.
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
 - Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
