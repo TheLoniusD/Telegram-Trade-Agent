@@ -25,6 +25,10 @@ MIN_SL_DIST_GOLD = 3.0
 # correzione, che il bot riconosce come segnale nuovo.
 MAX_SIGNAL_DISTANCE = float(os.getenv("MAX_SIGNAL_DISTANCE", "20"))
 
+# Il bot opera solo su conti DEMO: su un conto reale (o se il tipo di conto non
+# si può leggere) non apre nulla, a meno di ALLOW_REAL_ACCOUNT=1 nel .env.
+ALLOW_REAL_ACCOUNT = os.getenv("ALLOW_REAL_ACCOUNT", "0") == "1"
+
 # Quota massima del margine libero impegnabile da un singolo segnale (2 ticket)
 MARGIN_USAGE_LIMIT = 0.5
 
@@ -127,6 +131,14 @@ class RiskManager:
 
         if direction not in ("BUY", "SELL"):
             return {"approved": False, "reason": f"Direzione non valida: {direction}"}
+
+        # 0. Solo conti DEMO (vedi ALLOW_REAL_ACCOUNT)
+        account = mt5.account_info()
+        if account is None:
+            return {"approved": False, "reason": "conto MT5 non leggibile (terminale non collegato): nessun ordine"}
+        if account.trade_mode != getattr(mt5, "ACCOUNT_TRADE_MODE_DEMO", 0) and not ALLOW_REAL_ACCOUNT:
+            return {"approved": False, "reason": "il terminale non è collegato a un conto DEMO: nessun ordine "
+                                                 "(ALLOW_REAL_ACCOUNT=1 nel .env per permetterlo)"}
 
         # 1. Calcolo Prezzo d'Ingresso Stimato
         symbol_info = mt5.symbol_info(symbol)

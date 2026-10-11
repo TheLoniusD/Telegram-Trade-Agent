@@ -26,6 +26,13 @@ TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 # di un'operazione che non c'entra è maggiore del vantaggio.
 REENTRY_PARENT_MAX_AGE_SECONDS = 3600
 
+# "Lets buy again" scritto pochi minuti dopo un segnale nuovo nella stessa
+# direzione, ancora aperto, è il commento del trader a quel segnale, non un
+# secondo ingresso: dal 07 al 09/10 è successo 3 volte su 3 (da 6 a 60 secondi
+# dopo) e il bot raddoppiava il rischio sullo stesso setup (09/10 BUY 4201:
+# -138 $ del segnale e -144 $ del re-entry, stop preso anche dal trader).
+REENTRY_CAPTION_SECONDS = int(os.getenv("REENTRY_CAPTION_SECONDS", "300"))
+
 # Ticket aperti per ogni segnale, alternati sui TP del trader: e1 sul TP1, e2
 # sul TP2 (con 4 ticket anche e3/e4 più dentro la zona, vedi
 # RiskManager._entry_levels). Dal 06/10 sono 2, con tutto il rischio: nel
@@ -449,6 +456,18 @@ class OrderManager:
             if is_reentry:
                 logger.debug(f"🔁 [RE-ENTRY] Collegato all'operazione {source_trade.get('ticket_id') if source_trade else 'nessuna'}"
                             f" (root {root_msg_id}).")
+            if (is_reentry and source_trade and not source_trade.get("reentry")
+                    and source_trade.get("status") in CLOSABLE_STATUSES):
+                age = time.time() - (source_trade.get("created_at") or 0)
+                if age <= REENTRY_CAPTION_SECONDS:
+                    # Prezzo del segnale = bordo della zona (il più alto per un BUY)
+                    bounds = [p for p in (source_trade.get("entry_min"), source_trade.get("entry_max")) if p is not None]
+                    price = (max(bounds) if data.get("direction") == "BUY" else min(bounds)) if bounds else None
+                    return {"action": "IGNORE",
+                            "reason": f"\"again\" {age:.0f} secondi dopo il segnale "
+                                      f"{data.get('direction') or ''} {price:g}: stesso setup, nessuna nuova posizione"
+                                      if price is not None else
+                                      f"\"again\" {age:.0f} secondi dopo il segnale precedente: stesso setup, nessuna nuova posizione"}
 
             # Ereditarietà dei dati (solo se source_trade non è None)
             symbol = data.get("symbol") or self._get_param(source_trade, "symbol") or "XAUUSD"
