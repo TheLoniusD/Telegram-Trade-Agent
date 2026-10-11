@@ -245,6 +245,7 @@ PROVISIONAL_SL = 10.0        # SL provvisorio finché il trader non scrive il su
 MIN_SL_DISTANCE = 3.0
 STOPS_DISTANCE = 0.1         # distanza minima dal prezzo per spostare uno stop
 REENTRY_PARENT_SECONDS = 3600
+REENTRY_CAPTION_SECONDS = 300   # come il bot: "again" subito dopo un segnale è lo stesso setup
 PARTIAL_CLOSE_REPEAT_SECONDS = 15 * 60  # come il bot: un secondo "close half" vicino è lo stesso comando
 COMMAND_LINK_SECONDS = 6 * 3600
 
@@ -387,6 +388,8 @@ def extract_signals(events: list) -> list:
                 if not parents:
                     continue
                 parent = parents[-1]
+                if parent["parent"] is None and t - parent["t"] <= REENTRY_CAPTION_SECONDS:
+                    continue  # commento al segnale appena scritto, nessuna nuova posizione
                 inherited = levels_at(parent, t)
                 signal["parent"] = parent["id"]
                 signal["versions"].append((t, {"entry_min": None, "entry_max": None,

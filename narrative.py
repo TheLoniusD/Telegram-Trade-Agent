@@ -197,7 +197,10 @@ class Narrator:
             handler(e)
 
     def on_bot_start(self, e):
-        conto = "DEMO" if e.get("demo") else "⚠️ REALE"
+        if "demo" not in e:
+            conto = "non leggibile (MT5 non collegato)"  # 10/10: con MT5 non autorizzato diceva "REALE"
+        else:
+            conto = "DEMO" if e.get("demo") else "⚠️ REALE"
         self.say(f"▶️ Bot avviato · conto {conto} · saldo {num(e.get('balance'))} $ · equity {num(e.get('equity'))} $")
 
     def on_bot_stop(self, e):

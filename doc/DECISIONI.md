@@ -10,7 +10,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 08/10/2026)
+## Regole in vigore (aggiornato al 11/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
@@ -49,7 +49,11 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - **"Secure first layer now" / "close lowest layer"**: chiude su MT5 il ticket del layer indicato (il TP1) **solo se in guadagno**; mai segnato chiuso solo in memoria.
 - **"Close half" e simili**: chiude la percentuale chiesta, prima i ticket con il TP più lontano, **mai ticket in perdita**; ripetizione entro 15 minuti = stesso comando.
 - **Re-entry** ("Try buy again", senza prezzo): eredita SL e TP *scritti dal trader* dall'ultima operazione nella stessa direzione (aperta, o chiusa nell'ultima ora), entra a mercato; i messaggi sul segnale padre valgono anche per lui.
+- **"Again" scritto entro 5 minuti da un segnale nuovo ancora aperto** nella stessa direzione è il commento del trader a quel segnale: **nessuna nuova posizione** (`REENTRY_CAPTION_SECONDS=300`).
 - Un segnale con prezzo non è mai un re-entry, anche se vicino a uno aperto.
+
+### Sicurezza del conto
+- Il bot apre ordini **solo su un conto DEMO**: con un conto reale, o se il tipo di conto non si legge, ogni segnale viene rifiutato (`ALLOW_REAL_ACCOUNT=1` per permetterlo).
 
 ### Log e repository
 - Per giorno: `bot.log` (racconto), `operazioni.txt` (schede), `dettagli.log`, `errors.log`, `journal.jsonl` (dati). Heartbeat ogni 4 ore.
@@ -66,6 +70,8 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `BE_MIN_PROFIT` | 0 | guadagno minimo per il pareggio: deve restare 0 |
 | `PROVISIONAL_TP` | 10,20 | distanza dei TP provvisori dal segnale; `0` = nessun TP provvisorio |
 | `TRADE_ACTIVE_TIE` | 0.5 | ingressi entro questa distanza = stesso prezzo al Trade Active (si chiude il TP1) |
+| `REENTRY_CAPTION_SECONDS` | 300 | "again" entro questo tempo da un segnale aperto = stesso setup, nessuna posizione |
+| `ALLOW_REAL_ACCOUNT` | 0 | `1` = permette ordini su un conto non DEMO (oggi non va usato) |
 | `ENTRY_ZONE_WIDTH` | 5 | larghezza zona in fase rapida |
 | `ENTRY_ORDER_EXPIRY_MINUTES` | 30 | |
 | `TRADE_ACTIVE_MAX_CLOSE` | 2 | ticket incassati al Trade Active (ne resta sempre 1) |
@@ -87,6 +93,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
 | 02/10 | −258 $ | ingresso `range`; 2 stop pieni (−285 $) con tutti e 4 i ticket eseguiti; segnale NFP solo immagine, non visto |
 | 05/10 | −640 $ (−105 $ non registrati) | 4 stop pieni (−554 $), tutti con 4 ticket eseguiti; bug ordini eseguiti segnati come cancellati (SELL 4151) |
+| 09/10 | −250 $ | 2 ticket; BUY 4201 + re-entry "Lets buy again" 17 s dopo: 4 posizioni sullo stesso setup, entrambe allo stop (−282 $, "hit risk" anche per il trader); 1 stop di protezione (−36 $); 2 segnali mai entrati (prezzo 0,14 e 0,88 $ oltre il bordo) |
 | 08/10 | +206 $ (+73 $ da una posizione persa dal bot e chiusa al TP) | 2 ticket; nessuno stop pieno, nessun "hit risk" del trader; 2 stop di protezione (−53 $); 4 segnali mai entrati (prezzo 0,2–2 $ oltre il bordo) |
 | 07/10 | +770 $ (+663 $ da chiusura manuale) | primo giorno con 2 ticket; nessuno stop pieno, 8 vinti su 9 gestiti dal bot (+108 $); SELL 4133 mai completato dal trader, chiuso a mano a +663 $ |
 | 06/10 | −449 $ | ancora 4 ticket (e3/e4 a metà lotto); 5 stop pieni (−416 $): 4 anche per il trader ("hit risk"), 1 per MT5 scollegato 6 minuti (pareggio perso); 4 segnali mai entrati (prezzo oltre il bordo) |
@@ -94,6 +101,17 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 11/10 — "Again" subito dopo un segnale = stesso setup; ordini solo su conto DEMO
+- **Decisioni**
+  - Un re-entry ("Lets buy again") scritto entro **5 minuti** da un segnale nuovo nella stessa direzione **ancora aperto** non apre nuove posizioni: è il commento del trader a quel segnale. Se il segnale è già chiuso (stop) o sono passati più di 5 minuti, resta un re-entry vero (a mercato, con SL e TP del segnale).
+  - **Solo conto DEMO**: il risk manager rifiuta ogni ordine se il terminale non è su un conto DEMO o se il conto non si legge (`ALLOW_REAL_ACCOUNT=1` per permetterlo).
+  - Racconto: all'avvio con MT5 non autorizzato scriveva "conto ⚠️ REALE"; ora "conto non leggibile".
+- **Perché**
+  - Dal 07 al 09/10 i re-entry riconosciuti dal bot sono stati 3, **tutti scritti da 6 a 60 secondi dopo un segnale** nella stessa direzione ("Gold sell 4133" + "Lets sell again One more time"; "Gold sell 4130" + "Lets sell One more time"; "Gold buy 4201" + "Lets buy again"): il bot apriva altre 2 posizioni a mercato, raddoppiando il rischio sullo stesso setup. Risultato dei 3 re-entry: +5 $, +38 $, −144 $ (09/10, insieme al −138 $ del segnale). Nessun "again" isolato dopo uno stop in tutti i log dal 23/09.
+  - 10/10 (sabato): dalle 17:30 server senza Telegram e MT5 ("Authorization failed"), bot riavviato 41 volte in 30 minuti, tornato normale alle 18:04; con il conto non leggibile il racconto diceva "REALE".
+- **Contro**: se un giorno il trader vuole davvero aggiungere un secondo ingresso subito dopo il segnale, non lo seguiamo (resta il 2% su quel setup). L'08/10 il re-entry era l'unica posizione aperta (gli ordini del segnale non sono mai stati eseguiti) e ha preso il TP1 (+38 $): con la nuova regola non ci sarebbe stato.
+- **Da verificare**: "again" isolati (dopo uno stop o a distanza dal segnale), che restano re-entry veri.
 
 ### 08/10 — Layer chiuso su MT5, posizioni orfane riprese, parità al Trade Active entro 0,50 $
 - **Correzioni**
@@ -207,6 +225,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
 - Limiti di rischio complessivo (operazioni contemporanee, perdita giornaliera): proposti il 01/10, rimandati.
+- **Riavvii a raffica senza rete** (10/10: 41 riavvii in 30 minuti, nessun danno a mercato chiuso): valutare un'attesa crescente tra un tentativo e l'altro per non riempire i log.
 - Rischio per segnale: il 2% è fisso nel codice. Con 4 ticket l'arrotondamento dei lotti lo riduceva a circa 1,2% effettivo (06/10: stop pieni da −83 $); con 2 ticket è circa 1,8% (−125 $). Valutare un parametro `RISK_PERCENT`.
 - Segnale rapido mai completato dal trader: dal 07/10 ha SL e TP provvisori. Resta da decidere se gestirlo anche nel tempo (es. pareggio dopo un certo guadagno, visto che nessun Trade Active arriverà).
 - **MT5 scollegato spesso** (06/10 una volta, 07/10 quattro volte, da 1 a 7 minuti): controllare la connessione del terminale sul server.
