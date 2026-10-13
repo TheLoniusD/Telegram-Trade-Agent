@@ -103,6 +103,14 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ## Registro delle decisioni (dal più recente)
 
+### 13/10 — Verifica obbligatoria e istruzioni per le sessioni di Claude
+- **Decisione** (metodo di lavoro, nessuna regola di trading cambiata):
+  - `tests/`: banco di prova con broker finto (`tests/fake_mt5.py`, `tests/banco.py`) e scenari con controlli automatici su ingresso, pareggio e gradini, Trade Active, ordini eseguiti di nascosto, MT5 scollegato, re-entry, posizioni orfane, layer, SL rimesso. Si lancia con `python tests/run_all.py` (circa 1 secondo, nessun MT5/Telegram/.env, cartella temporanea).
+  - Regola: **ogni correzione si fa con un test e si verifica**; il push si fa solo con la verifica riuscita (hook in `.claude/settings.json` che blocca `git push`) e dopo l'ok del proprietario.
+  - `CLAUDE.md` e skill di progetto (`analisi-log`, `rigioco`, `prompt-server`) per sessioni nuove con memoria limitata, anche sul server.
+- **Perché**: le prove sul broker finto vivevano solo nella cartella temporanea di una sessione e il controllo dei risultati era a occhio; le regole di lavoro erano ripetute a ogni prompt.
+- **Da verificare**: che la sessione sul server lanci la verifica prima di ogni riavvio; aggiungere uno scenario a ogni bug trovato nei log.
+
 ### 11/10 (rigioco) — Pareggio a +1 $; protezione, ingresso al bordo, incasso al Trade Active e TP provvisori confermati
 - **Decisione**: pareggio a ingresso **± 1 $** invece di ± 0,50 $ (`BE_OFFSET` di default 1.0, nessuna modifica al `.env`); se MT5 lo rifiuta, **prima della protezione si prova il pareggio ridotto a ± 0,50 $** (`BE_FALLBACK_OFFSET=0.5`). Tutto il resto resta com'è: stop di protezione ¼-½-¾, mai ingressi fuori zona, incasso al Trade Active con qualsiasi guadagno, TP provvisori 10/20 $, 2 ticket.
 - **Perché**: rigioco dei messaggi del trader dal 24/09 al 09/10 **con i tick reali** (`logs/rigioco_tick.txt` e `rigioco_tick_dettaglio.txt`): 134 segnali, rischio fisso 140 $ per segnale, orologio del broker UTC+3 in tutti i giorni, tick in 263 finestre su 264. Coincide con il reale delle regole attuali a pochi dollari: 08/10 SELL 4121 −35,0 (reale −35,22), BUY 4134 −16,9 (−15,57); 09/10 BUY 4194 −35,0 (−35,62), BUY 4181 +24,5 (+22,71), BUY 4182 +16,5 (+16,77), SELL 4172 +7,0 (+7,12).
