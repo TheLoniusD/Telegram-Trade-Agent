@@ -26,7 +26,9 @@ Le regole di trading in vigore e il perché di ogni scelta sono in **[doc/DECISI
 | `logger_config.py` | file di log per giorno, in ora italiana |
 | `verifica_be.py` | rigioca le posizioni di un giorno sulle candele al minuto di MT5 (analisi) |
 | `prezzi.py` | cosa ha fatto il prezzo dopo ogni segnale di un giorno, sulle candele al minuto di MT5; con `rigioco` confronta regole diverse su più giornate (analisi) |
+| `tests/` | banco di prova con broker finto: `python tests/run_all.py` prova le regole principali senza MT5 né Telegram (da lanciare dopo ogni modifica) |
 | `doc/` | `DECISIONI.md` (regole e scelte), archivio di messaggi reali del canale |
+| `CLAUDE.md`, `.claude/` | istruzioni, skill e hook per le sessioni di Claude Code (analisi dei log, rigioco, prompt per il server, verifica prima del push) |
 
 ## Branch
 
