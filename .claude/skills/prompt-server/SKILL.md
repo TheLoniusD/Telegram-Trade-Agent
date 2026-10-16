@@ -34,9 +34,9 @@ REGOLE FISSE (sempre valide)
 - Non modificare il codice: se qualcosa non va, riporta l'errore esatto.
 
 COSA FARE
-1. Nella cartella del progetto: controllo dello stato del bot (CLAUDE.md, "Controllo dello stato"). Poi: PRIMA=$(git rev-parse HEAD); git status --short (solo righe sotto logs/); git add -f logs; git commit -m "Log aggiornati" (se c'è qualcosa); git pull --no-rebase origin server.
+1. Nella cartella del progetto: controllo dello stato del bot (CLAUDE.md, "Controllo dello stato") e annota il commit attuale (git rev-parse --short HEAD). Poi: git status --short (solo righe sotto logs/); git add -f logs; git commit -m "Log aggiornati" (se c'è qualcosa); git pull --no-rebase origin server.
 2. Verifica: git log --oneline -3 deve contenere "<titolo del commit>". <controlli specifici della modifica>
-3. git diff --name-only $PRIMA HEAD -- requirements.txt: se compare, installa i pacchetti con il Python del servizio (CLAUDE.md, "Dati del server") e riporta cosa è stato installato.
+3. git diff --name-only <commit annotato> HEAD -- requirements.txt: se compare, installa i pacchetti con il Python del servizio (CLAUDE.md, "Dati del server") e riporta cosa è stato installato.
 4. Verifica: <python> tests/run_all.py → deve finire con "VERIFICA RIUSCITA". Se fallisce, NON riavviare il bot e riporta l'uscita.
 5. Riavvia il servizio systemd del bot (nome nei "Dati del server" del CLAUDE.md). Dopo circa 30 secondi: servizio attivo, pgrep -af telegram_listener mostra UN solo processo, in logs/<data di oggi, ora italiana>/bot.log c'è una nuova riga "▶️ Bot avviato · conto DEMO".
 6. <eventuali passi extra: rigioco, controlli sul .env senza stamparlo>
