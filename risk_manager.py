@@ -4,6 +4,7 @@ import os
 import MetaTrader5 as mt5
 
 import journal
+from order_manager import PROVISIONAL_TP_DISTANCES, ticket_tp_index
 
 
 # Distanza dello SL temporaneo (fase rapida) dal prezzo del segnale.
@@ -222,6 +223,13 @@ class RiskManager:
             level = entry_levels[key] if entry_levels[key] is not None else current_price
             if take_profit is not None and not (take_profit > level if direction == "BUY" else take_profit < level):
                 take_profit = None
+            # Ingresso a mercato senza prezzo e senza TP (nessun TP da ereditare, o
+            # già superato): TP provvisori dal prezzo d'ingresso, come lo SL
+            # provvisorio. Il 13/10 "Lets sell one more time" è entrato senza TP.
+            if take_profit is None and entry_min is None and PROVISIONAL_TP_DISTANCES:
+                index = ticket_tp_index(key, tickets.get(key, {}))
+                distance = PROVISIONAL_TP_DISTANCES[min(index, len(PROVISIONAL_TP_DISTANCES) - 1)]
+                take_profit = round(current_price + distance if direction == "BUY" else current_price - distance, 2)
             orders_to_execute[key] = {
                 "symbol": symbol,
                 "direction": direction,
