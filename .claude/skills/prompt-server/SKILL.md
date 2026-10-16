@@ -32,6 +32,7 @@ REGOLE FISSE (sempre valide)
 - Il bot gira solo come servizio systemd, in un solo processo: mai avviare telegram_listener.py a mano.
 - Il conto MT5 è e deve restare DEMO.
 - Non modificare il codice: se qualcosa non va, riporta l'errore esatto.
+- Non chiedere né accettare token, password o chiavi private: se il push fallisce per le credenziali, fermati e riporta l'errore.
 
 COSA FARE
 1. Nella cartella del progetto: controllo dello stato del bot (CLAUDE.md, "Controllo dello stato") e annota il commit attuale (git rev-parse --short HEAD). Poi: git status --short (solo righe sotto logs/); git add -f logs; git commit -m "Log aggiornati" (se c'è qualcosa); git pull --no-rebase origin server.

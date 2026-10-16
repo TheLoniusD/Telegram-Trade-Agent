@@ -24,6 +24,7 @@ Di solito ricevi un **prompt** scritto da una sessione sul PC: seguilo insieme a
 | Servizio systemd del bot | `telegram-trade-agent.service`, servizio **di sistema** (`/etc/systemd/system/`), `User=trader` |
 | Comando Python del servizio | `/home/trader/telegram-trade-agent/venv/bin/python` (ambiente virtuale; `ExecStart=... telegram_listener.py`) |
 | MT5 (`mt5server.exe` sotto Wine) | servizi di sistema in catena: `mt5-xvfb.service` (Xvfb `:99`) → `mt5-terminal.service` (`wine terminal64.exe /portable`) → `mt5-server.service` (`wine /home/trader/mt5server.exe`, processo `Z:\home\trader\mt5server.exe`) |
+| Accesso a GitHub | SSH con una **chiave di deploy** con scrittura, valida solo per questo repository: chiave `~/.ssh/telegram_trade_agent`, `origin` = `git@github.com:TheLoniusD/Telegram-Trade-Agent.git`, `core.sshCommand` nella configurazione git del repository. Prova: `ssh -i ~/.ssh/telegram_trade_agent -o IdentitiesOnly=yes -T git@github.com` → "Hi TheLoniusD/Telegram-Trade-Agent! You've successfully authenticated". Se `git remote get-url origin` inizia ancora con `https://`, la chiave non è configurata: il push chiede le credenziali e non può riuscire |
 
 Se una riga è *da completare*, trovala e scrivila qui:
 - `systemctl list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'` e, se non c'è, `systemctl --user list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'`;
@@ -42,6 +43,8 @@ Poi committa questo file da solo (`git add CLAUDE.md && git commit -m "CLAUDE.md
 - **Non modificare il codice** (né test, skill, `requirements.txt`, `.gitignore`): solo log, risultati del rigioco e i *Dati del server* qui sopra.
 - Git: solo il branch `server`. Mai `push --force`, mai `pull --rebase`, mai `reset`, `rebase`, `commit --amend`, `checkout` di altri branch, `merge` di `main`. Si fa `git pull --no-rebase origin server`, poi push. Se il pull va in conflitto: `git merge --abort` e riporta.
 - Mai `git add .` o `git add -A`: si aggiungono solo i file previsti.
+- La configurazione di git (`remote`, `core.sshCommand`, credenziali) si cambia solo con i comandi precisi di un prompt.
+- **Credenziali**: mai chiedere, accettare o scrivere token, password o chiavi private, né in chat né in file o comandi. La chiave privata `~/.ssh/telegram_trade_agent` non si mostra, non si copia e non si sposta; quella pubblica (`.pub`) si può mostrare. Se il push fallisce per le credenziali, fermati e riporta l'errore: non cercare altre strade.
 
 ## Controllo dello stato
 
@@ -75,6 +78,7 @@ git push origin server
 - Il pull può portare codice nuovo: il bot continua a girare con la versione di prima finché non lo riavvii con un *Rilascio*. Se il pull ha cambiato file `.py` o `requirements.txt`, dillo nella risposta.
 - Il push esegue la verifica (hook, vedi *Verifica*): se la verifica fallisce il push è bloccato, anche quello dei soli log. Riporta l'errore e non aggirarlo.
 - Push rifiutato perché il remoto è avanti: rifai pull (`--no-rebase`) e push.
+- Push rifiutato per le credenziali (`Permission denied (publickey)`, `could not read Username`, chiave "read only"): vedi *Regole fisse*, riporta l'errore esatto e l'uscita di `git remote get-url origin`. I commit restano in locale e partono con il caricamento successivo.
 - I log del giorno in corso sono parziali: vanno caricati lo stesso, il caricamento successivo li completa.
 - Rispondi con: stato del bot, giorni caricati (cartelle nuove o cambiate), commit in cima dopo il pull, esito del push.
 
