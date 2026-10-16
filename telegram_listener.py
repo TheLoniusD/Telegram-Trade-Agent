@@ -791,6 +791,8 @@ def handle_message(event, is_edit: bool):
                         if exec_result.get("success"):
                             ticket_data["stop_loss"] = order_config.get("stop_loss")
                             trade_data["stop_loss"] = order_config.get("stop_loss")
+                            # Anche il TP inviato (es. quello provvisorio di un ingresso senza prezzo)
+                            ticket_data["take_profit"] = order_config.get("take_profit")
 
                     if exec_result.get("success"):
                         opened_count += 1

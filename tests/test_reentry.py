@@ -58,4 +58,25 @@ check(sorted(p.tp for p in positions) == [4113.0, 4123.0], "TP del segnale (4123
       [p.tp for p in positions])
 pulisci()
 
+scenario("13/10: \"Lets sell one more time\" 1 minuto dopo il segnale, classificato senza re-entry: nessuna nuova posizione")
+broker.reset(price=4192.0)
+segnale(9, "SELL", 4192, 4192, 4197, 4207, [4182, 4172])
+invia(10, "Lets sell one more time", classe("NEW_SIGNAL", direction="SELL"))
+check(len(broker.positions) == 2, "restano solo le 2 posizioni del segnale", len(broker.positions))
+decision = [e for e in diario() if e["event"] == "DECISION" and e.get("msg_id") == 10]
+check(decision and decision[-1]["action"] == "IGNORE" and "stesso setup" in (decision[-1]["reason"] or ""),
+      "diario: \"stesso setup, nessuna nuova posizione\"", decision)
+pulisci()
+
+scenario("Ingresso a mercato senza prezzo e senza segnali aperti: TP provvisori a 10 / 20 $ dal prezzo d'ingresso")
+broker.reset(price=4150.0)
+invia(11, "M5 double top, lets sell it", classe("NEW_SIGNAL", direction="SELL"))
+positions = list(broker.positions.values())
+check(len(positions) == 2, "2 posizioni a mercato", len(positions))
+check(sorted(p.tp for p in positions) == [4130.0, 4140.0], "TP provvisori 4140 / 4130: nessuna posizione senza uscita",
+      [p.tp for p in positions])
+check(sorted(t.get("take_profit") or 0 for t in operazione(11)["tickets"].values()) == [4130.0, 4140.0],
+      "TP provvisori anche in memoria", [t.get("take_profit") for t in operazione(11)["tickets"].values()])
+pulisci()
+
 fine()

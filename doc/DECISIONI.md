@@ -10,7 +10,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 11/10/2026)
+## Regole in vigore (aggiornato al 16/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
@@ -25,7 +25,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Niente più e3/e4 più dentro la zona (tolti il 06/10). Restano disponibili con `ENTRY_TICKETS=4`: limite a metà e a ¾ della zona, lotto ridotto da `ENTRY_DEEP_LOT_FACTOR`.
 - Zona: quella scritta dal trader; nella fase rapida ("Gold buy 4186") si assume larga 5 $ a favore del trader.
 - SL provvisorio a 10 $ dal segnale finché il trader non scrive il suo; SL a meno di 3 $ o dalla parte sbagliata → provvisorio.
-- **TP provvisori** a 10 $ (TP1) e 20 $ (TP2) dal prezzo del segnale finché il trader non scrive i suoi (`PROVISIONAL_TP=10,20`): nessuna posizione resta senza uscita se il segnale non viene mai completato.
+- **TP provvisori** a 10 $ (TP1) e 20 $ (TP2) dal prezzo del segnale finché il trader non scrive i suoi (`PROVISIONAL_TP=10,20`): nessuna posizione resta senza uscita se il segnale non viene mai completato. Un ingresso a mercato senza prezzo che non ha TP da ereditare li prende dal prezzo d'ingresso.
 - Se una posizione del bot risulta su MT5 **senza SL**, il controllo periodico (ogni 30 s) rimette lo SL che ha in memoria.
 - **Posizioni orfane**: ogni 30 s le posizioni del bot su MT5 (magic number) vengono confrontate con la memoria; quelle segnate chiuse o cancellate per errore tornano in gestione, quelle sconosciute vengono segnalate.
 - Ordini limite non eseguiti: cancellati dopo 30 minuti, o al primo comando di pareggio/Trade Active/chiusura.
@@ -49,7 +49,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - **"Secure first layer now" / "close lowest layer"**: chiude su MT5 il ticket del layer indicato (il TP1) **solo se in guadagno**; mai segnato chiuso solo in memoria.
 - **"Close half" e simili**: chiude la percentuale chiesta, prima i ticket con il TP più lontano, **mai ticket in perdita**; ripetizione entro 15 minuti = stesso comando.
 - **Re-entry** ("Try buy again", senza prezzo): eredita SL e TP *scritti dal trader* dall'ultima operazione nella stessa direzione (aperta, o chiusa nell'ultima ora), entra a mercato; i messaggi sul segnale padre valgono anche per lui.
-- **"Again" scritto entro 5 minuti da un segnale nuovo ancora aperto** nella stessa direzione è il commento del trader a quel segnale: **nessuna nuova posizione** (`REENTRY_CAPTION_SECONDS=300`).
+- **"Again" scritto entro 5 minuti da un segnale nuovo ancora aperto** nella stessa direzione è il commento del trader a quel segnale: **nessuna nuova posizione** (`REENTRY_CAPTION_SECONDS=300`). Vale per ogni ingresso senza prezzo ("one more time", "lets sell it"), anche se l'agente non lo segna come re-entry.
 - Un segnale con prezzo non è mai un re-entry, anche se vicino a uno aperto.
 
 ### Sicurezza del conto
@@ -94,6 +94,11 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | 01/10 | −231 $ | ingresso in due fasi; 2 stop pieni (−299 $, anche il trader "hit risk") |
 | 02/10 | −258 $ | ingresso `range`; 2 stop pieni (−285 $) con tutti e 4 i ticket eseguiti; segnale NFP solo immagine, non visto |
 | 05/10 | −640 $ (−105 $ non registrati) | 4 stop pieni (−554 $), tutti con 4 ticket eseguiti; bug ordini eseguiti segnati come cancellati (SELL 4151) |
+| 16/10 | +214 $ | nessuno stop pieno; 1 stop di protezione (−31 $); BUY 4155 e2 al TP2 (+125 $); 2 segnali mai entrati (prezzo 1,4–1,5 $ oltre il bordo) |
+| 15/10 | +12 $ | un solo segnale pubblico (giornata del trader per i VIP) |
+| 14/10 | −261 $ | 3 stop pieni (−365 $): 2 anche per il trader, 1 (SELL 4147) tenuto dal trader oltre il suo SL e chiuso al TP; 2 stop di protezione (−63 $); 2 segnali mai entrati (1,6–1,7 $ oltre il bordo); un BUY perso durante un riavvio non spiegato (08:08, trader TP 175 pips) |
+| 13/10 | +119 $ | trader 12/12; nessuno stop pieno; 5 stop di protezione (−125 $); SELL 4197 e2 al TP2 (+125 $); "Lets sell one more time" aperto per errore come segnale nuovo (+13 $) |
+| 12/10 | −439 $ | 3 stop pieni (−411 $): 2 anche per il trader, 1 (BUY 4165) chiuso dal trader a −30 pips ("i cut lose 30pips", ignorato dall'agente); 2 stop di protezione (−125 $); 1 segnale mai entrato (1,1 $ oltre il bordo) |
 | 09/10 | −250 $ | 2 ticket; BUY 4201 + re-entry "Lets buy again" 17 s dopo: 4 posizioni sullo stesso setup, entrambe allo stop (−282 $, "hit risk" anche per il trader); 1 stop di protezione (−36 $); 2 segnali mai entrati (prezzo 0,14 e 0,88 $ oltre il bordo) |
 | 08/10 | +206 $ (+73 $ da una posizione persa dal bot e chiusa al TP) | 2 ticket; nessuno stop pieno, nessun "hit risk" del trader; 2 stop di protezione (−53 $); 4 segnali mai entrati (prezzo 0,2–2 $ oltre il bordo) |
 | 07/10 | +770 $ (+663 $ da chiusura manuale) | primo giorno con 2 ticket; nessuno stop pieno, 8 vinti su 9 gestiti dal bot (+108 $); SELL 4133 mai completato dal trader, chiuso a mano a +663 $ |
@@ -102,6 +107,14 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 16/10 — Ingresso senza prezzo subito dopo un segnale = stesso setup; TP provvisori anche a mercato
+- **Correzioni**
+  - Un ingresso a mercato senza prezzo scritto entro 5 minuti da un segnale nuovo ancora aperto nella stessa direzione non apre posizioni **anche se l'agente non lo segna come re-entry**. Il prompt dell'agente riconosce "one more time" come "again".
+  - Un ingresso a mercato senza prezzo che non ha TP da ereditare prende i **TP provvisori** a 10/20 $ dal prezzo d'ingresso; il TP inviato a MT5 va anche in memoria.
+- **Perché**: 13/10 "Lets sell one more time" 63 secondi dopo "Gold sell 4192": l'08/10 la stessa frase era stata riconosciuta come re-entry, il 13/10 come segnale nuovo senza re-entry; il bot ha aperto altre 2 posizioni a mercato (4.192,08) **senza TP** e con lo SL provvisorio. È finita a pareggio (+12,52 $), ma era il raddoppio del rischio che la regola dell'11/10 voleva evitare. Il rigioco (`prezzi.py`) trattava già così ogni ingresso senza prezzo: ora bot e rigioco coincidono.
+- **Contro**: un ingresso a mercato senza prezzo voluto davvero entro 5 minuti da un segnale nella stessa direzione non viene seguito (come per "again").
+- **Da verificare**: altri messaggi senza prezzo dopo un segnale ("lets sell it", "one more"), e che la riga 📥 di un ingresso senza prezzo mostri i TP.
 
 ### 13/10 — Verifica obbligatoria e istruzioni per le sessioni di Claude
 - **Decisione** (metodo di lavoro, nessuna regola di trading cambiata):
@@ -248,7 +261,10 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Questioni aperte
-- **Rigioco** (`prezzi.py rigioco`, con i tick): da rilanciare man mano che si aggiungono giornate (secondo rigioco dell'11/10: regole attuali +497 $ dal 24/09 al 09/10, `logs/rigioco_tick.txt`).
+- **Rigioco** (`prezzi.py rigioco`, con i tick): da rilanciare man mano che si aggiungono giornate (secondo rigioco dell'11/10: regole attuali +497 $ dal 24/09 al 09/10, `logs/rigioco_tick.txt`). Da rilanciare fino al 16/10 per misurare lo stop di protezione sulla settimana 12–16/10 (vedi sotto).
+- **Pareggio +1 $ rifiutato e stop di protezione** (dati 12–16/10, prima settimana con +1 $): MT5 ha rifiutato il pareggio su **35 ticket su 48** (73%), quasi sempre perché al Trade Active il prezzo era già tornato all'ingresso (e1 in perdita in 10 Trade Active su 37). Dei 35: 11 pareggi pieni entrati poco dopo (+70 $), 6 pareggi ridotti (+20 $), **18 stop di protezione colpiti (−344 $, 10 segnali)**, tutti su segnali che il trader dà vinti. Il rigioco dell'11/10 dava la protezione a +182 $ rispetto a niente protezione; resta da vedere con il rigioco quanti di questi 10 sarebbero finiti allo stop pieno senza protezione.
+- **Riavvii non spiegati** il 14/10 alle 08:07 e 08:11 e il 15/10 alle 08:03 (06:03–06:11 UTC, senza arresto registrato né rilascio): il 14/10 si è perso un BUY (msg 59121, con la sua modifica) che il trader ha chiuso al TP (175 pips). Da cercare la causa sul server (`journalctl`); valutare la lettura all'avvio degli ultimi messaggi del canale.
+- **"Cut loss" dichiarato dal trader**: 12/10 "this setup i cut lose 30pips" classificato IGNORE; il trader ha chiuso il BUY 4165 a −30 pips, noi 4 minuti dopo allo stop pieno (−125 $ invece di circa −42 $). Unico caso nei log (gli altri "cut lose if solid break X" sono condizionati e diventano SL).
 - **Risultato legato ai giorni di trend**: dal 24/09 al 09/10 tutto il guadagno viene dal 28/09 (+1.420 $ con le regole attuali); negli altri 11 giorni le regole perdono 923 $ (vedi 11/10).
 - **2 o 4 ticket**: i 2 ticket rendono di più in totale ma solo per il 28/09; i 4 ticket sono andati meglio in 8 giorni su 12 (meno esposti). Da rivedere con più giorni.
 - **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $.
@@ -260,7 +276,8 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - **Riavvii a raffica senza rete** (10/10: 41 riavvii in 30 minuti, nessun danno a mercato chiuso): valutare un'attesa crescente tra un tentativo e l'altro per non riempire i log.
 - Rischio per segnale: il 2% è fisso nel codice. Con 4 ticket l'arrotondamento dei lotti lo riduceva a circa 1,2% effettivo (06/10: stop pieni da −83 $); con 2 ticket è circa 1,8% (−125 $). Valutare un parametro `RISK_PERCENT`.
 - Segnale rapido mai completato dal trader: dal 07/10 ha SL e TP provvisori. Resta da decidere se gestirlo anche nel tempo (es. pareggio dopo un certo guadagno, visto che nessun Trade Active arriverà).
-- **MT5 scollegato spesso** (06/10 una volta, 07/10 quattro volte, da 1 a 7 minuti): controllare la connessione del terminale sul server.
+- **MT5 scollegato spesso** (06/10 una volta, 07/10 quattro volte, da 1 a 7 minuti; dal 12 al 16/10 nove volte, da 30 secondi a 8,5 minuti, senza danni): controllare la connessione del terminale sul server.
+- **Segnali mai entrati**: dal 12 al 16/10 cinque, con il prezzo da 1,1 a 1,7 $ oltre il bordo, tutti dati vinti dal trader (Trade Active 45–60 pips). Il rigioco dell'11/10 scartava le tolleranze da 1 e 2 $ (−320 / −268 $).
 - Notizie ad alto impatto (NFP, CPI…): operare o no durante la pubblicazione.
-- "Cut loss if solid break X": oggi diventa uno SL rigido; valutare uno SL "morbido" che chiude solo a candela chiusa oltre il livello.
+- "Cut loss if solid break X": oggi diventa uno SL rigido; valutare uno SL "morbido" che chiude solo a candela chiusa oltre il livello. 14/10 SELL 4147: stop pieno a 4157 (−125 $), il trader "still hold it, it still not solid break 4157" e poi lo chiude al TP (210 pips).
 - Più esempi reali nel prompt dell'agente, man mano che arrivano messaggi nuovi.
