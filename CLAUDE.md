@@ -97,6 +97,7 @@ I parametri si leggono da `.env` con `os.getenv(NOME, default)`. **Il default ne
 - Git: mai `push --force`, mai `pull --rebase`, mai `reset` su `main` o `server`; si fa pull con merge e poi push.
 - Il bot non si avvia mai dal PC: il PC e il server non devono mai girare insieme con la stessa sessione Telegram.
 - Sul server si interviene solo con il prompt per la sessione sul server, mai chiedendo al proprietario comandi a mano.
+- Credenziali (token GitHub, password, chiavi private): mai chiederle al proprietario né farle passare in chat o nei prompt. Il server pubblica su GitHub con la sua chiave di deploy SSH; se un suo push fallisce per le credenziali, si sistema la configurazione del server con un prompt, non con un token.
 
 ## Skill del progetto (`.claude/skills/`)
 
