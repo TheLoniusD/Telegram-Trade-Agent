@@ -20,10 +20,10 @@ Di solito ricevi un **prompt** scritto da una sessione sul PC: seguilo insieme a
 | | |
 |---|---|
 | Utente | `trader` |
-| Cartella del progetto | *da completare* |
-| Servizio systemd del bot | *da completare* (e se è di sistema o utente) |
-| Comando Python del servizio | *da completare* (`python3` o quello di un ambiente virtuale) |
-| MT5 (`mt5server.exe` sotto Wine) | *da completare* (come parte: servizio, processo) |
+| Cartella del progetto | `/home/trader/telegram-trade-agent` |
+| Servizio systemd del bot | `telegram-trade-agent.service`, servizio **di sistema** (`/etc/systemd/system/`), `User=trader` |
+| Comando Python del servizio | `/home/trader/telegram-trade-agent/venv/bin/python` (ambiente virtuale; `ExecStart=... telegram_listener.py`) |
+| MT5 (`mt5server.exe` sotto Wine) | servizi di sistema in catena: `mt5-xvfb.service` (Xvfb `:99`) → `mt5-terminal.service` (`wine terminal64.exe /portable`) → `mt5-server.service` (`wine /home/trader/mt5server.exe`, processo `Z:\home\trader\mt5server.exe`) |
 
 Se una riga è *da completare*, trovala e scrivila qui:
 - `systemctl list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'` e, se non c'è, `systemctl --user list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'`;
