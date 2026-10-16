@@ -1,12 +1,15 @@
 {
+  "env": {
+    "PYTHONUTF8": "1"
+  },
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verifica_prima_del_push.py\"",
+            "command": "if python3 -c '' </dev/null 2>/dev/null; then PY=python3; else PY=python; fi; \"$PY\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/verifica_prima_del_push.py\"",
             "timeout": 600,
             "statusMessage": "Verifica prima del push (tests/run_all.py)..."
           }

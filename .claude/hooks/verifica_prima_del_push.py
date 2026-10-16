@@ -1,7 +1,8 @@
 """
-Hook di Claude Code (PreToolUse sul tool Bash): prima di ogni "git push" lancia
-la verifica completa (tests/run_all.py) e blocca il push se qualcosa fallisce.
-Gli altri comandi passano subito. Configurato in .claude/settings.json.
+Hook di Claude Code (PreToolUse sui tool Bash e PowerShell): prima di ogni "git push"
+lancia la verifica completa (tests/run_all.py) e blocca il push se qualcosa fallisce.
+Gli altri comandi passano subito. Configurato in .claude/settings.json, che lo avvia
+con python3 sul server e con python sul PC Windows (dove python3 non funziona).
 """
 import json
 import os
@@ -20,7 +21,7 @@ if not os.path.exists(runner):
     sys.exit(0)  # branch senza test (es. vecchio server non ancora aggiornato): non blocca
 
 run = subprocess.run([sys.executable, runner], cwd=root, capture_output=True, text=True,
-                     encoding="utf-8", errors="replace")
+                     encoding="utf-8", errors="replace", env=dict(os.environ, PYTHONUTF8="1"))
 if run.returncode != 0:
     sys.stderr.write("Push bloccato: la verifica tests/run_all.py non passa. Correggi e rilancia i test prima di pubblicare.\n\n"
                      + run.stdout[-4000:] + run.stderr[-1000:])
