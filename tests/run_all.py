@@ -22,6 +22,10 @@ TIMEOUT_SECONDS = 300
 
 
 def main() -> int:
+    # I test stampano simboli (→, −, emoji): girano in UTF-8 anche su Windows, dove la
+    # console è cp1252 e senza questo si fermerebbero con UnicodeEncodeError.
+    sys.stdout.reconfigure(errors="replace")
+    test_env = dict(os.environ, PYTHONUTF8="1")
     failed = []
 
     errors = []
@@ -46,7 +50,7 @@ def main() -> int:
         start = time.monotonic()
         try:
             run = subprocess.run([sys.executable, path], cwd=TESTS, capture_output=True, text=True,
-                                 encoding="utf-8", errors="replace", timeout=TIMEOUT_SECONDS)
+                                 encoding="utf-8", errors="replace", timeout=TIMEOUT_SECONDS, env=test_env)
             output, code = run.stdout + run.stderr, run.returncode
         except subprocess.TimeoutExpired as e:
             output, code = f"{e.stdout or ''}\nTEMPO SCADUTO dopo {TIMEOUT_SECONDS} s", -1

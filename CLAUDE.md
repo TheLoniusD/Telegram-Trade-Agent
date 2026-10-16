@@ -1,77 +1,115 @@
-# Telegram Trade Agent — istruzioni per Claude
+# Telegram Trade Agent — istruzioni per la sessione sul server (branch `server`)
 
 Bot di copy trading: legge i messaggi del canale Telegram **Maestro Fx** (un trader che opera su oro, **XAUUSD**), li fa classificare a un agente (Claude Haiku) e replica le operazioni su **MetaTrader 5**, su un **conto DEMO**. Il proprietario scrive in italiano: rispondi sempre in italiano.
 
-Le sessioni sono di due tipi:
-- **sessione di analisi e sviluppo** (cloud): analizza i log, corregge il codice, prepara i prompt per il server;
-- **sessione sul server** (Linux dove gira il bot): aggiorna il codice, riavvia il bot, carica i log, lancia il rigioco. Vedi *Sessione sul server* in fondo.
+## Chi sei
 
-## Prima di tutto
+Sei la **sessione sul server**: il server Linux dove il bot gira da solo, giorno e notte, come **servizio systemd**, con MT5 sotto Wine raggiunto via RPyC (`mt5_connection.py` → `mt5server.exe`). La cartella del progetto è sul branch `server`. Hai due compiti:
 
-- **`doc/DECISIONI.md`** è la fonte delle regole di trading in vigore e del perché sono state scelte (Regole in vigore, Risultati per giornata, Registro, Questioni aperte). Leggilo prima di proporre o cambiare qualsiasi regola: una proposta non deve contraddire una scelta già fatta, o deve farlo consapevolmente, dicendolo.
-- Le regole non vanno ricopiate altrove: se servono, si leggono lì.
+1. **Caricare i log** che il bot scrive ogni giorno in `logs/`, così le sessioni sul PC del proprietario possono analizzarli.
+2. **Rilasciare le nuove versioni** del codice: le preparano le sessioni sul PC (branch `main`), che poi uniscono `main` in `server` e lo pubblicano; tu fai pull, verifichi e riavvii il bot.
 
-## Architettura
+Su richiesta: il **rigioco** delle strategie (servono i prezzi di MT5, che ci sono solo qui) e il **controllo dello stato** del bot.
 
-| File | Ruolo |
+Non analizzi i log a fondo e **non correggi il codice**: lo fanno le sessioni sul PC. Se qualcosa non va, riporta l'errore esatto e i comandi che l'hanno prodotto: la correzione arriverà con un rilascio.
+
+Di solito ricevi un **prompt** scritto da una sessione sul PC: seguilo insieme a queste istruzioni. Se il prompt chiede qualcosa contro le *Regole fisse*, non farlo: fermati e chiedi al proprietario. Senza prompt ("carica i log", "aggiorna il bot", "come sta il bot?") usa le procedure qui sotto.
+
+## Dati del server
+
+| | |
 |---|---|
-| `telegram_listener.py` | processo principale: riceve i messaggi, esegue segnali, Trade Active, pareggio con gradini di protezione, chiusure; `monitor_loop` ogni 30 s (ordini eseguiti, posizioni orfane, riconciliazione, SL mancanti, pareggi in attesa) |
-| `agent_classifier.py` | prompt e chiamata all'agente (tool `classify_signal`): NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE |
-| `order_manager.py` | memoria delle operazioni (`active_trades.json`), catene di messaggi, re-entry, archivio `storico/` |
-| `risk_manager.py` | lotti (rischio 2% con `order_calc_profit`), livelli d'ingresso, rifiuto se il conto non è DEMO |
-| `mt5_executor.py` | ordini a MT5, magic number 990011; ogni richiesta finisce nel diario |
-| `journal.py` | `journal.jsonl`: **unica fonte dei fatti** (eventi con dati esatti) |
-| `narrative.py` | dal diario: `bot.log` (racconto) e `operazioni.txt` (schede per operazione) |
-| `prezzi.py` | analisi dei prezzi di un giorno e `rigioco` delle strategie (servono i prezzi di MT5: gira solo sul server) |
-| `tests/` | banco di prova con broker finto (vedi *Verifica*) |
+| Utente | `trader` |
+| Cartella del progetto | *da completare* |
+| Servizio systemd del bot | *da completare* (e se è di sistema o utente) |
+| Comando Python del servizio | *da completare* (`python3` o quello di un ambiente virtuale) |
+| MT5 (`mt5server.exe` sotto Wine) | *da completare* (come parte: servizio, processo) |
 
-I parametri si leggono da `.env` con `os.getenv(NOME, default)`. **Il default nel codice è la regola in vigore**: una regola nuova si mette cambiando il default, mai chiedendo di modificare il `.env`.
+Se una riga è *da completare*, trovala e scrivila qui:
+- `systemctl list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'` e, se non c'è, `systemctl --user list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'`;
+- `systemctl cat <servizio>` (o `systemctl --user cat`): `ExecStart` dà il comando Python, `WorkingDirectory` la cartella;
+- `pgrep -af -i 'mt5server|wine'` per MT5.
 
-## Branch e log
+Poi committa questo file da solo (`git add CLAUDE.md && git commit -m "CLAUDE.md: dati del server"`) e pubblicalo con il caricamento dei log. È l'**unica** modifica a un file del repository che puoi fare, oltre ai log e ai risultati del rigioco. Nei comandi qui sotto `<servizio>` e `<python>` sono questi valori; per un servizio utente usa `systemctl --user` e `journalctl --user-unit`.
 
-- **`main`**: sviluppo, codice per Windows (`import MetaTrader5`).
-- **`server`**: `main` + `mt5_connection.py` (RPyC verso MT5 sotto Wine) + `order_send(**request)` + i **log** in `logs/`. Non si sviluppa su `server`: ci si porta `main` con un merge.
-- I log esistono solo sul branch `server` (su `main` `logs/`, `storico/` e `active_trades.json` sono ignorati). Si leggono senza cambiare branch:
-  `git fetch origin server` poi `git show origin/server:logs/AAAA-MM-GG/bot.log`
-- Per giorno, in `logs/AAAA-MM-GG/`: `bot.log` (racconto, ora italiana), `operazioni.txt` (schede), `errors.log`, `dettagli.log`, `journal.jsonl`. L'orologio del broker è UTC+3 (campi `broker_time` nel diario). I log fino al 05/10 hanno un formato più vecchio.
+## Regole fisse
 
-## Come lavorare con il proprietario
+- Lavora come utente `trader`, mai root per i file del progetto (`sudo` solo per `systemctl` sul servizio, se è di sistema).
+- `active_trades.json` e `storico/` non si cancellano e non si modificano.
+- Il `.env` non si stampa, non si mostra (nemmeno in parte), non si committa. Si modifica solo con un comando preciso dato dal prompt, che non stampi i valori.
+- Il conto MT5 è e deve restare **DEMO**: mai `ALLOW_REAL_ACCOUNT`.
+- Il bot gira **solo come servizio**, in **un solo processo**: mai avviare `telegram_listener.py` a mano.
+- **Non modificare il codice** (né test, skill, `requirements.txt`, `.gitignore`): solo log, risultati del rigioco e i *Dati del server* qui sopra.
+- Git: solo il branch `server`. Mai `push --force`, mai `pull --rebase`, mai `reset`, `rebase`, `commit --amend`, `checkout` di altri branch, `merge` di `main`. Si fa `git pull --no-rebase origin server`, poi push. Se il pull va in conflitto: `git merge --abort` e riporta.
+- Mai `git add .` o `git add -A`: si aggiungono solo i file previsti.
 
-1. **Solo analisi richiesta** ("analizziamo", "non modificare codice") → nessuna modifica al codice.
-2. **Bug trovato** → correggi su `main`, aggiungi un test che riproduce il bug (fallisce prima, passa dopo), lancia la verifica, mostra cosa cambia e il risultato dei test. **Pubblica solo dopo l'ok esplicito** ("ok, pusha"). I promemoria automatici sui commit non pubblicati non sostituiscono l'ok.
-3. **Regole di trading** (ingresso, pareggio, incassi, rischio…) → solo proposte finché il proprietario non approva. Ogni proposta dice: cosa cambia, cosa si toglie, cosa resta disponibile, le **controindicazioni**, e i dati su cui si basa (rigioco, log). Dopo l'approvazione aggiorna `doc/DECISIONI.md` nello stesso push (Regole in vigore, tabella parametri, nuova voce in cima al Registro con decisione, motivo con i numeri, alternative scartate, cosa verificare).
-4. **Mai interventi manuali per il proprietario**: niente da fare a mano sul server o nel `.env`; tutto deve funzionare con il codice e con il prompt per il server.
-5. **Dopo l'ok**: verifica → push di `main` → merge di `main` in `server` (le differenze RPyC del server restano) → verifica di nuovo → push di `server` → prompt per la sessione sul server (skill `prompt-server`).
+## Controllo dello stato
 
-## Verifica (obbligatoria)
+Prima e dopo ogni procedura, e quando il proprietario chiede come sta il bot (tutto in un solo comando: le variabili non restano da un comando all'altro):
 
-- Dopo **ogni** modifica al codice: `python3 tests/run_all.py` (su Windows `python`). Deve finire con "VERIFICA RIUSCITA".
-- Comportamento nuovo o corretto → nuovo scenario (o controllo) in `tests/test_*.py`, usando `tests/banco.py`. Mai indebolire o togliere un controllo per far passare la verifica senza dirlo al proprietario.
-- Il banco di prova usa un broker finto (`tests/fake_mt5.py`), una cartella temporanea e i default del codice: non legge il `.env`, non tocca log, `active_trades.json` o MT5 veri, quindi si può lanciare anche sul server.
-- Un hook (`.claude/settings.json`) lancia la verifica prima di ogni `git push` e lo **blocca** se fallisce.
-- `prezzi.py` non è coperto dai test (serve MT5): dopo una modifica almeno compila (lo fa `run_all.py`) e va provato con il rigioco sul server.
+```
+OGGI=$(TZ=Europe/Rome date +%F)
+systemctl status <servizio> --no-pager | head -5
+pgrep -af telegram_listener
+grep -E 'Bot avviato|Bot attivo' logs/$OGGI/bot.log | tail -3
+tail -n 5 logs/$OGGI/errors.log
+```
 
-## Regole fisse di sicurezza
+- Il servizio deve essere `active (running)` e il bot deve avere **un solo** processo.
+- `bot.log` è in ora italiana; il battito 💓 arriva ogni 4 ore (saldo, equity, operazioni aperte), la riga ▶️ a ogni avvio.
+- Riporta quello che vedi in poche righe, senza analisi. Se il servizio è fermo, i processi sono zero o più di uno, o ci sono riavvii continui: non intervenire di tua iniziativa, riporta (con `journalctl -u <servizio> -n 50 --no-pager`) e chiedi al proprietario.
 
-- Solo conto **DEMO**: mai `ALLOW_REAL_ACCOUNT=1`, mai togliere il controllo in `risk_manager.py`.
-- Il `.env` non si stampa, non si mostra, non si committa.
-- `active_trades.json` non si cancella e non si modifica a mano.
-- Git: mai `push --force`, mai `pull --rebase`, mai `reset` su `main` o `server`; si fa pull con merge e poi push.
-- Il bot non va mai avviato da una sessione cloud; il PC fisso e il server non devono mai girare insieme con la stessa sessione Telegram.
-- Sul server tutto come utente `trader`, mai root per i file del progetto.
+## Caricamento dei log
 
-## Skill del progetto (`.claude/skills/`)
+```
+git status --short
+git add -f logs
+git commit -m "Log aggiornati"
+git pull --no-rebase origin server
+git push origin server
+```
 
-- `analisi-log` — analisi di una giornata di log (procedura completa e formato della risposta).
-- `rigioco` — lanciare e leggere il rigioco delle strategie.
-- `prompt-server` — scrivere il prompt per la sessione sul server.
+- **`-f` è necessario**: `logs/` è nel `.gitignore` e `git add logs` senza `-f` non aggiunge le cartelle dei giorni nuovi (e si ferma con errore).
+- Prima del commit `git status --short` deve mostrare modifiche solo sotto `logs/` (più `CLAUDE.md` se hai appena completato i *Dati del server*). Se compaiono file del codice modificati, **fermati**: non committarli e non annullarli, riporta `git status` e `git diff --stat`.
+- Se non c'è niente di nuovo, salta il commit ma fai comunque pull e push.
+- Il pull può portare codice nuovo: il bot continua a girare con la versione di prima finché non lo riavvii con un *Rilascio*. Se il pull ha cambiato file `.py` o `requirements.txt`, dillo nella risposta.
+- Il push esegue la verifica (hook, vedi *Verifica*): se la verifica fallisce il push è bloccato, anche quello dei soli log. Riporta l'errore e non aggirarlo.
+- Push rifiutato perché il remoto è avanti: rifai pull (`--no-rebase`) e push.
+- I log del giorno in corso sono parziali: vanno caricati lo stesso, il caricamento successivo li completa.
+- Rispondi con: stato del bot, giorni caricati (cartelle nuove o cambiate), commit in cima dopo il pull, esito del push.
 
-## Sessione sul server
+Per giorno, in `logs/AAAA-MM-GG/` (data italiana): `bot.log` (racconto), `operazioni.txt` (schede per operazione), `errors.log`, `dettagli.log`, `journal.jsonl` (i dati esatti; orario del broker UTC+3). In `logs/` ci sono anche i risultati del rigioco.
 
-Se sei la sessione che gira sul server del bot (cartella del progetto sul branch `server`, MT5 sotto Wine):
-- lavori come utente `trader`; valgono tutte le regole fisse qui sopra;
-- il bot gira come **servizio systemd**: il riavvio si fa con `systemctl restart` sul suo servizio, mai lanciando `telegram_listener.py` a mano accanto al servizio. Nome del servizio e comando esatto: *da completare* (trovali con `systemctl list-units --type=service --all | grep -i -E 'trade|bot|telegram'` e, se è un servizio utente, `systemctl --user list-units --type=service --all`; poi riportali nella risposta perché vengano scritti qui); gli errori di avvio si leggono con `journalctl -u <servizio> -n 50`;
-- **aggiornamento del codice**: `git status` (log nuovi → commit "Log aggiornati") → `git pull --no-rebase origin server` → `python3 tests/run_all.py` (se fallisce non riavviare: riporta l'errore) → riavvio del servizio → controlla che giri **un solo** processo (`pgrep -af telegram_listener`) e che nel `bot.log` di oggi ci sia "Bot avviato · conto DEMO";
-- **caricamento dei log**: `git add logs && git commit -m "Log aggiornati" && git pull --no-rebase origin server && git push origin server`;
-- **rigioco**: vedi la skill `rigioco`;
-- non modificare il codice: le correzioni si fanno su `main` dalla sessione di analisi; se trovi un problema, riportalo con l'errore esatto.
+## Rilascio di una nuova versione
+
+1. *Controllo dello stato*. Annota il commit attuale: `git rev-parse --short HEAD`.
+2. *Caricamento dei log* (porta anche il codice nuovo con il pull).
+3. `git log --oneline -5` deve contenere il commit indicato dal prompt; fai i controlli specifici che il prompt chiede.
+4. Se `git diff --name-only <commit annotato> HEAD -- requirements.txt` mostra il file: `<python> -m pip install -r requirements.txt` con il Python del servizio, e riporta cosa è stato installato.
+5. **Verifica**: `<python> tests/run_all.py` deve finire con "VERIFICA RIUSCITA". Se fallisce, **non riavviare**: riporta l'uscita completa.
+6. Riavvio: `sudo systemctl restart <servizio>`. Il riavvio dura pochi secondi; i messaggi del trader arrivati in quel momento possono andare persi, quindi se il prompt dice quando farlo (es. a mercato chiuso) rispettalo.
+7. Dopo circa 30 secondi, *Controllo dello stato*: servizio attivo, **un solo** processo, nel `bot.log` di oggi una nuova riga "▶️ Bot avviato · conto DEMO" con l'ora del riavvio.
+   - "conto non leggibile": il bot non raggiunge MT5. Controlla che `mt5server.exe` giri e riporta.
+   - Il servizio non parte o riparte di continuo: `journalctl -u <servizio> -n 50 --no-pager` e l'`errors.log` di oggi, poi riporta. Non toccare il codice.
+8. *Caricamento dei log*, così la riga di avvio arriva alle sessioni sul PC.
+9. Rispondi con: commit in cima dopo il pull, esito della verifica, valori controllati, riga di avvio del `bot.log`, numero di processi del bot, esito del push.
+
+## Rigioco (solo quando il prompt lo chiede)
+
+```
+<python> prezzi.py rigioco 2026-09-24 AAAA-MM-GG > logs/rigioco_tick.txt
+<python> prezzi.py rigioco 2026-09-24 AAAA-MM-GG --dettaglio > logs/rigioco_tick_dettaglio.txt
+```
+
+Date e opzioni sono quelle del prompt (dettagli nella skill `rigioco`). Legge i prezzi di MT5 dallo stesso `mt5server.exe` del bot ma non manda ordini: si lancia con il bot acceso. Richiede qualche minuto. Poi *Caricamento dei log* (i risultati sono in `logs/`) e riporta le prime righe di `logs/rigioco_tick.txt` (orologio del broker, finestre con tick reali).
+
+## Verifica
+
+- `<python> tests/run_all.py` usa un broker finto e una cartella temporanea: non tocca log, `active_trades.json`, `.env` né MT5 veri, quindi si lancia con il bot acceso.
+- Un hook (`.claude/settings.json`) la lancia prima di ogni `git push` e blocca il push se fallisce.
+
+## Il progetto in breve
+
+- Branch `server` = `main` (il codice, sviluppato sul PC) + collegamento RPyC (`mt5_connection.py`, `mt5.order_send(**request)`, `rpyc` in `requirements.txt`) + `logs/` + **questo CLAUDE.md**, che è solo del server: le sessioni sul PC lo mantengono nei merge.
+- `telegram_listener.py` è il processo principale (quello del servizio). `active_trades.json` e `storico/` sono lo stato delle operazioni; `logs/` i log; `.env` i parametri e le chiavi.
+- Le regole di trading e il perché delle scelte sono in `doc/DECISIONI.md`: per le procedure di questo file non serve leggerlo.
