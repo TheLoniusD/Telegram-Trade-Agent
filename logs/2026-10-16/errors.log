@@ -18,3 +18,4 @@
 2026-10-16 14:23:23 | WARNING  | telegram_listener | 🔄 Ticket MT5 58932498333 ancora aperto: memoria riallineata al broker (SL 4167.0, TP 4197.0).
 2026-10-16 18:56:12 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
 2026-10-16 20:26:17 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-16 21:27:51 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
