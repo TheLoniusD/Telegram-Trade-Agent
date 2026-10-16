@@ -451,23 +451,32 @@ class OrderManager:
             # 28/09 veniva collegato al sell 4180 ed ereditava il suo stop, appena
             # spostato a pareggio (4179,5), cioè a 50 centesimi dall'ingresso.
             is_reentry = bool(data.get("is_reentry")) and data.get("entry_min") is None
-            source_trade = self._find_reentry_parent(data.get("symbol"), data.get("direction")) if is_reentry else None
+            # Ingresso senza prezzo (re-entry o "lets sell it"): l'ultima
+            # operazione nella stessa direzione, per ereditarne i valori (solo il
+            # re-entry) e per riconoscere il commento a un segnale appena scritto.
+            market_parent = (self._find_reentry_parent(data.get("symbol"), data.get("direction"))
+                             if data.get("entry_min") is None else None)
+            source_trade = market_parent if is_reentry else None
             root_msg_id = source_trade.get("root_msg_id", source_trade["msg_id"]) if source_trade else msg_id
             if is_reentry:
                 logger.debug(f"🔁 [RE-ENTRY] Collegato all'operazione {source_trade.get('ticket_id') if source_trade else 'nessuna'}"
                             f" (root {root_msg_id}).")
-            if (is_reentry and source_trade and not source_trade.get("reentry")
-                    and source_trade.get("status") in CLOSABLE_STATUSES):
-                age = time.time() - (source_trade.get("created_at") or 0)
+            # Vale anche se l'agente non lo segna come re-entry: il 13/10 "Lets sell
+            # one more time" (re-entry l'08/10) è arrivato come ingresso a mercato
+            # 63 secondi dopo "Gold sell 4192" e ha aperto altre 2 posizioni.
+            if (market_parent and not market_parent.get("reentry")
+                    and market_parent.get("status") in CLOSABLE_STATUSES):
+                age = time.time() - (market_parent.get("created_at") or 0)
                 if age <= REENTRY_CAPTION_SECONDS:
                     # Prezzo del segnale = bordo della zona (il più alto per un BUY)
-                    bounds = [p for p in (source_trade.get("entry_min"), source_trade.get("entry_max")) if p is not None]
+                    bounds = [p for p in (market_parent.get("entry_min"), market_parent.get("entry_max")) if p is not None]
                     price = (max(bounds) if data.get("direction") == "BUY" else min(bounds)) if bounds else None
+                    what = "\"again\"" if is_reentry else "ingresso senza prezzo"
                     return {"action": "IGNORE",
-                            "reason": f"\"again\" {age:.0f} secondi dopo il segnale "
+                            "reason": f"{what} {age:.0f} secondi dopo il segnale "
                                       f"{data.get('direction') or ''} {price:g}: stesso setup, nessuna nuova posizione"
                                       if price is not None else
-                                      f"\"again\" {age:.0f} secondi dopo il segnale precedente: stesso setup, nessuna nuova posizione"}
+                                      f"{what} {age:.0f} secondi dopo il segnale precedente: stesso setup, nessuna nuova posizione"}
 
             # Ereditarietà dei dati (solo se source_trade non è None)
             symbol = data.get("symbol") or self._get_param(source_trade, "symbol") or "XAUUSD"

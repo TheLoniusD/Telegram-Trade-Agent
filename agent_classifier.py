@@ -114,8 +114,9 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
      -> is_reentry: false.
 
   b) Re-entry: "Try buy again", "Try sell again", "Lets try buy again", "Lets sell again",
-     "Sell again M15 DBD zone", "Try buy again, M15,M30,H1 got bullish engulfing".
-     Riconoscibile dalla parola "again" (o "re-entry") insieme a una direzione, SENZA prezzo: il trader
+     "Sell again M15 DBD zone", "Try buy again, M15,M30,H1 got bullish engulfing",
+     "Lets sell one more time", "Lets sell again One more time".
+     Riconoscibile dalla parola "again" (o "one more time", "re-entry") insieme a una direzione, SENZA prezzo: il trader
      rientra nello stesso setup dell'operazione precedente, di cui valgono SL e TP (non li riscrive mai).
      -> intent: 'NEW_SIGNAL', is_actionable: true, is_reentry: true, entry_min/entry_max null.
      Un segnale con un prezzo ("Gold sell 4179") NON è mai un re-entry, anche se il prezzo è vicino a quello di
@@ -196,6 +197,7 @@ reply al messaggio del segnale.
     imperativo operativo).
 14. "Bad entry" -> IGNORE (commento, nessun comando: non chiudere né modificare nulla).
 15. "Lets try buy again" -> NEW_SIGNAL, direction BUY, entry_min null, is_reentry true (rientro nel setup precedente).
+16. "Lets sell one more time" -> NEW_SIGNAL, direction SELL, entry_min null, is_reentry true ("one more time" = "again").
 
 Chiama SEMPRE ed ESCLUSIVAMENTE lo strumento 'classify_signal' con i campi compilati secondo queste regole.
 Nel campo 'raw_reasoning' indica in MASSIMO 6 PAROLE quale regola della tassonomia hai applicato (es. "fase rapida, nessun SL/TP" o "HIT TP MAX, BE su tutto"). Non scrivere una frase completa: è un tag di debug, non una spiegazione."""
