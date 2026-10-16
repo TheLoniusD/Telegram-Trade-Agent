@@ -1,0 +1,26 @@
+2026-10-14 04:06:37 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58884336190: Invalid stops (retcode 10016)
+2026-10-14 04:06:37 | WARNING  | telegram_listener | 🔄 Ticket MT5 58884336190 ancora aperto: memoria riallineata al broker (SL 4165.0, TP 4145.0).
+2026-10-14 04:06:37 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58884336200: Invalid stops (retcode 10016)
+2026-10-14 04:06:37 | WARNING  | telegram_listener | 🔄 Ticket MT5 58884336200 ancora aperto: memoria riallineata al broker (SL 4165.0, TP 4135.0).
+2026-10-14 04:17:38 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58884398808: Invalid stops (retcode 10016)
+2026-10-14 04:17:38 | WARNING  | telegram_listener | 🔄 Ticket MT5 58884398808 ancora aperto: memoria riallineata al broker (SL 4170.0, TP 4150.0).
+2026-10-14 04:17:38 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58884398836: Invalid stops (retcode 10016)
+2026-10-14 04:17:38 | WARNING  | telegram_listener | 🔄 Ticket MT5 58884398836 ancora aperto: memoria riallineata al broker (SL 4170.0, TP 4140.0).
+2026-10-14 07:34:41 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58885909607: Invalid stops (retcode 10016)
+2026-10-14 07:34:41 | WARNING  | telegram_listener | 🔄 Ticket MT5 58885909607 ancora aperto: memoria riallineata al broker (SL 4151.0, TP 4181.0).
+2026-10-14 08:07:48 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-14 08:08:04 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-10-14 08:08:04 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-14 08:08:04 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-14 08:08:04 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-10-14 08:08:04 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-10-14 08:11:05 | INFO     | order_manager | 📂 Stato memoria caricato da: active_trades.json (0 trade attivi)
+2026-10-14 08:11:05 | INFO     | mt5_executor | 🚀 Connessione a MetaTrader 5 riuscita!
+2026-10-14 08:11:05 | INFO     | telegram_listener | 👥 Filtro mittenti disattivato: accetto tutti i messaggi del canale.
+2026-10-14 08:11:05 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
+2026-10-14 08:11:05 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
+2026-10-14 08:11:05 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-10-14 13:31:14 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58890683780: Invalid stops (retcode 10016)
+2026-10-14 13:31:14 | WARNING  | telegram_listener | 🔄 Ticket MT5 58890683780 ancora aperto: memoria riallineata al broker (SL 4149.0, TP 4129.0).
+2026-10-14 13:31:14 | ERROR    | mt5_executor | ❌ Errore spostamento SL (BREAKEVEN) posizione #58890683802: Invalid stops (retcode 10016)
+2026-10-14 13:31:14 | WARNING  | telegram_listener | 🔄 Ticket MT5 58890683802 ancora aperto: memoria riallineata al broker (SL 4149.0, TP 4119.0).

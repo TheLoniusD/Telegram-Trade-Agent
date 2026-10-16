@@ -1,0 +1,39 @@
+00:12:03 💓 Bot attivo · saldo 6.733,39 $ · equity 6.733,39 $ · 0 operazioni aperte · 0 messaggi scartati dall'ultimo controllo
+04:06:28 📩 Trader: "Gold sell 4140"
+04:06:28 🧠 Agente: nuovo segnale SELL 4140
+04:06:28 📥 [SELL 4140] 2 ordini: e1 4.140,00 in attesa · e2 4.140,00 in attesa | SL 4.150,00 provvisorio · TP 4.130,00 / 4.120,00 · 0,14 lotti
+04:07:27 ✏️ Trader modifica: "GOLD SELL NOW · Sell @ 4140 - 4145 · SL🔴4150 · TP✅4130 · TP✅4120"
+04:07:27 🧠 Agente: aggiornamento: zona 4140–4145 · SL 4.150,00 · TP 4.130,00 / 4.120,00
+04:10:46 ✅ [SELL 4140] e1 eseguito a 4.140,00
+04:10:46 ✅ [SELL 4140] e2 eseguito a 4.140,00
+04:12:16 💓 Bot attivo · saldo 6.733,39 $ · equity 6.680,65 $ · 1 operazioni aperte · 8 messaggi scartati dall'ultimo controllo
+04:27:28 📩 Trader: "Lets close half now"
+04:27:28 🧠 Agente: aggiornamento: chiudi il 50%
+04:27:28 ✂️ Chiusura parziale del 50%: 0,07 lotti su 0,14 · e2, e1 in perdita, non chiusi
+04:28:28 📩 Trader: "Gold running 75 pips now , close half and BE your entry 🫵"
+04:28:28 🧠 Agente: aggiornamento: chiudi il 50% · pareggio
+04:28:28 ✂️ Chiusura parziale ripetuta dopo 0 minuti: trattata come la stessa, ignorata
+04:28:28 ❌ [SELL 4140] MT5 rifiuta il pareggio di e1: Invalid stops (retcode 10016)
+04:28:28 ⏳ [SELL 4140] e1 pareggio a 4.139,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+04:28:28 🛟 [SELL 4140] e1 pareggio non ancora possibile (a 4.139,00): stop di protezione da 4.150,00 a 4.142,50
+04:28:28 ❌ [SELL 4140] MT5 rifiuta il pareggio di e2: Invalid stops (retcode 10016)
+04:28:28 ⏳ [SELL 4140] e2 pareggio a 4.139,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+04:28:28 🛟 [SELL 4140] e2 pareggio non ancora possibile (a 4.139,00): stop di protezione da 4.150,00 a 4.142,50
+04:30:51 🛡️ [SELL 4140] e1 pareggio applicato: SL 4.139,00
+04:30:51 🛡️ [SELL 4140] e2 pareggio applicato: SL 4.139,00
+04:32:21 🏁 [SELL 4140] e1 chiuso a pareggio 4.139,00 · +6,24 $
+04:32:21 🏁 [SELL 4140] e2 chiuso a pareggio 4.139,00 · +6,24 $ · operazione chiusa: +12,48 $
+04:33:07 📩 Trader: "Trade Active ✅ · Gold Sell Running 110+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+04:33:07 🧠 Agente: aggiornamento: pareggio
+04:33:07    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+08:03:46 ▶️ Bot avviato · conto DEMO · saldo 6.745,87 $ · equity 6.745,87 $
+08:04:16 💓 Bot attivo · saldo 6.745,87 $ · equity 6.745,87 $ · 0 operazioni aperte · 0 messaggi scartati dall'ultimo controllo
+12:04:27 💓 Bot attivo · saldo 6.745,87 $ · equity 6.745,87 $ · 0 operazioni aperte · 1 messaggi scartati dall'ultimo controllo
+13:05:29 🔌 MT5 non disponibile: terminale MT5 non collegato al server del broker
+13:11:59 🔌 MT5 di nuovo collegato
+15:42:06 🔌 MT5 non disponibile: terminale MT5 non collegato al server del broker
+15:42:36 🔌 MT5 di nuovo collegato
+16:04:37 💓 Bot attivo · saldo 6.745,87 $ · equity 6.745,87 $ · 0 operazioni aperte · 2 messaggi scartati dall'ultimo controllo
+20:04:50 💓 Bot attivo · saldo 6.745,87 $ · equity 6.745,87 $ · 0 operazioni aperte · 0 messaggi scartati dall'ultimo controllo
+21:27:25 🔌 MT5 non disponibile: terminale MT5 non collegato al server del broker
+21:33:25 🔌 MT5 di nuovo collegato
