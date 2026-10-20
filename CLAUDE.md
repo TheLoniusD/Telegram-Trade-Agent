@@ -6,7 +6,7 @@ Bot di copy trading: legge i messaggi del canale Telegram **Maestro Fx** (un tra
 
 Sei la **sessione sul server**: il server Linux dove il bot gira da solo, giorno e notte, come **servizio systemd**, con MT5 sotto Wine raggiunto via RPyC (`mt5_connection.py` → `mt5server.exe`). La cartella del progetto è sul branch `server`. Hai due compiti:
 
-1. **Caricare i log** che il bot scrive ogni giorno in `logs/`, così le sessioni sul PC del proprietario possono analizzarli.
+1. **Caricare i log** che il bot scrive ogni giorno in `logs/`, così le sessioni sul PC del proprietario possono analizzarli. Ogni ora li pubblica anche il *Caricamento automatico dei log* (cron) in un repository di soli log: tu lo installi quando un prompt lo chiede e controlli che funzioni.
 2. **Rilasciare le nuove versioni** del codice: le preparano le sessioni sul PC (branch `main`), che poi uniscono `main` in `server` e lo pubblicano; tu fai pull, verifichi e riavvii il bot.
 
 Su richiesta: il **rigioco** delle strategie (servono i prezzi di MT5, che ci sono solo qui) e il **controllo dello stato** del bot.
@@ -25,6 +25,7 @@ Di solito ricevi un **prompt** scritto da una sessione sul PC: seguilo insieme a
 | Comando Python del servizio | `/home/trader/telegram-trade-agent/venv/bin/python` (ambiente virtuale; `ExecStart=... telegram_listener.py`) |
 | MT5 (`mt5server.exe` sotto Wine) | servizi di sistema in catena: `mt5-xvfb.service` (Xvfb `:99`) → `mt5-terminal.service` (`wine terminal64.exe /portable`) → `mt5-server.service` (`wine /home/trader/mt5server.exe`, processo `Z:\home\trader\mt5server.exe`) |
 | Accesso a GitHub | SSH con una **chiave di deploy** con scrittura, valida solo per questo repository: chiave `~/.ssh/telegram_trade_agent`, `origin` = `git@github.com:TheLoniusD/Telegram-Trade-Agent.git`, `core.sshCommand` nella configurazione git del repository. Prova: `ssh -i ~/.ssh/telegram_trade_agent -o IdentitiesOnly=yes -T git@github.com` → "Hi TheLoniusD/Telegram-Trade-Agent! You've successfully authenticated". Se `git remote get-url origin` inizia ancora con `https://`, la chiave non è configurata: il push chiede le credenziali e non può riuscire |
+| Caricamento automatico dei log | cron dell'utente `trader` (riga che finisce con `# caricamento-log:tta`), ogni ora ai :05, verso il repository privato `git@github.com:TheLoniusD/Telegram-Trade-Agent-log.git`. Configurazione `~/.config/caricamento-log/tta.conf`, copia del repository `~/tta-log`, chiave di deploy `~/.ssh/tta_log` (con scrittura, valida solo per quel repository), registro `~/.local/state/caricamento-log/tta.log`. Istruzioni complete: `infrastruttura/caricamento-log/README.md` |
 
 Se una riga è *da completare*, trovala e scrivila qui:
 - `systemctl list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'` e, se non c'è, `systemctl --user list-units --type=service --all | grep -i -E 'trade|bot|telegram|mt5|wine'`;
@@ -44,7 +45,8 @@ Poi committa questo file da solo (`git add CLAUDE.md && git commit -m "CLAUDE.md
 - Git: solo il branch `server`. Mai `push --force`, mai `pull --rebase`, mai `reset`, `rebase`, `commit --amend`, `checkout` di altri branch, `merge` di `main`. Si fa `git pull --no-rebase origin server`, poi push. Se il pull va in conflitto: `git merge --abort` e riporta.
 - Mai `git add .` o `git add -A`: si aggiungono solo i file previsti.
 - La configurazione di git (`remote`, `core.sshCommand`, credenziali) si cambia solo con i comandi precisi di un prompt.
-- **Credenziali**: mai chiedere, accettare o scrivere token, password o chiavi private, né in chat né in file o comandi. La chiave privata `~/.ssh/telegram_trade_agent` non si mostra, non si copia e non si sposta; quella pubblica (`.pub`) si può mostrare. Se il push fallisce per le credenziali, fermati e riporta l'errore: non cercare altre strade.
+- **Credenziali**: mai chiedere, accettare o scrivere token, password o chiavi private, né in chat né in file o comandi. Le chiavi private `~/.ssh/telegram_trade_agent` e `~/.ssh/tta_log` non si mostrano, non si copiano e non si spostano; quelle pubbliche (`.pub`) si possono mostrare. Se il push fallisce per le credenziali, fermati e riporta l'errore: non cercare altre strade.
+- Il *Caricamento automatico dei log* si installa, aggiorna o rimuove solo con `infrastruttura/caricamento-log/installa.sh` e solo quando un prompt lo chiede, senza `sudo`. La riga di crontab e la copia `~/tta-log` non si modificano a mano.
 
 ## Controllo dello stato
 
@@ -56,9 +58,12 @@ systemctl status <servizio> --no-pager | head -5
 pgrep -af telegram_listener
 grep -E 'Bot avviato|Bot attivo' logs/$OGGI/bot.log | tail -3
 tail -n 5 logs/$OGGI/errors.log
+crontab -l | grep caricamento-log
+tail -n 2 ~/.local/state/caricamento-log/tta.log
 ```
 
 - Il servizio deve essere `active (running)` e il bot deve avere **un solo** processo.
+- Caricamento automatico (una volta installato): una riga in crontab e, nel registro, una riga "caricato: …" dell'ultima ora. Se manca, o c'è una riga ERRORE, riportala.
 - `bot.log` è in ora italiana; il battito 💓 arriva ogni 4 ore (saldo, equity, operazioni aperte), la riga ▶️ a ogni avvio.
 - Riporta quello che vedi in poche righe, senza analisi. Se il servizio è fermo, i processi sono zero o più di uno, o ci sono riavvii continui: non intervenire di tua iniziativa, riporta (con `journalctl -u <servizio> -n 50 --no-pager`) e chiedi al proprietario.
 
@@ -84,12 +89,30 @@ git push origin server
 
 Per giorno, in `logs/AAAA-MM-GG/` (data italiana): `bot.log` (racconto), `operazioni.txt` (schede per operazione), `errors.log`, `dettagli.log`, `journal.jsonl` (i dati esatti; orario del broker UTC+3). In `logs/` ci sono anche i risultati del rigioco.
 
+## Caricamento automatico dei log
+
+Ogni ora cron lancia `~/.local/lib/caricamento-log/caricamento-log.sh`. Lo script copia `logs/` nella copia `~/tta-log` del repository dei log, scrive `STATO.md` (stato del bot) e pubblica. Non tocca la cartella del progetto e non fa pull: il codice cambia solo con un *Rilascio*. Per ora il *Caricamento dei log* sul branch `server` continua come prima; smetterà quando le sessioni sul PC leggeranno i log dal repository nuovo, e lo dirà un prompt.
+
+Installazione, solo quando un prompt la chiede, come utente `trader` e senza `sudo`:
+
+1. Configurazione (nessuna credenziale dentro), con questo comando:
+   ```
+   mkdir -p ~/.config/caricamento-log && printf '%s\n' 'ISTANZA="tta"' 'REPO_LOG="git@github.com:TheLoniusD/Telegram-Trade-Agent-log.git"' 'CARTELLA_LOG="/home/trader/telegram-trade-agent/logs"' 'SERVIZI_EXTRA="mt5-xvfb.service mt5-terminal.service mt5-server.service"' > ~/.config/caricamento-log/tta.conf && cat ~/.config/caricamento-log/tta.conf
+   ```
+2. Dalla cartella del progetto: `bash infrastruttura/caricamento-log/installa.sh ~/.config/caricamento-log/tta.conf`. La prima volta crea la chiave `~/.ssh/tta_log`, mostra la **chiave pubblica** ed esce con codice 2.
+3. **Fermati.** Riporta la chiave pubblica (la riga `ssh-ed25519 …`) al proprietario: la aggiunge su GitHub come deploy key del repository dei log, con scrittura. Aspetta la sua conferma.
+4. Dopo la conferma, rilancia lo stesso comando. Deve stampare "Chiave riconosciuta da GitHub", una riga "caricato: …" e "Installato".
+5. Controllo: `crontab -l | grep caricamento-log`, `git -C ~/tta-log log --oneline -3`, `head -12 ~/tta-log/STATO.md`.
+
+- Una versione nuova dello script arriva con il pull, ma si attiva solo rilanciando `installa.sh` con lo stesso file di configurazione (vedi *Rilascio*, punto 4).
+- Errori: tabella *Problemi comuni* in `infrastruttura/caricamento-log/README.md`. Se GitHub non riconosce la chiave o la dice "read only", riporta l'errore al proprietario: non creare altre chiavi e non cambiare il remote.
+
 ## Rilascio di una nuova versione
 
 1. *Controllo dello stato*. Annota il commit attuale: `git rev-parse --short HEAD`.
 2. *Caricamento dei log* (porta anche il codice nuovo con il pull).
 3. `git log --oneline -5` deve contenere il commit indicato dal prompt; fai i controlli specifici che il prompt chiede.
-4. Se `git diff --name-only <commit annotato> HEAD -- requirements.txt` mostra il file: `<python> -m pip install -r requirements.txt` con il Python del servizio, e riporta cosa è stato installato.
+4. Se `git diff --name-only <commit annotato> HEAD -- requirements.txt` mostra il file: `<python> -m pip install -r requirements.txt` con il Python del servizio, e riporta cosa è stato installato. Se `git diff --name-only <commit annotato> HEAD -- infrastruttura/caricamento-log` mostra file e il caricamento automatico è installato: `bash infrastruttura/caricamento-log/installa.sh ~/.config/caricamento-log/tta.conf`, e riporta l'ultima riga.
 5. **Verifica**: `<python> tests/run_all.py` deve finire con "VERIFICA RIUSCITA". Se fallisce, **non riavviare**: riporta l'uscita completa.
 6. Riavvio: `sudo systemctl restart <servizio>`. Il riavvio dura pochi secondi; i messaggi del trader arrivati in quel momento possono andare persi, quindi se il prompt dice quando farlo (es. a mercato chiuso) rispettalo.
 7. Dopo circa 30 secondi, *Controllo dello stato*: servizio attivo, **un solo** processo, nel `bot.log` di oggi una nuova riga "▶️ Bot avviato · conto DEMO" con l'ora del riavvio.
