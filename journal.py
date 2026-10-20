@@ -16,9 +16,11 @@ suo msg_id, così si può seguire l'intera catena messaggio -> classificazione
 Tipi di evento principali:
   BOT_START / BOT_STOP       avvio e arresto del listener
   MESSAGE                    messaggio ricevuto (testo, edit, reply)
-  MESSAGE_SKIPPED            scartato prima della classificazione (motivo)
+  MESSAGE_SKIPPED            scartato prima della classificazione (motivo); per foto/GIF
+                             senza testo anche tipo e id del media e bid/ask di quel momento
   CLASSIFIED                 output dell'agente classificatore
-  CLASSIFIER_CALL            token consumati dalla chiamata all'agente
+  CLASSIFIER_CALL            token consumati dalla chiamata all'agente e secondi di attesa
+  AGENT_WARMUP               riscaldamento dell'agente alla GIF che precede i segnali
   DECISION                   esito dell'Order Manager (OPEN/UPDATE/CLOSE/IGNORE)
   RISK_CALC                  calcolo dei lotti (rischio, tetto sul margine, totale)
   RISK_REJECTED              segnale scartato dal Risk Manager

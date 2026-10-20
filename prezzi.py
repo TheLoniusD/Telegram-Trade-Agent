@@ -328,6 +328,11 @@ COMMAND_LINK_SECONDS = 6 * 3600
 
 RE_TRADE_ACTIVE = re.compile(r"trade active|running|zero float", re.I)
 RE_HIT_TP = re.compile(r"hit\s*tp", re.I)
+# Segnale rapido nel formato fisso del trader: dal 23/09 al 20/10 196 su 196
+# classificati dall'agente esattamente così (direzione e prezzo). Il codice lo
+# potrebbe leggere da solo, senza aspettare l'agente (~3 s, 7-9 s la mattina).
+RE_QUICK_SIGNAL = re.compile(r"^\s*gold\s+(buy|sell)\s+\d{4}(?:\.\d+)?\s*$", re.I)
+QUICK_ENTRY_MAX_DELAY = 30   # oltre, il messaggio non è stato letto subito (recupero, riavvio)
 
 # Tick reali dopo il segnale e dopo ogni comando del trader: le candele da un
 # minuto non dicono a che prezzo il bot ha trovato il mercato, né se lo stop di
@@ -353,6 +358,7 @@ BASE_RULES = dict(
     protect=(0.25, 0.5, 0.75), # gradini dello stop di protezione se il pareggio non è possibile
     sl_margin=0.0,             # margine oltre lo SL del trader
     expiry=30 * 60,            # ordini limite non eseguiti cancellati dopo
+    entry_at_message=False,    # segnale rapido eseguito all'arrivo del messaggio, senza aspettare l'agente
 )
 
 # nome: (sigla per il dettaglio, regole diverse da quelle attuali)
@@ -374,6 +380,8 @@ STRATEGIES = {
     "senza TP provvisori":        ("no TPprv", dict(provisional_tp=())),
     # 19–20/10: pareggio colpito pochi secondi dopo il Trade Active, poi il prezzo al TP2
     "e2 senza pareggio":          ("e2 noBE", dict(be_keys=("e1", "e3"))),
+    # 20/10: "Gold sell 4121" letto dal codice, ordine all'arrivo del messaggio invece di ~3 s dopo
+    "segnale rapido senza agente": ("rapido", dict(entry_at_message=True)),
     "pareggio a metà rischio":    ("BE 1/2R", dict(be_risk=0.5)),
     "mai BE":                     ("mai BE", dict(be="none", ta_close=0, protect=())),
 }
@@ -442,11 +450,13 @@ def extract_signals(events: list) -> list:
     Un comando vale per il segnale a cui risponde (e per i suoi re-entry);
     senza risposta, per l'ultimo segnale nella stessa direzione.
     """
-    texts, replies = {}, {}
+    texts, replies, arrivals = {}, {}, {}
     for e in events:
         if e["event"] == "MESSAGE":
             texts.setdefault(e.get("msg_id"), e.get("text") or "")
             replies.setdefault(e.get("msg_id"), e.get("reply_to"))
+            if not e.get("is_edit"):
+                arrivals.setdefault(e.get("msg_id"), e["_t"])
 
     signals, by_id, done = [], {}, set()
     for e in events:
@@ -464,8 +474,10 @@ def extract_signals(events: list) -> list:
             continue
 
         if intent == "NEW_SIGNAL" and direction in ("BUY", "SELL"):
+            # t = classificazione (quando il bot ha agito), t_msg = arrivo del messaggio
             signal = {"id": msg_id, "t": t, "buy": direction == "BUY", "versions": [], "events": [],
-                      "label": text.split("\n")[0][:24], "parent": None}
+                      "label": text.split("\n")[0][:24], "parent": None,
+                      "t_msg": arrivals.get(msg_id), "quick": bool(RE_QUICK_SIGNAL.match(text))}
             if data.get("entry_min") is None:
                 # Re-entry ("Try buy again"): a mercato, SL e TP dell'ultimo segnale nella stessa direzione
                 parents = [s for s in signals if s["buy"] == signal["buy"] and t - s["t"] <= REENTRY_PARENT_SECONDS]
@@ -584,6 +596,14 @@ def download_ticks(mt5, start_utc: float, end_utc: float, offset: int) -> list:
     return out
 
 
+def quick_entry_time(signal: dict):
+    """Arrivo del messaggio di un segnale rapido letto subito dal bot, o None (entry_at_message)."""
+    t_msg = signal.get("t_msg")
+    if signal.get("quick") and t_msg is not None and 0 <= signal["t"] - t_msg <= QUICK_ENTRY_MAX_DELAY:
+        return t_msg
+    return None
+
+
 def tick_windows(signals: list) -> list:
     """
     Finestre (inizio, fine) in cui servono i tick: dal minuto del segnale e di
@@ -592,7 +612,8 @@ def tick_windows(signals: list) -> list:
     """
     raw = []
     for signal in signals:
-        for t in [signal["t"]] + [et for et, _, _ in signal["events"]]:
+        arrival = [quick_entry_time(signal)] if quick_entry_time(signal) is not None else []
+        for t in [signal["t"]] + arrival + [et for et, _, _ in signal["events"]]:
             start = t - t % 60
             end = (t + TICK_WINDOW_SECONDS) - (t + TICK_WINDOW_SECONDS) % 60 + 60
             raw.append((start, end))
@@ -633,6 +654,11 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
     """
     buy = signal["buy"]
     end = signal["t"] + hours * 3600
+    # Ingresso quando il bot ha la classificazione; con entry_at_message il segnale
+    # rapido ("Gold sell 4121") all'arrivo del messaggio, con gli stessi livelli
+    entry_t = signal["t"]
+    if rules["entry_at_message"] and quick_entry_time(signal) is not None:
+        entry_t = quick_entry_time(signal)
     tickets, started, ta_done, applied = {}, False, False, 0
     # Per tempo, e a parità di tempo nell'ordine del messaggio (prima la chiusura, poi il pareggio)
     events = sorted(signal["events"], key=lambda event: event[0])
@@ -712,12 +738,12 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
         is_tick = duration == 0
         # Su una candela si entra all'apertura della prima candela intera dopo il
         # segnale; su un tick al primo prezzo dopo che il bot ha letto il messaggio.
-        if t < (signal["t"] if is_tick else signal["t"] - signal["t"] % 60 + 60):
+        if t < (entry_t if is_tick else entry_t - entry_t % 60 + 60):
             continue
         ask_o, ask_h, ask_l, ask_c = o + sp, h + sp, l + sp, c + sp
 
         if not started:
-            levels = levels_at(signal, t)
+            levels = levels_at(signal, max(t, signal["t"]))
             market = ask_o if buy else o
             zone = _zone(levels, buy)
             if zone is not None and min(abs(market - zone[0]), abs(market - zone[1])) > MAX_SIGNAL_DISTANCE:
@@ -759,7 +785,7 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
                                 "lots": risk * share / distance, "realized": 0.0, "be": False,
                                 "since": t, "reason": None, "exit": None}
             started = True
-            applied = sum(1 for vt, _ in signal["versions"] if vt <= t)
+            applied = sum(1 for vt, _ in signal["versions"] if vt <= max(t, signal["t"]))
 
         # Modifiche del trader arrivate dopo l'ingresso (fase completa, correzioni)
         while applied < len(signal["versions"]) and signal["versions"][applied][0] <= t:

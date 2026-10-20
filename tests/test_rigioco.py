@@ -94,4 +94,36 @@ scenario("Variante \"pareggio a metà rischio\": stop di e2 a metà della distan
 esito = rigioca("pareggio a metà rischio")
 check(esito["e2"][0] == "TP" and vicino(esito["e2"][1], 4133.1), "e2 al TP2 con lo stop a 4.133,10", esito["e2"])
 
+# Variante del 20/10 "segnale rapido senza agente": "Gold sell 4121" arriva a T0,
+# l'agente lo classifica 3 secondi dopo. All'arrivo il prezzo è a 4.121,30 (nella zona),
+# alla classificazione è sceso a 4.120,50 (oltre il bordo): con le regole attuali l'ordine
+# resta limite a 4.121 e il prezzo non ci torna più; scende fino ai TP provvisori 4.111/4.101.
+RAPIDO = [{"event": "MESSAGE", "msg_id": 7, "text": "Gold sell 4121", "reply_to": None, "_t": T0},
+          {"event": "CLASSIFIED", "msg_id": 7, "intent": "NEW_SIGNAL", "_t": T0 + 3,
+           "data": dati(entry_min=4121.0)}]
+prezzi_tick = [(0.5, 4121.3), (3.5, 4120.5), (60, 4118.0), (600, 4110.0), (1200, 4100.0)]
+points = [(T0 + s, 0, p, p, p, p, SPREAD) for s, p in prezzi_tick]
+signal = prezzi.extract_signals(RAPIDO)[0]
+
+scenario("Segnale rapido: ora di arrivo del messaggio e formato riconosciuti")
+check(signal["t_msg"] == T0 and signal["t"] == T0 + 3 and signal["quick"], "arrivo T0, classificazione T0+3, rapido",
+      (signal["t_msg"] - T0, signal["t"] - T0, signal["quick"]))
+check(prezzi.tick_windows([signal])[0][0] <= T0, "i tick partono dall'arrivo del messaggio")
+
+scenario("Regole attuali: prezzo oltre il bordo alla classificazione, segnale mai entrato")
+esito = prezzi.simulate_signal(signal, points, dict(prezzi.BASE_RULES), risk=140.0, hours=8)
+states = {key: (x["state"], x["price"]) for key, x in esito["tickets"].items()}
+check(states == {"e1": ("pending", 4121.0), "e2": ("pending", 4121.0)} and esito["result"] == 0,
+      "e1 ed e2 limite a 4.121, mai eseguiti", states)
+
+scenario("Variante \"segnale rapido senza agente\": a mercato all'arrivo, e1 ed e2 ai TP")
+esito = rigioca("segnale rapido senza agente")
+check(esito["e1"][0] == "TP" and esito["e2"][0] == "TP", "e1 al TP1, e2 al TP2", esito)
+
+scenario("Un segnale nel formato completo non cambia con la variante (passa comunque dall'agente)")
+COMPLETO = [dict(RAPIDO[0], text="GOLD SELL NOW\n\nSell @ 4121 - 4126\n\nSL🔴4131"), RAPIDO[1]]
+signal = prezzi.extract_signals(COMPLETO)[0]
+check(not signal["quick"], "non è un segnale rapido")
+check(rigioca("segnale rapido senza agente") == rigioca("attuale"), "stesso esito delle regole attuali")
+
 fine()

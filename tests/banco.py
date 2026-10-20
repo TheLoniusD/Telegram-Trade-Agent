@@ -70,6 +70,7 @@ _telethon.events = types.SimpleNamespace(NewMessage=lambda **k: None, MessageEdi
 sys.modules["telethon"] = _telethon
 _agent = types.ModuleType("agent_classifier")
 _agent.agent_classify_telegram_message = None
+_agent.warm_up_agent = None
 sys.modules["agent_classifier"] = _agent
 
 import telegram_listener as L  # noqa: E402
@@ -79,6 +80,17 @@ import narrative  # noqa: E402
 L.is_market_time_open = lambda: (True, "")
 _next_classification = {}
 L.agent_classify_telegram_message = lambda *a, **k: _next_classification["value"]
+
+# Riscaldamenti dell'agente chiesti dal bot (alla GIF che precede i segnali)
+riscaldamenti = []
+
+
+def _riscaldamento_finto():
+    riscaldamenti.append(datetime.now(timezone.utc))
+    return {"model": "finto", "cache_read_input_tokens": 0, "cache_creation_input_tokens": 5658}
+
+
+L.warm_up_agent = _riscaldamento_finto
 
 
 # ----------------------------------------------------------------------
@@ -114,6 +126,17 @@ def invia(msg_id, text, classification, edit=False, reply_to=None):
     """Il trader scrive (o modifica, edit=True) un messaggio; l'agente lo classifica così."""
     _next_classification["value"] = classification
     asyncio.run(L.process_message(_Event(msg_id, text, reply_to), edit))
+
+
+def media(msg_id, kind="gif", media_id=777, edit=False):
+    """Il trader pubblica un media senza testo (gif, photo, sticker…); aspetta l'eventuale riscaldamento."""
+    event = _Event(msg_id, "")
+    event.media = types.SimpleNamespace(id=media_id)
+    setattr(event, kind, event.media)
+    L._warmup_thread = None
+    asyncio.run(L.process_message(event, edit))
+    if L._warmup_thread is not None:
+        L._warmup_thread.join(timeout=5)
 
 
 def segnale(msg_id, direction, price, low, high, sl, tps):
