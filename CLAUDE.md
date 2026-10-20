@@ -66,7 +66,7 @@ I parametri si leggono da `.env` con `os.getenv(NOME, default)`. **Il default ne
 - Comportamento nuovo o corretto → nuovo scenario (o controllo) in `tests/test_*.py`, usando `tests/banco.py`. Mai indebolire o togliere un controllo per far passare la verifica senza dirlo al proprietario.
 - Il banco di prova usa un broker finto (`tests/fake_mt5.py`, messo da `tests/banco.py` al posto sia di `MetaTrader5` sia di `mt5_connection`), una cartella temporanea e i default del codice: non legge il `.env`, non tocca log, `active_trades.json` o MT5 veri. Funziona allo stesso modo sul codice di `main` e su quello di `server`.
 - Un hook (`.claude/settings.json`) lancia la verifica prima di ogni `git push`, da Bash o da PowerShell, e lo **blocca** se fallisce.
-- `prezzi.py` non è coperto dai test (serve MT5): dopo una modifica almeno compila (lo fa `run_all.py`) e va provato con il rigioco sul server.
+- `prezzi.py`: `tests/test_rigioco.py` prova la lettura dei comandi del trader e la simulazione su prezzi finti; il rigioco vero (prezzi di MT5) dopo una modifica va rilanciato sul server.
 
 ## Rilascio (solo dopo l'ok esplicito)
 

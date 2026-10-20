@@ -372,6 +372,9 @@ STRATEGIES = {
     "ingresso fino a 1 $ oltre":  ("ingr 1", dict(entry_tol=1.0)),
     "ingresso fino a 2 $ oltre":  ("ingr 2", dict(entry_tol=2.0)),
     "senza TP provvisori":        ("no TPprv", dict(provisional_tp=())),
+    # 19–20/10: pareggio colpito pochi secondi dopo il Trade Active, poi il prezzo al TP2
+    "e2 senza pareggio":          ("e2 noBE", dict(be_keys=("e1", "e3"))),
+    "pareggio a metà rischio":    ("BE 1/2R", dict(be_risk=0.5)),
     "mai BE":                     ("mai BE", dict(be="none", ta_close=0, protect=())),
 }
 
@@ -484,20 +487,24 @@ def extract_signals(events: list) -> list:
         # Comandi. HIT TP / HIT TP MAX = pareggio (regola dal 28/09, qualunque
         # cosa abbia deciso l'agente nei giorni prima).
         if RE_HIT_TP.search(text):
-            kind = "BE"
+            kinds = ["BE"]
         elif intent == "CLOSE_SIGNAL":
-            kind = "CLOSE"
+            kinds = ["CLOSE"]
         elif details.get("close_percentage"):
-            kind = "HALF"
+            # "Close half and BE your entry": chiusura parziale e poi pareggio, come
+            # il bot (mai Trade Active insieme a una chiusura parziale). Fino al 20/10
+            # il pareggio si perdeva: 13/10 SELL 4187 +210 $ nel rigioco, −31 $ reale.
+            kinds = ["HALF"] + (["BE"] if details.get("move_sl_to_be") else [])
         elif details.get("move_sl_to_be"):
-            kind = "TA" if (data.get("running_pips") or RE_TRADE_ACTIVE.search(text)) else "BE"
+            kinds = ["TA" if (data.get("running_pips") or RE_TRADE_ACTIVE.search(text)) else "BE"]
         elif details.get("layer_target"):
-            kind = "LAYER"  # "Secure first layer now"
+            kinds = ["LAYER"]  # "Secure first layer now"
         else:
             continue
-        if (msg_id, kind) in done:
+        kinds = [kind for kind in kinds if (msg_id, kind) not in done]
+        if not kinds:
             continue
-        done.add((msg_id, kind))
+        done.update((msg_id, kind) for kind in kinds)
 
         target, ref, depth = None, replies.get(msg_id), 0
         while ref and depth < 5:
@@ -513,9 +520,11 @@ def extract_signals(events: list) -> list:
             target = candidates[-1]
         family = [target] + [s for s in signals if s["parent"] == target["id"]]
         for s in family:
-            if kind == "HALF" and any(k == "HALF" and t - et < PARTIAL_CLOSE_REPEAT_SECONDS for et, k, _ in s["events"]):
-                continue
-            s["events"].append((t, kind, details.get("close_percentage")))
+            for kind in kinds:
+                if kind == "HALF" and any(k == "HALF" and t - et < PARTIAL_CLOSE_REPEAT_SECONDS
+                                          for et, k, _ in s["events"]):
+                    continue  # ripetizione: ignorata, ma il pareggio dello stesso messaggio resta
+                s["events"].append((t, kind, details.get("close_percentage")))
     return signals
 
 
@@ -625,7 +634,8 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
     buy = signal["buy"]
     end = signal["t"] + hours * 3600
     tickets, started, ta_done, applied = {}, False, False, 0
-    events = sorted(signal["events"])
+    # Per tempo, e a parità di tempo nell'ordine del messaggio (prima la chiusura, poi il pareggio)
+    events = sorted(signal["events"], key=lambda event: event[0])
     next_event = 0
     be_wanted = be_all = False
     last_retry = None
