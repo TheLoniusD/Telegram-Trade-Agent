@@ -1,0 +1,3 @@
+# Script per Linux: sempre a capo LF, anche in una copia su Windows (bash non legge i CRLF)
+*.sh   text eol=lf
+*.conf text eol=lf
