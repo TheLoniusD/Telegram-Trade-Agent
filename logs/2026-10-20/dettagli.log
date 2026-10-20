@@ -34,3 +34,5 @@
 2026-10-20 18:18:50 | INFO     | telegram_listener | 🔄 Riconciliazione con MT5 completata (0 valori allineati).
 2026-10-20 18:18:50 | INFO     | telegram_listener | 🤖 Ascolto attivo sul canale: https://t.me/Maestrofxofficial
 2026-10-20 18:18:50 | INFO     | telegram_listener | In attesa di messaggi... (Premi Ctrl+C per fermare)
+2026-10-20 18:36:21 | ERROR    | telegram_listener | ❌ Problema MT5: terminale MT5 non collegato al server del broker
+2026-10-20 18:43:51 | INFO     | telegram_listener | ✅ MT5 operativo: situazione tornata normale.
