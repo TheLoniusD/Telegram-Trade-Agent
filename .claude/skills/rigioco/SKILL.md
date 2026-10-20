@@ -42,4 +42,5 @@ Poi i log si caricano sul branch `server`. Opzioni utili:
 - Si porta la stessa regola in `prezzi.py`, così "attuale" resta uguale al bot (`BASE_RULES` e, se serve, `simulate_signal`).
 - La regola precedente resta come variante, con la data ("BE +0,5 $ (fino all'11/10)"), per poterla confrontare.
 - Si aggiornano la riga "Regole attuali" stampata dal rigioco e `doc/DECISIONI.md` con i numeri.
-- La verifica (`python3 tests/run_all.py`) controlla solo che `prezzi.py` compili: il rigioco va rilanciato sul server.
+- La verifica (`python3 tests/run_all.py`) prova `prezzi.py` solo su prezzi finti (`tests/test_rigioco.py`: lettura dei comandi, simulazione di un segnale): il rigioco vero va rilanciato sul server. Ogni difetto del simulatore trovato con la calibrazione diventa uno scenario lì.
+- Un messaggio può contenere più comandi ("close half and BE your entry"): il simulatore deve eseguirli tutti, nell'ordine del bot (fino al 20/10 perdeva il pareggio: 13/10 SELL 4187 +210 $ nel rigioco, −31 $ reale).

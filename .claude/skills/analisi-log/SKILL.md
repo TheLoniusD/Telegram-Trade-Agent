@@ -28,6 +28,7 @@ Per ogni segnale:
 - **Gestione**: Trade Active (quale ticket incassato, l'altro a pareggio), pareggio applicato, ridotto o rifiutato (con stop di protezione), chiusure parziali, layer.
 - **Esito di ogni ticket**: TP, incasso, pareggio, protezione, stop pieno, chiusura del trader. Con quanto.
 - **Confronto con il trader**: ha scritto HIT TP o "hit our risk"? Il nostro esito è coerente col suo? Se lui vince e noi perdiamo, trova il motivo preciso (ingresso, pareggio troppo stretto o rifiutato, classificazione, bug, MT5 scollegato).
+- Il **riepilogo del trader** ("YESTERDAY SUMMARY", vinti/persi e pips per segnale) non si aspetta: di solito arriva verso le 19:08 dello stesso giorno, quello del venerdì il sabato mattina (16/10 → 17/10 alle 04:18, scartato per il weekend: è solo nel `journal.jsonl`), certi giorni manca (09/10, 15/10). Se c'è lo si usa; altrimenti il confronto si fa con i suoi Trade Active, HIT TP e "hit risk". I suoi pips sono gonfiati (contati dal bordo lontano della zona, a volte attribuiti al segnale sbagliato): servono per sapere vinto o perso, non quanto.
 
 Poi, sulla giornata intera:
 - **MT5 e bot**: disconnessioni (🔌) e cosa è successo nel frattempo, riavvii (▶️), errori (❌), conto DEMO all'avvio.
