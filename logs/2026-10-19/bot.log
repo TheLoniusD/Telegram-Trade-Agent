@@ -1,0 +1,218 @@
+00:08:50 💓 Bot attivo · saldo 6.960,27 $ · equity 6.960,27 $ · 0 operazioni aperte · 0 messaggi scartati dall'ultimo controllo
+04:03:09 📩 Trader: "Gold buy 4176"
+04:03:09 🧠 Agente: nuovo segnale BUY 4176
+04:03:09 📥 [BUY 4176] 2 ordini: e1 4.176,00 in attesa · e2 4.176,00 in attesa | SL 4.166,00 provvisorio · TP 4.186,00 / 4.196,00 · 0,14 lotti
+04:03:58 ✏️ Trader modifica: "GOLD BUY NOW · Buy @ 4176 - 4171 · SL🔴4166 · TP✅4186 · TP✅4196"
+04:03:58 🧠 Agente: aggiornamento: zona 4171–4176 · SL 4.166,00 · TP 4.186,00 / 4.196,00
+04:06:27 📩 Trader: "Trade Active ✅ · Gold Buy Running 55+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+04:06:27 🧠 Agente: aggiornamento: pareggio
+04:06:27 💰 [BUY 4176] Trade Active 55 pips: nessun ticket aperto: gli ordini in attesa vengono cancellati
+04:06:27 🗑️ [BUY 4176] e1 cancellato, mai eseguito: il trader ha chiesto il BE prima che l'ordine venisse eseguito
+04:06:28 🗑️ [BUY 4176] e2 cancellato, mai eseguito: il trader ha chiesto il BE prima che l'ordine venisse eseguito
+04:09:00 💓 Bot attivo · saldo 6.960,27 $ · equity 6.960,27 $ · 0 operazioni aperte · 10 messaggi scartati dall'ultimo controllo
+04:11:27 📩 Trader: "Trade Active ✅ · Gold Buy Running 100+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+04:11:27 🧠 Agente: aggiornamento: pareggio
+04:11:27    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+04:19:38 📩 Trader: "Gold buy 4176"
+04:19:38 🧠 Agente: nuovo segnale BUY 4176
+04:19:38 📥 [BUY 4176 delle 04:19] 2 ordini: e1 4.176,00 in attesa · e2 4.176,00 in attesa | SL 4.166,00 provvisorio · TP 4.186,00 / 4.196,00 · 0,14 lotti
+04:20:00 ✅ [BUY 4176 delle 04:19] e1 eseguito a 4.176,00
+04:20:00 ✅ [BUY 4176 delle 04:19] e2 eseguito a 4.176,00
+04:20:20 ✏️ Trader modifica: "GOLD BUY NOW · Buy @ 4176 - 4171 · SL🔴4166 · TP✅4186 · TP✅4196"
+04:20:20 🧠 Agente: aggiornamento: zona 4171–4176 · SL 4.166,00 · TP 4.186,00 / 4.196,00
+04:33:29 📩 Trader: "Running 50pips reverse back to the zone, i'm still hold this setup"
+04:33:29 🧠 Agente: nessuna azione (Commento narrative stato posizione senza comando operativo)
+04:42:28 📩 Trader: "Trade Active ✅ · Gold Buy Running 90+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+04:42:28 🧠 Agente: aggiornamento: pareggio
+04:42:28 💰 [BUY 4176 delle 04:19] Trade Active 90 pips: e1 in perdita, non chiusi
+04:42:28 ❌ [BUY 4176 delle 04:19] MT5 rifiuta il pareggio di e1: Invalid stops (retcode 10016)
+04:42:28 ⏳ [BUY 4176 delle 04:19] e1 pareggio a 4.177,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+04:42:29 🛟 [BUY 4176 delle 04:19] e1 pareggio non ancora possibile (a 4.177,00): stop di protezione da 4.166,00 a 4.173,50
+04:42:29 ❌ [BUY 4176 delle 04:19] MT5 rifiuta il pareggio di e2: Invalid stops (retcode 10016)
+04:42:29 ⏳ [BUY 4176 delle 04:19] e2 pareggio a 4.177,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+04:42:29 🛟 [BUY 4176 delle 04:19] e2 pareggio non ancora possibile (a 4.177,00): stop di protezione da 4.166,00 a 4.173,50
+04:43:05 🛡️ [BUY 4176 delle 04:19] e1 pareggio pieno non ancora possibile (a 4.177,00): pareggio ridotto, SL da 4.173,50 a 4.176,50
+04:43:05 🛡️ [BUY 4176 delle 04:19] e2 pareggio pieno non ancora possibile (a 4.177,00): pareggio ridotto, SL da 4.173,50 a 4.176,50
+04:43:35 🏁 [BUY 4176 delle 04:19] e1 chiuso a pareggio 4.176,50 · +3,12 $
+04:43:35 🏁 [BUY 4176 delle 04:19] e2 chiuso a pareggio 4.176,50 · +3,12 $ · operazione chiusa: +6,24 $
+06:48:30 📩 Trader: "Gold remains in an overall H1 uptrend, but price movement is currently slow and consolidating. · We’ll stay p…"
+06:48:30 🧠 Agente: nessuna azione (analisi tecnica, nessun comando operativo)
+07:05:02 📩 Trader: "Gold buy 4180"
+07:05:02 🧠 Agente: nuovo segnale BUY 4180
+07:05:02 📥 [BUY 4180] 2 ordini: e1 4.180,00 in attesa · e2 4.180,00 in attesa | SL 4.170,00 provvisorio · TP 4.190,00 / 4.200,00 · 0,14 lotti
+07:06:30 ✏️ Trader modifica: "GOLD BUY NOW · Buy @ 4180 - 4175 · SL🔴4170 · TP✅4190 · TP✅4200"
+07:06:30 🧠 Agente: aggiornamento: zona 4175–4180 · SL 4.170,00 · TP 4.190,00 / 4.200,00
+07:11:31 📩 Trader: "Trade Active ✅ · Gold Buy Running 50+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+07:11:31 🧠 Agente: aggiornamento: pareggio
+07:11:31 💰 [BUY 4180] Trade Active 50 pips: nessun ticket aperto: gli ordini in attesa vengono cancellati
+07:11:31 🗑️ [BUY 4180] e1 cancellato, mai eseguito: il trader ha chiesto il BE prima che l'ordine venisse eseguito
+07:11:31 🗑️ [BUY 4180] e2 cancellato, mai eseguito: il trader ha chiesto il BE prima che l'ordine venisse eseguito
+07:12:30 📩 Trader: "BE a few layer try hold it 🫵"
+07:12:30 🧠 Agente: nessuna azione (Commento generico senza comando operativo concreto)
+07:14:31 📩 Trader: "Hit our BE , ready next"
+07:14:31 🧠 Agente: nessuna azione (Celebrativo, comando ambiguo BE senza trade attivo)
+07:17:01 📩 Trader: "Gold buy 4179"
+07:17:01 🧠 Agente: nuovo segnale BUY 4179
+07:17:01 📥 [BUY 4179] 2 ordini: e1 4.179,00 in attesa · e2 4.179,00 in attesa | SL 4.169,00 provvisorio · TP 4.189,00 / 4.199,00 · 0,14 lotti
+07:17:05 📩 Trader: "Lets buy again"
+07:17:05 🧠 Agente: re-entry BUY (rientro nel setup precedente)
+07:17:05    ↳ nessuna azione: "again" 4 secondi dopo il segnale BUY 4179: stesso setup, nessuna nuova posizione
+07:17:15 ✅ [BUY 4179] e1 eseguito a 4.179,00
+07:17:15 ✅ [BUY 4179] e2 eseguito a 4.179,00
+07:18:31 ✏️ Trader modifica: "GOLD BUY NOW · Buy @ 4179 - 4174 · SL🔴4169 · TP✅4189 · TP✅4199"
+07:18:31 🧠 Agente: aggiornamento: zona 4174–4179 · SL 4.169,00 · TP 4.189,00 / 4.199,00
+07:31:30 📩 Trader: "Lets closed half now"
+07:31:30 🧠 Agente: aggiornamento: chiudi il 50%
+07:31:30 ✂️ Chiusura parziale del 50%: 0,07 lotti su 0,14
+07:31:30 🏁 [BUY 4179] e2 chiuso dal bot 4.179,69 · +4,30 $
+07:32:06 📩 Trader: "Lets closed half now"
+07:32:06 🧠 Agente: aggiornamento: chiudi il 50%
+07:32:06 ✂️ Chiusura parziale ripetuta dopo 0 minuti: trattata come la stessa, ignorata
+07:33:30 📩 Trader: "Trade Active ✅ · Gold Buy Running 60+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+07:33:30 🧠 Agente: aggiornamento: pareggio
+07:33:30 💰 [BUY 4179] Trade Active 60 pips: un solo ticket aperto: resta per il TP, va a pareggio
+07:33:30 ❌ [BUY 4179] MT5 rifiuta il pareggio di e1: Invalid stops (retcode 10016)
+07:33:30 ⏳ [BUY 4179] e1 pareggio a 4.180,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+07:33:30 🛟 [BUY 4179] e1 pareggio non ancora possibile (a 4.180,00): stop di protezione da 4.169,00 a 4.176,50
+07:34:18 🏁 [BUY 4179] e1 chiuso a stop 4.176,50 · −15,59 $ · operazione chiusa: −11,29 $
+07:42:30 📩 Trader: "Trade Active ✅ · Gold Buy Running 165+ Pips · Gold Buy Running 115+ Pips · Scalpers secure ur Profits & BE+ u…"
+07:42:30 🧠 Agente: aggiornamento: pareggio
+07:42:30    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+08:04:22 📩 Trader: "Gold buy 4184"
+08:04:22 🧠 Agente: nuovo segnale BUY 4184
+08:04:22 📥 [BUY 4184] 2 ordini: e1 4.183,31 eseguito · e2 4.183,29 eseguito | SL 4.174,00 provvisorio · TP 4.194,00 / 4.204,00 · 0,14 lotti
+08:05:30 ✏️ Trader modifica: "GOLD BUY NOW · Buy @ 4184 - 4179 · SL🔴4174 · TP✅4194 · TP✅4204"
+08:05:30 🧠 Agente: aggiornamento: zona 4179–4184 · SL 4.174,00 · TP 4.194,00 / 4.204,00
+08:09:23 💓 Bot attivo · saldo 6.955,22 $ · equity 6.955,72 $ · 1 operazioni aperte · 29 messaggi scartati dall'ultimo controllo
+08:31:28 🏁 [BUY 4184] e1 chiuso a stop 4.174,00 · −58,09 $
+08:31:28 🏁 [BUY 4184] e2 chiuso a stop 4.174,00 · −57,96 $ · operazione chiusa: −116,05 $
+08:31:31 📩 Trader: "Hit risk ! · Ready setup recovery!"
+08:31:31 🧠 Agente: nessuna azione (messaggio enigmatico privo parole chiave operative)
+08:33:31 📩 Trader: "Gold buy 4173"
+08:33:31 🧠 Agente: nuovo segnale BUY 4173
+08:33:32 📥 [BUY 4173 delle 08:33] 2 ordini: e1 4.173,00 in attesa · e2 4.173,00 in attesa | SL 4.163,00 provvisorio · TP 4.183,00 / 4.193,00 · 0,14 lotti
+08:34:22 ✏️ Trader modifica: "GOLD BUY NOW · Buy @ 4173 - 4168 · SL🔴4163 · TP✅4183 · TP✅4193"
+08:34:22 🧠 Agente: aggiornamento: zona 4168–4173 · SL 4.163,00 · TP 4.183,00 / 4.193,00
+08:38:32 📩 Trader: "Trade Active ✅ · Gold Buy Running 40+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+08:38:32 🧠 Agente: aggiornamento: pareggio
+08:38:32 💰 [BUY 4173 delle 08:33] Trade Active 40 pips: nessun ticket aperto: gli ordini in attesa vengono cancellati
+08:38:32 🗑️ [BUY 4173 delle 08:33] e1 cancellato, mai eseguito: il trader ha chiesto il BE prima che l'ordine venisse eseguito
+08:38:32 🗑️ [BUY 4173 delle 08:33] e2 cancellato, mai eseguito: il trader ha chiesto il BE prima che l'ordine venisse eseguito
+08:39:31 📩 Trader: "Hold a few layer with BE 🫵"
+08:39:31 🧠 Agente: aggiornamento: pareggio
+08:39:31    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+08:44:31 📩 Trader: "Trade Active ✅ · Gold Buy Running 60+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+08:44:31 🧠 Agente: aggiornamento: pareggio
+08:44:31    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+09:03:12 📩 Trader: "HIT TP⚡️⚡️ · Gold Buy 180+ Pips ✔️ · Collect all or half & BE+ ur entries · If u caught it , show it 🫵"
+09:03:12 🧠 Agente: aggiornamento: pareggio
+09:03:12    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+09:46:33 📩 Trader: "Gold sell 4184"
+09:46:33 🧠 Agente: nuovo segnale SELL 4184
+09:46:33 📥 [SELL 4184] 2 ordini: e1 4.184,08 eseguito · e2 4.184,12 eseguito | SL 4.194,00 provvisorio · TP 4.174,00 / 4.164,00 · 0,14 lotti
+09:47:33 ✏️ Trader modifica: "GOLD SELL NOW · Sell @ 4184 - 4189 · SL🔴4194 · TP✅4174 · TP✅4164"
+09:47:33 🧠 Agente: aggiornamento: zona 4184–4189 · SL 4.194,00 · TP 4.174,00 / 4.164,00
+09:54:12 📩 Trader: "Trade Active ✅ · Gold Sell Running 70+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+09:54:12 🧠 Agente: aggiornamento: pareggio
+09:54:12 🏁 [SELL 4184] e1 chiuso incassato al Trade Active a 4.178,54 · +34,61 $
+09:54:12 💰 [SELL 4184] Trade Active 70 pips: incasso e1
+09:54:12 🛡️ [SELL 4184] pareggio: e2 SL 4.183,12
+10:02:34 📩 Trader: "HIT TP⚡️⚡️ · Gold Sell 125+ Pips ✔️ · Collect all or half & BE+ ur entries · Lets see who caught the move 🫵"
+10:02:34 🧠 Agente: aggiornamento: pareggio
+10:02:34    ↳ nessuna azione: Nessuna modifica applicabile (nessun trade idoneo).
+10:07:33 📩 Trader: "📉REASON SELL SETUP · 🔻M15 bearish engulfing pattern indicates strong selling pressure. · 🔻Price broke below t…"
+10:07:33 🧠 Agente: nessuna azione (Analisi tecnica post-hoc, nessun imperativo operativo)
+10:18:34 📩 Trader: "🕯Gold is still ranging within the same zone, with no confirmed breakout yet. · ⌛ Stay patient and wait for a …"
+10:18:34 🧠 Agente: nessuna azione (Analisi tecnica, nessun comando operativo)
+12:09:48 💓 Bot attivo · saldo 6.873,78 $ · equity 6.969,46 $ · 1 operazioni aperte · 54 messaggi scartati dall'ultimo controllo
+12:41:50 🏁 [SELL 4184] e2 chiuso a TP 4.164,00 · +125,64 $ · operazione chiusa: +160,25 $
+13:01:19 📩 Trader: "Gold sell 4171"
+13:01:19 🧠 Agente: nuovo segnale SELL 4171
+13:01:20 📥 [SELL 4171] 2 ordini: e1 4.171,59 eseguito · e2 4.171,74 eseguito | SL 4.181,00 provvisorio · TP 4.161,00 / 4.151,00 · 0,14 lotti
+13:02:28 ✏️ Trader modifica: "Gold sell 4172"
+13:02:28 🧠 Agente: aggiornamento senza modifiche
+13:02:59 ✏️ Trader modifica: "GOLD SELL NOW · Sell @ 4172 - 4177 · SL🔴4182 · TP✅4162 · TP✅4152"
+13:02:59 🧠 Agente: aggiornamento: zona 4172–4177 · SL 4.182,00 · TP 4.162,00 / 4.152,00
+13:02:59 ✏️ [SELL 4171] livelli aggiornati: SL 4.182,00 · TP 4.162,00 / 4.152,00
+13:34:27 📩 Trader: "Trade Active ✅ · Gold Sell Running 80+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+13:34:27 🧠 Agente: aggiornamento: pareggio
+13:34:28 🏁 [SELL 4171] e1 chiuso incassato al Trade Active a 4.170,00 · +9,92 $
+13:34:28 💰 [SELL 4171] Trade Active 80 pips: incasso e1
+13:34:28 🛡️ [SELL 4171] pareggio: e2 SL 4.170,74
+13:34:58 🏁 [SELL 4171] e2 chiuso a pareggio 4.170,74 · +6,24 $ · operazione chiusa: +16,16 $
+13:37:37 📩 Trader: "Hold a few layer with BE 🫵"
+13:37:37 🧠 Agente: aggiornamento: pareggio
+13:37:37    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+13:48:36 📩 Trader: "Gold sell 4169"
+13:48:36 🧠 Agente: nuovo segnale SELL 4169
+13:48:36 📥 [SELL 4169] 2 ordini: e1 4.169,00 in attesa · e2 4.169,00 in attesa | SL 4.179,00 provvisorio · TP 4.159,00 / 4.149,00 · 0,14 lotti
+13:49:24 ✏️ Trader modifica: "GOLD SELL NOW · Sell @ 4169 - 4174 · SL🔴4179 · TP✅4159 · TP✅4149"
+13:49:24 🧠 Agente: aggiornamento: zona 4169–4174 · SL 4.179,00 · TP 4.159,00 / 4.149,00
+13:50:59 ✅ [SELL 4169] e1 eseguito a 4.169,00
+13:50:59 ✅ [SELL 4169] e2 eseguito a 4.169,00
+14:03:32 🏁 [SELL 4169] e1 chiuso a TP 4.159,00 · +62,36 $
+14:05:25 📩 Trader: "HIT TP MAX⚡️⚡️ · Gold Sell 255+ Pips ✔️ · Gold Sell 185+ Pips ✔️ · Gold Sell 110+ Pips ✔️ · Collect all or ha…"
+14:05:25 🧠 Agente: aggiornamento: pareggio
+14:05:25 🛡️ [SELL 4169] pareggio: e2 SL 4.168,00
+14:06:37 📩 Trader: "Gold sell 4166"
+14:06:37 🧠 Agente: nuovo segnale SELL 4166
+14:06:37 📥 [SELL 4166] 2 ordini: e1 4.166,00 in attesa · e2 4.166,00 in attesa | SL 4.176,00 provvisorio · TP 4.156,00 / 4.146,00 · 0,14 lotti
+14:07:36 📩 Trader: "Let sell again"
+14:07:36 🧠 Agente: re-entry SELL (rientro nel setup precedente)
+14:07:36    ↳ nessuna azione: "again" 59 secondi dopo il segnale SELL 4166: stesso setup, nessuna nuova posizione
+14:07:39 ✏️ Trader modifica: "GOLD SELL NOW · Sell @ 4166 - 4171 · SL🔴4176 · TP✅4156 · TP✅4146"
+14:07:39 🧠 Agente: aggiornamento: zona 4166–4171 · SL 4.176,00 · TP 4.156,00 / 4.146,00
+14:09:03 ✅ [SELL 4166] e1 eseguito a 4.166,00
+14:09:03 ✅ [SELL 4166] e2 eseguito a 4.166,00
+14:09:33 🏁 [SELL 4169] e2 chiuso a pareggio 4.168,00 · +6,24 $ · operazione chiusa: +68,60 $
+14:15:58 📩 Trader: "Trade Active ✅ · Gold Sell Running 45+ Pips · Scalpers secure ur Profits & BE+ ur entries"
+14:15:58 🧠 Agente: aggiornamento: pareggio
+14:15:58 💰 [SELL 4166] Trade Active 45 pips: e1 in perdita, non chiusi
+14:15:58 ❌ [SELL 4166] MT5 rifiuta il pareggio di e1: Invalid stops (retcode 10016)
+14:15:58 ⏳ [SELL 4166] e1 pareggio a 4.165,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+14:15:58 🛟 [SELL 4166] e1 pareggio non ancora possibile (a 4.165,00): stop di protezione da 4.176,00 a 4.168,50
+14:15:58 ❌ [SELL 4166] MT5 rifiuta il pareggio di e2: Invalid stops (retcode 10016)
+14:15:58 ⏳ [SELL 4166] e2 pareggio a 4.165,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+14:15:59 🛟 [SELL 4166] e2 pareggio non ancora possibile (a 4.165,00): stop di protezione da 4.176,00 a 4.168,50
+14:16:36 📩 Trader: "Hold a few layer with BE 🫵"
+14:16:36 🧠 Agente: aggiornamento: pareggio
+14:16:36 ❌ [SELL 4166] MT5 rifiuta il pareggio di e1: Invalid stops (retcode 10016)
+14:16:36 ⏳ [SELL 4166] e1 pareggio a 4.165,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+14:16:36 ❌ [SELL 4166] MT5 rifiuta il pareggio di e2: Invalid stops (retcode 10016)
+14:16:36 ⏳ [SELL 4166] e2 pareggio a 4.165,00 in attesa: prezzo ancora troppo vicino, riprovo ogni 30 secondi
+14:17:37 🛡️ [SELL 4166] e1 pareggio applicato: SL 4.165,00
+14:17:38 🛡️ [SELL 4166] e2 pareggio applicato: SL 4.165,00
+14:18:08 🏁 [SELL 4166] e1 chiuso a pareggio 4.165,00 · +6,24 $
+14:18:08 🏁 [SELL 4166] e2 chiuso a pareggio 4.165,00 · +6,24 $ · operazione chiusa: +12,48 $
+14:22:52 📩 Trader: "Gold sell 4167"
+14:22:52 🧠 Agente: nuovo segnale SELL 4167
+14:22:53 📥 [SELL 4167] 2 ordini: e1 4.167,00 in attesa · e2 4.167,00 in attesa | SL 4.177,00 provvisorio · TP 4.157,00 / 4.147,00 · 0,14 lotti
+14:23:08 ✅ [SELL 4167] e1 eseguito a 4.167,00
+14:23:08 ✅ [SELL 4167] e2 eseguito a 4.167,00
+14:23:32 ✏️ Trader modifica: "GOLD SELL NOW · Sell @ 4167 - 4172 · SL🔴4177 · TP✅4157 · TP✅4147"
+14:23:32 🧠 Agente: aggiornamento: zona 4167–4172 · SL 4.177,00 · TP 4.157,00 / 4.147,00
+14:25:32 📩 Trader: "Trade Active ✅ · Gold Sell Running 65+ Pips · Gold Sell Running 45+ Pips · Scalpers secure ur Profits & BE+ u…"
+14:25:32 🧠 Agente: aggiornamento: pareggio
+14:25:32 🏁 [SELL 4167] e1 chiuso incassato al Trade Active a 4.165,57 · +8,92 $
+14:25:32 💰 [SELL 4167] Trade Active 45 pips: incasso e1
+14:25:32 🛡️ [SELL 4167] pareggio: e2 SL 4.166,00
+14:26:08 🏁 [SELL 4167] e2 chiuso a pareggio 4.166,00 · +6,24 $ · operazione chiusa: +15,16 $
+14:37:34 📩 Trader: "Trade Active ✅ · Gold Sell Running 90+ Pips · Gold Sell Running 70+ Pips · Scalpers secure ur Profits & BE+ u…"
+14:37:34 🧠 Agente: aggiornamento: pareggio
+14:37:34    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+15:08:38 📩 Trader: "Gold has broken below the ascending trendline, showing potential signs of a trend reversal to the downside.📉 …"
+15:08:38 🧠 Agente: nessuna azione (Analisi tecnica senza imperativo operativo)
+15:28:22 📩 Trader: "HIT TP MAX⚡️⚡️ · Gold Sell 255+ Pips ✔️ · Gold Sell 185+ Pips ✔️ · Gold Sell 110+ Pips ✔️ · Gold Sell 90+ Pip…"
+15:28:22 🧠 Agente: aggiornamento: pareggio
+15:28:22    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+16:10:13 💓 Bot attivo · saldo 7.111,82 $ · equity 7.111,82 $ · 0 operazioni aperte · 53 messaggi scartati dall'ultimo controllo
+16:36:40 📩 Trader: "HIT TP MAX⚡️⚡️ · Gold Sell 420+ Pips ✔️ · Gold Sell 345+ Pips ✔️ · Gold Sell 270+ Pips ✔️ · Gold Sell 250+ Pi…"
+16:36:40 🧠 Agente: aggiornamento: pareggio
+16:36:40    ↳ nessuna azione: Nessun trade attivo trovato per l'aggiornamento.
+19:08:24 📩 Trader: "YESTERDAY SUMMARY · 19th October 2026 · ✔️GOLD Buy : 100 PIPS · ✔️GOLD Buy : 165 PIPS · ✔️GOLD Buy : 50 PIPS …"
+19:08:24 🧠 Agente: nessuna azione (resoconto giornaliero, nessun comando operativo)
+20:10:27 💓 Bot attivo · saldo 7.111,82 $ · equity 7.111,82 $ · 0 operazioni aperte · 15 messaggi scartati dall'ultimo controllo
+21:19:30 🔌 MT5 non disponibile: terminale MT5 non collegato al server del broker
+21:24:01 🔌 MT5 di nuovo collegato
+23:29:37 🔌 MT5 non disponibile: terminale MT5 non collegato al server del broker
+23:30:07 🔌 MT5 di nuovo collegato
