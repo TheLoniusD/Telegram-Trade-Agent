@@ -6,7 +6,7 @@ Bot di copy trading: legge i messaggi del canale Telegram **Maestro Fx** (un tra
 
 Sei la **sessione sul server**: il server Linux dove il bot gira da solo, giorno e notte, come **servizio systemd**, con MT5 sotto Wine raggiunto via RPyC (`mt5_connection.py` → `mt5server.exe`). La cartella del progetto è sul branch `server`. Hai due compiti:
 
-1. **Caricare i log** che il bot scrive ogni giorno in `logs/`, così le sessioni sul PC del proprietario possono analizzarli. Ogni ora li pubblica anche il *Caricamento automatico dei log* (cron) in un repository di soli log: tu lo installi quando un prompt lo chiede e controlli che funzioni.
+1. **Far arrivare i log** che il bot scrive ogni giorno in `logs/` alle sessioni del proprietario. Li pubblica da solo, ogni ora, il *Caricamento automatico dei log* (cron) in un repository di soli log. Tu controlli che funzioni e, quando servono subito, fai il *Caricamento dei log*. Il branch `server` non contiene più i log.
 2. **Rilasciare le nuove versioni** del codice: le preparano le sessioni sul PC (branch `main`), che poi uniscono `main` in `server` e lo pubblicano; tu fai pull, verifichi e riavvii il bot.
 
 Su richiesta: il **rigioco** delle strategie (servono i prezzi di MT5, che ci sono solo qui) e il **controllo dello stato** del bot.
@@ -32,7 +32,7 @@ Se una riga è *da completare*, trovala e scrivila qui:
 - `systemctl cat <servizio>` (o `systemctl --user cat`): `ExecStart` dà il comando Python, `WorkingDirectory` la cartella;
 - `pgrep -af -i 'mt5server|wine'` per MT5.
 
-Poi committa questo file da solo (`git add CLAUDE.md && git commit -m "CLAUDE.md: dati del server"`) e pubblicalo con il caricamento dei log. È l'**unica** modifica a un file del repository che puoi fare, oltre ai log e ai risultati del rigioco. Nei comandi qui sotto `<servizio>` e `<python>` sono questi valori; per un servizio utente usa `systemctl --user` e `journalctl --user-unit`.
+Poi committa questo file da solo (`git add CLAUDE.md && git commit -m "CLAUDE.md: dati del server"`) e pubblicalo: `git pull --no-rebase origin server && git push origin server`. È l'**unica** modifica a un file del repository che puoi fare: i log e i risultati del rigioco stanno in `logs/`, che git ignora. Nei comandi qui sotto `<servizio>` e `<python>` sono questi valori; per un servizio utente usa `systemctl --user` e `journalctl --user-unit`.
 
 ## Regole fisse
 
@@ -41,7 +41,8 @@ Poi committa questo file da solo (`git add CLAUDE.md && git commit -m "CLAUDE.md
 - Il `.env` non si stampa, non si mostra (nemmeno in parte), non si committa. Si modifica solo con un comando preciso dato dal prompt, che non stampi i valori.
 - Il conto MT5 è e deve restare **DEMO**: mai `ALLOW_REAL_ACCOUNT`.
 - Il bot gira **solo come servizio**, in **un solo processo**: mai avviare `telegram_listener.py` a mano.
-- **Non modificare il codice** (né test, skill, `requirements.txt`, `.gitignore`): solo log, risultati del rigioco e i *Dati del server* qui sopra.
+- **Non modificare il codice** (né test, skill, `requirements.txt`, `.gitignore`): solo i *Dati del server* qui sopra.
+- I log non si committano nel progetto (mai `git add logs`, nemmeno con `-f`): li pubblica il caricamento nel repository dei log.
 - Git: solo il branch `server`. Mai `push --force`, mai `pull --rebase`, mai `reset`, `rebase`, `commit --amend`, `checkout` di altri branch, `merge` di `main`. Si fa `git pull --no-rebase origin server`, poi push. Se il pull va in conflitto: `git merge --abort` e riporta.
 - Mai `git add .` o `git add -A`: si aggiungono solo i file previsti.
 - La configurazione di git (`remote`, `core.sshCommand`, credenziali) si cambia solo con i comandi precisi di un prompt.
@@ -67,31 +68,37 @@ tail -n 2 ~/.local/state/caricamento-log/tta.log
 - `bot.log` è in ora italiana; il battito 💓 arriva ogni 4 ore (saldo, equity, operazioni aperte), la riga ▶️ a ogni avvio.
 - Riporta quello che vedi in poche righe, senza analisi. Se il servizio è fermo, i processi sono zero o più di uno, o ci sono riavvii continui: non intervenire di tua iniziativa, riporta (con `journalctl -u <servizio> -n 50 --no-pager`) e chiedi al proprietario.
 
-## Caricamento dei log
+## Aggiornamento del codice
 
 ```
 git status --short
-git add -f logs
-git commit -m "Log aggiornati"
 git pull --no-rebase origin server
-git push origin server
 ```
 
-- **`-f` è necessario**: `logs/` è nel `.gitignore` e `git add logs` senza `-f` non aggiunge le cartelle dei giorni nuovi (e si ferma con errore).
-- Prima del commit `git status --short` deve mostrare modifiche solo sotto `logs/` (più `CLAUDE.md` se hai appena completato i *Dati del server*). Se compaiono file del codice modificati, **fermati**: non committarli e non annullarli, riporta `git status` e `git diff --stat`.
-- Se non c'è niente di nuovo, salta il commit ma fai comunque pull e push.
-- Il pull può portare codice nuovo: il bot continua a girare con la versione di prima finché non lo riavvii con un *Rilascio*. Se il pull ha cambiato file `.py` o `requirements.txt`, dillo nella risposta.
-- Il push esegue la verifica (hook, vedi *Verifica*): se la verifica fallisce il push è bloccato, anche quello dei soli log. Riporta l'errore e non aggirarlo.
-- Push rifiutato perché il remoto è avanti: rifai pull (`--no-rebase`) e push.
-- Push rifiutato per le credenziali (`Permission denied (publickey)`, `could not read Username`, chiave "read only"): vedi *Regole fisse*, riporta l'errore esatto e l'uscita di `git remote get-url origin`. I commit restano in locale e partono con il caricamento successivo.
-- I log del giorno in corso sono parziali: vanno caricati lo stesso, il caricamento successivo li completa.
-- Rispondi con: stato del bot, giorni caricati (cartelle nuove o cambiate), commit in cima dopo il pull, esito del push.
+- `git status --short` deve essere vuoto: `logs/` è ignorata e non compare. Se compaiono file modificati, **fermati**: non committarli e non annullarli, riporta `git status` e `git diff --stat`.
+- Il pull porta il codice nuovo sul disco, ma il bot continua a girare con la versione di prima finché non lo riavvii con un *Rilascio*. Se il pull ha cambiato file `.py` o `requirements.txt`, dillo nella risposta. Se ha cambiato `infrastruttura/caricamento-log/`, reinstalla il caricamento automatico: `bash infrastruttura/caricamento-log/installa.sh ~/.config/caricamento-log/tta.conf`, che deve finire con "Installato.".
+- Pull in conflitto: `git merge --abort` e riporta.
+- Il push serve solo se hai commit locali (i *Dati del server*): `git push origin server`. Esegue la verifica (hook, vedi *Verifica*): se fallisce, il push è bloccato; riporta l'errore e non aggirarlo. Se il push è rifiutato per le credenziali (`Permission denied (publickey)`, `could not read Username`, chiave "read only"), vedi *Regole fisse*: riporta l'errore esatto e l'uscita di `git remote get-url origin`.
+- Rispondi con: commit in cima dopo il pull, file cambiati.
 
-Per giorno, in `logs/AAAA-MM-GG/` (data italiana): `bot.log` (racconto), `operazioni.txt` (schede per operazione), `errors.log`, `dettagli.log`, `journal.jsonl` (i dati esatti; orario del broker UTC+3). In `logs/` ci sono anche i risultati del rigioco.
+## Caricamento dei log
+
+I log li pubblica da solo, ogni ora al minuto 05, il *Caricamento automatico dei log*. Per pubblicarli subito (dopo un riavvio, dopo un rigioco, o quando il proprietario chiede di caricarli):
+
+```
+~/.local/lib/caricamento-log/caricamento-log.sh ~/.config/caricamento-log/tta.conf
+```
+
+- Deve finire con una riga "… caricato: <commit> Log del … · cose da controllare: N". Se N è più di 0, riporta l'elenco in cima a `~/tta-log/STATO.md`.
+- Una riga ERRORE va riportata (tabella *Problemi comuni* in `infrastruttura/caricamento-log/README.md`). Non modificare a mano `~/tta-log` né la crontab.
+- I log del giorno in corso sono parziali: il caricamento successivo li completa.
+- Rispondi con: stato del bot, ultima riga del caricamento.
+
+Per giorno, in `logs/AAAA-MM-GG/` (data italiana): `bot.log` (racconto), `operazioni.txt` (schede per operazione), `errors.log`, `dettagli.log`, `journal.jsonl` (i dati esatti; orario del broker UTC+3). In `logs/` ci sono anche i risultati del rigioco. Nel repository dei log la struttura è la stessa, con `STATO.md` in cima.
 
 ## Caricamento automatico dei log
 
-Ogni ora cron lancia `~/.local/lib/caricamento-log/caricamento-log.sh`. Lo script copia `logs/` nella copia `~/tta-log` del repository dei log, scrive `STATO.md` (stato del bot) e pubblica. Non tocca la cartella del progetto e non fa pull: il codice cambia solo con un *Rilascio*. Per ora il *Caricamento dei log* sul branch `server` continua come prima; smetterà quando le sessioni sul PC leggeranno i log dal repository nuovo, e lo dirà un prompt.
+Ogni ora cron lancia `~/.local/lib/caricamento-log/caricamento-log.sh`. Lo script copia `logs/` nella copia `~/tta-log` del repository dei log, scrive `STATO.md` (stato del bot) e pubblica. Non tocca la cartella del progetto e non fa pull: il codice cambia solo con un *Rilascio*.
 
 Installazione, solo quando un prompt la chiede, come utente `trader` e senza `sudo`:
 
@@ -110,7 +117,7 @@ Installazione, solo quando un prompt la chiede, come utente `trader` e senza `su
 ## Rilascio di una nuova versione
 
 1. *Controllo dello stato*. Annota il commit attuale: `git rev-parse --short HEAD`.
-2. *Caricamento dei log* (porta anche il codice nuovo con il pull).
+2. *Aggiornamento del codice* (pull).
 3. `git log --oneline -5` deve contenere il commit indicato dal prompt; fai i controlli specifici che il prompt chiede.
 4. Se `git diff --name-only <commit annotato> HEAD -- requirements.txt` mostra il file: `<python> -m pip install -r requirements.txt` con il Python del servizio, e riporta cosa è stato installato. Se `git diff --name-only <commit annotato> HEAD -- infrastruttura/caricamento-log` mostra file e il caricamento automatico è installato: `bash infrastruttura/caricamento-log/installa.sh ~/.config/caricamento-log/tta.conf`, e riporta l'ultima riga.
 5. **Verifica**: `<python> tests/run_all.py` deve finire con "VERIFICA RIUSCITA". Se fallisce, **non riavviare**: riporta l'uscita completa.
@@ -118,8 +125,8 @@ Installazione, solo quando un prompt la chiede, come utente `trader` e senza `su
 7. Dopo circa 30 secondi, *Controllo dello stato*: servizio attivo, **un solo** processo, nel `bot.log` di oggi una nuova riga "▶️ Bot avviato · conto DEMO" con l'ora del riavvio.
    - "conto non leggibile": il bot non raggiunge MT5. Controlla che `mt5server.exe` giri e riporta.
    - Il servizio non parte o riparte di continuo: `journalctl -u <servizio> -n 50 --no-pager` e l'`errors.log` di oggi, poi riporta. Non toccare il codice.
-8. *Caricamento dei log*, così la riga di avvio arriva alle sessioni sul PC.
-9. Rispondi con: commit in cima dopo il pull, esito della verifica, valori controllati, riga di avvio del `bot.log`, numero di processi del bot, esito del push.
+8. *Caricamento dei log*, così la riga di avvio arriva subito alle sessioni del proprietario.
+9. Rispondi con: commit in cima dopo il pull, esito della verifica, valori controllati, riga di avvio del `bot.log`, numero di processi del bot, ultima riga del caricamento dei log.
 
 ## Rigioco (solo quando il prompt lo chiede)
 
@@ -137,6 +144,6 @@ Date e opzioni sono quelle del prompt (dettagli nella skill `rigioco`). Legge i 
 
 ## Il progetto in breve
 
-- Branch `server` = `main` (il codice, sviluppato sul PC) + collegamento RPyC (`mt5_connection.py`, `mt5.order_send(**request)`, `rpyc` in `requirements.txt`) + `logs/` + **questo CLAUDE.md**, che è solo del server: le sessioni sul PC lo mantengono nei merge.
+- Branch `server` = `main` (il codice, sviluppato sul PC) + collegamento RPyC (`mt5_connection.py`, `mt5.order_send(**request)`, `rpyc` in `requirements.txt`) + **questo CLAUDE.md**, che è solo del server: le sessioni sul PC lo mantengono nei merge. I log (fino al 20/10 anche nel branch) sono nel repository `TheLoniusD/Telegram-Trade-Agent-log`.
 - `telegram_listener.py` è il processo principale (quello del servizio). `active_trades.json` e `storico/` sono lo stato delle operazioni; `logs/` i log; `.env` i parametri e le chiavi.
 - Le regole di trading e il perché delle scelte sono in `doc/DECISIONI.md`: per le procedure di questo file non serve leggerlo.
