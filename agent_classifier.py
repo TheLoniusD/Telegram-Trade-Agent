@@ -1,4 +1,5 @@
 import os
+import time
 import anthropic
 
 import journal
@@ -246,6 +247,47 @@ CLASSIFY_SIGNAL_TOOL = {
     "strict": True
 }
 
+# Prompt di sistema, uguale per la classificazione e per il riscaldamento: la
+# cache vale solo se tools e sistema sono identici byte per byte.
+SYSTEM_BLOCKS = [
+    {
+        "type": "text",
+        "text": MAESTRO_FX_SYSTEM_PROMPT,
+        # TTL 1h invece del default 5 min: i segnali del trader arrivano a intervalli irregolari,
+        # spesso >5 min l'uno dall'altro. Con TTL corto la cache scade tra un segnale e l'altro e
+        # il messaggio più critico in termini di latenza (il NEW_SIGNAL rapido) ripaga ogni volta
+        # il costo pieno di elaborazione del prompt.
+        "cache_control": {"type": "ephemeral", "ttl": "1h"},
+    }
+]
+
+
+def warm_up_agent() -> dict:
+    """
+    Riscaldamento dell'agente, lanciato dal listener quando il trader pubblica
+    la GIF che precede i segnali. Stessi modello, tools e prompt di sistema della
+    classificazione, con max_tokens=0: l'API scrive (o rinfresca) la cache del
+    prompt e risponde subito, senza generare nulla. Il tool_choice forzato non è
+    ammesso con max_tokens=0, ma non fa parte della cache di tools e sistema: la
+    classificazione vera la ritrova pronta.
+
+    Dal 01 al 20/10 il primo segnale della mattina (~04:00, cache scaduta dopo
+    la notte) ha aspettato l'agente 7-9 secondi invece dei soliti 3.
+    """
+    response = client.messages.create(
+        model=MODEL_ID,
+        max_tokens=0,
+        system=SYSTEM_BLOCKS,
+        tools=[CLASSIFY_SIGNAL_TOOL],
+        messages=[{"role": "user", "content": "riscaldamento"}],
+    )
+    usage = response.usage
+    return {
+        "model": MODEL_ID, "request_id": response._request_id, "input_tokens": usage.input_tokens,
+        "cache_read_input_tokens": usage.cache_read_input_tokens,
+        "cache_creation_input_tokens": usage.cache_creation_input_tokens,
+    }
+
 
 def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: int, has_media: bool, is_forwarded: bool, timestamp: float) -> dict:
     """
@@ -264,20 +306,11 @@ def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: 
     \"\"\"{message_text}\"\"\"
     """
 
+    started = time.monotonic()
     response = client.messages.create(
         model=MODEL_ID,
         max_tokens=1024,
-        system=[
-            {
-                "type": "text",
-                "text": MAESTRO_FX_SYSTEM_PROMPT,
-                # TTL 1h invece del default 5 min: i segnali del trader arrivano a intervalli irregolari,
-                # spesso >5 min l'uno dall'altro. Con TTL corto la cache scade tra un segnale e l'altro e
-                # il messaggio più critico in termini di latenza (il NEW_SIGNAL rapido) ripaga ogni volta
-                # il costo pieno di elaborazione del prompt.
-                "cache_control": {"type": "ephemeral", "ttl": "1h"},
-            }
-        ],
+        system=SYSTEM_BLOCKS,
         tools=[CLASSIFY_SIGNAL_TOOL],
         tool_choice={"type": "tool", "name": "classify_signal"},
         messages=[{"role": "user", "content": user_payload}],
@@ -285,9 +318,11 @@ def agent_classify_telegram_message(message_text: str, is_edit: bool, reply_to: 
 
     # Token consumati: sul canale ufficiale ogni messaggio costa una chiamata,
     # così dal journal si può calcolare quanto ha speso il bot in una giornata.
+    # I secondi dicono quanto ha aspettato il segnale (con e senza riscaldamento).
     usage = response.usage
     journal.record(
         "CLASSIFIER_CALL", model=MODEL_ID, stop_reason=response.stop_reason, request_id=response._request_id,
+        seconds=round(time.monotonic() - started, 2),
         input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_creation_input_tokens=usage.cache_creation_input_tokens,

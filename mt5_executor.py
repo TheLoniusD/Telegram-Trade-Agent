@@ -474,6 +474,18 @@ class MT5Executor:
             return None
         return tick.ask if direction == "BUY" else tick.bid
 
+    def quote(self, symbol: str) -> Optional[dict]:
+        """Bid e ask di adesso con l'ora del broker, per il diario (None se MT5 non ha il tick)."""
+        if self.test_mode:
+            return None
+        try:
+            tick = mt5.symbol_info_tick(symbol or "XAUUSD")
+        except Exception as e:
+            raise MT5UnavailableError(str(e))
+        if tick is None:
+            return None
+        return {"bid": tick.bid, "ask": tick.ask, "broker_time": broker_time_str(tick.time)}
+
     def move_pending(self, ticket: int, price: float) -> bool:
         """Sposta il prezzo di un ordine limite in attesa, lasciando SL e TP invariati."""
         if self.test_mode:

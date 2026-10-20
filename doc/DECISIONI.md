@@ -10,11 +10,12 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ---
 
-## Regole in vigore (aggiornato al 16/10/2026)
+## Regole in vigore (aggiornato al 20/10/2026)
 
 ### Segnali e classificazione
 - Si ascolta solo il canale Maestro Fx; l'agente (Claude Haiku) classifica ogni messaggio in NEW_SIGNAL / UPDATE_SIGNAL / CLOSE_SIGNAL / IGNORE.
 - Prima dell'agente vengono scartati: messaggi senza testo, inoltrati, senza parole operative, modifiche identiche, **falsi edit** (reazioni/visualizzazioni: senza data di modifica recente), correzioni di messaggi vecchi (> 10 minuti) che non sono segnali aperti.
+- **Foto e GIF senza testo**: non si classificano e non aprono nulla, ma il diario registra tipo di media e prezzo di quel momento. Alla **GIF che precede i segnali** il bot controlla MT5 e, se l'agente non è stato chiamato negli ultimi 5 minuti, lo **riscalda** (chiamata a vuoto con lo stesso prompt) perché il segnale non parta da freddo. Le foto di Trade Active / HIT TP / HIT TP MAX non vengono lette.
 - **Errore di battitura**: un segnale con prezzo a più di **20 $** dal mercato non viene aperto (`MAX_SIGNAL_DISTANCE`); la correzione del trader viene aperta dal **recupero**.
 - **Recupero**: una modifica recente di un segnale mai aperto (perso durante un riavvio, o rifiutato) viene trattata come segnale nuovo; mai riaperto un segnale già chiuso.
 - Una **modifica** vale solo per il proprio messaggio (o quello a cui risponde), mai per "l'ultima operazione aperta".
@@ -109,6 +110,22 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 20/10 — GIF prima del segnale: prezzo nel diario e agente riscaldato; le foto non si leggono
+- **Decisioni** (nessuna regola di trading cambiata)
+  - Le **foto** dei messaggi Trade Active, HIT TP e HIT TP MAX **non si leggono**: il testo contiene già tutto quello che il bot usa.
+  - Ogni messaggio senza testo finisce nel diario con tipo di media (gif, photo, sticker…), id del media e bid/ask di quel momento.
+  - Alla **GIF**: controllo di MT5 e riscaldamento dell'agente (chiamata con `max_tokens=0`, stessi tools e prompt: scrive la cache del prompt senza generare nulla) se l'agente non è stato chiamato negli ultimi 5 minuti; riga 🎞️ nel racconto con il prezzo. Nessun ordine.
+  - Ogni chiamata all'agente registra i **secondi di attesa** (`CLASSIFIER_CALL.seconds`, `AGENT_WARMUP`).
+  - Rigioco: variante **"segnale rapido senza agente"** (sigla `rapido`): il segnale rapido "Gold buy/sell NNNN" entra all'arrivo del messaggio invece che alla classificazione, con gli stessi livelli.
+- **Perché** (log 23/09–20/10)
+  - Trade Active 192 su 192, HIT TP 36 su 36 e HIT TP MAX 12 su 12 (dal 28/09) classificati bene dal solo testo, quasi tutti in risposta al segnale. Leggere la foto avrebbe rallentato proprio i comandi in cui i secondi contano (pareggio colpito in 9–18 s). Gli HIT TP MAX "NEWS WIN" (NFP, CPI) sono inoltrati dal canale privato: segnali mai pubblicati qui.
+  - Prima di **188 segnali rapidi su 196** c'è una GIF senza testo (per il proprietario sempre la stessa, nessun contenuto). Anticipo: fino a 5 s in 50 casi, 6–60 s in 74, 1–3 min in 49, 3–5 min in 15. Non dice la direzione: non si può entrare prima.
+  - Dal messaggio all'ordine passano **3,5 s** (mediana), quasi tutti di attesa dell'agente; il **primo segnale della mattina** (~04:00, cache del prompt scaduta dopo la notte) **7–9 s** (6 casi tra il 01 e il 19/10).
+  - I 196 segnali rapidi hanno tutti lo stesso formato e l'agente li ha letti sempre come direzione + prezzo: il codice potrebbe eseguirli senza aspettarlo. Prima di farlo si misura quanto vale con il rigioco (oggi il rigioco entra all'ora della classificazione, cioè con il ritardo vero).
+- **Contro**: una chiamata in più all'agente per GIF, al massimo pochi centesimi al giorno (la scrittura della cache che oggi paga il primo segnale la paga la GIF; si spende in più solo per le GIF non seguite da un segnale); il prezzo alla GIF e i secondi sono solo dati, non cambiano le operazioni.
+- **Scartato**: lettura delle immagini con la visione (nessuna informazione in più, più lenta); ordini alla GIF (senza direzione servirebbero i due lati, rischio doppio).
+- **Da verificare**: righe 🎞️ nel racconto e campi `media` / `media_id` nel diario (la GIF deve risultare `gif`, sempre con lo stesso id); `CLASSIFIER_CALL.seconds` del primo segnale della mattina con il riscaldamento (prima 7–9 s) e `cache_read_input_tokens` > 0; prezzo alla GIF confrontato con il prezzo del segnale e con quello all'ordine (`RISK_CALC.price`) nei segnali mai entrati; rigioco "segnale rapido senza agente" contro "attuale".
 
 ### 16/10 — Ingresso senza prezzo subito dopo un segnale = stesso setup; TP provvisori anche a mercato
 - **Correzioni**
@@ -281,7 +298,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - **Risultato legato ai giorni di trend**: dal 24/09 al 09/10 tutto il guadagno viene dal 28/09 (+1.420 $ con le regole attuali); negli altri 11 giorni le regole perdono 923 $ (vedi 11/10).
 - **2 o 4 ticket**: i 2 ticket rendono di più in totale ma solo per il 28/09; i 4 ticket sono andati meglio in 8 giorni su 12 (meno esposti). Da rivedere con più giorni.
 - **Asimmetria vinti/persi**: un trade vinto rende +10–30 $, uno stop pieno costa circa −140 $.
-- **Segnali solo immagine** (NFP del 02/10): invisibili al bot; possibile lettura con visione, da valutare.
+- **Segnali solo immagine** (NFP del 02/10): invisibili al bot; unico caso noto. I segnali delle notizie (NFP, CPI) sono dati nel canale privato: qui arriva solo il risultato inoltrato ("NEWS WIN"). Lettura delle immagini scartata il 20/10 per le foto dei comandi.
 - Pareggio più largo di +1 $: +1,5 $ quasi uguale in totale (+23 $) ma taglia i vincenti nei giorni di trend, +2 $ peggio (vedi 11/10); da rivedere con più giorni di trend.
 - Gestione dei Trade Active su più righe oltre al pareggio.
 - Gestione di HIT TP / HIT TP MAX oltre al pareggio (da rivedere solo con test positivi).
@@ -290,7 +307,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 - Rischio per segnale: il 2% è fisso nel codice. Con 4 ticket l'arrotondamento dei lotti lo riduceva a circa 1,2% effettivo (06/10: stop pieni da −83 $); con 2 ticket è circa 1,8% (−125 $). Valutare un parametro `RISK_PERCENT`.
 - Segnale rapido mai completato dal trader: dal 07/10 ha SL e TP provvisori. Resta da decidere se gestirlo anche nel tempo (es. pareggio dopo un certo guadagno, visto che nessun Trade Active arriverà).
 - **MT5 scollegato spesso** (06/10 una volta, 07/10 quattro volte, da 1 a 7 minuti; dal 12 al 16/10 nove volte, da 30 secondi a 8,5 minuti, senza danni; 17/10, sabato a mercato chiuso, cinque volte, fino a 12,5 minuti; 19/10 due volte, 4,5 minuti e 30 secondi, senza operazioni aperte; 20/10 un minuto alle 00:26): controllare la connessione del terminale sul server.
-- **Segnali mai entrati**: dal 12 al 16/10 cinque, con il prezzo da 1,1 a 1,7 $ oltre il bordo, tutti dati vinti dal trader (Trade Active 45–60 pips); 19/10 tre, con il prezzo 0,25 / 0,80 / 1,62 $ oltre il bordo, tutti vinti dal trader (50 pips poi pareggio, 100 pips, HIT TP 180 pips); 20/10 uno (SELL 4121 delle 14:20, 1,10 $ oltre, Trade Active 70 pips). Il rigioco dell'11/10 scartava le tolleranze da 1 e 2 $ (−320 / −268 $).
+- **Segnali mai entrati**: dal 12 al 16/10 cinque, con il prezzo da 1,1 a 1,7 $ oltre il bordo, tutti dati vinti dal trader (Trade Active 45–60 pips); 19/10 tre, con il prezzo 0,25 / 0,80 / 1,62 $ oltre il bordo, tutti vinti dal trader (50 pips poi pareggio, 100 pips, HIT TP 180 pips); 20/10 uno (SELL 4121 delle 14:20, 1,10 $ oltre, Trade Active 70 pips). Il rigioco dell'11/10 scartava le tolleranze da 1 e 2 $ (−320 / −268 $). Dal 20/10 si misura il ritardo: prezzo alla GIF che precede il segnale (diario), variante del rigioco "segnale rapido senza agente" (ordine ~3 s prima). Se il prezzo del segnale è già quello della GIF, il ritardo è del trader e non si recupera.
 - Notizie ad alto impatto (NFP, CPI…): operare o no durante la pubblicazione.
 - "Cut loss if solid break X": oggi diventa uno SL rigido; valutare uno SL "morbido" che chiude solo a candela chiusa oltre il livello. 14/10 SELL 4147: stop pieno a 4157 (−125 $), il trader "still hold it, it still not solid break 4157" e poi lo chiude al TP (210 pips).
 - Più esempi reali nel prompt dell'agente, man mano che arrivano messaggi nuovi.

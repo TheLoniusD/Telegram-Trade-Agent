@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import threading
 import time
 import traceback
 
@@ -11,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import journal
-from agent_classifier import agent_classify_telegram_message
+from agent_classifier import agent_classify_telegram_message, warm_up_agent
 from order_manager import OrderManager, CLOSABLE_STATUSES, ticket_tp_index
 from risk_manager import RiskManager, zone_bounds
 from mt5_executor import MT5Executor, MT5UnavailableError
@@ -150,6 +151,13 @@ ENTRY_ORDER_EXPIRY_SECONDS = int(os.getenv("ENTRY_ORDER_EXPIRY_MINUTES", "30")) 
 # di ripetere azioni già eseguite.
 _last_text_by_msg: dict = {}
 _LAST_TEXT_MAX_ENTRIES = 1000
+
+# GIF del trader prima dei segnali: il bot riscalda l'agente (vedi
+# handle_media_without_text) solo se non lo ha chiamato da almeno questo tempo.
+# Una GIF arrivata subito dopo un'altra chiamata lo trova già pronto.
+AGENT_WARMUP_MIN_GAP_SECONDS = 300
+_last_agent_call = None     # time.monotonic() dell'ultima chiamata all'agente (o riscaldamento)
+_warmup_thread = None       # ultimo riscaldamento lanciato (i test lo aspettano)
 
 
 def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
@@ -645,6 +653,74 @@ def sync_ticket_with_broker(tp_config: dict, mt5_ticket: int) -> None:
                    stop_loss=tp_config["stop_loss"], take_profit=tp_config["take_profit"])
 
 
+def media_info(event) -> tuple:
+    """(tipo, id) del media di un messaggio: gif, sticker, video, photo, document o altro."""
+    # Una GIF è anche un video (Telegram le converte in mp4 animati): va riconosciuta per prima
+    for kind in ("gif", "sticker", "video", "photo", "document"):
+        item = getattr(event, kind, None)
+        if item:
+            return kind, getattr(item, "id", None)
+    return ("altro" if getattr(event, "media", None) else None), None
+
+
+def _agent_warmup(msg_id) -> None:
+    """Chiamata di riscaldamento, in un thread: i messaggi che arrivano intanto non la aspettano."""
+    started = time.monotonic()
+    try:
+        result = warm_up_agent()
+        journal.record("AGENT_WARMUP", msg_id=msg_id, ok=True, seconds=round(time.monotonic() - started, 2), **result)
+    except Exception as e:
+        logger.warning(f"⚠️ Riscaldamento dell'agente non riuscito: {type(e).__name__}: {e}")
+        journal.record("AGENT_WARMUP", msg_id=msg_id, ok=False, seconds=round(time.monotonic() - started, 2),
+                       error=f"{type(e).__name__}: {e}")
+
+
+def agent_idle() -> bool:
+    """True se l'agente non è stato chiamato (né riscaldato) da AGENT_WARMUP_MIN_GAP_SECONDS."""
+    return _last_agent_call is None or time.monotonic() - _last_agent_call >= AGENT_WARMUP_MIN_GAP_SECONDS
+
+
+def start_agent_warmup(msg_id) -> None:
+    global _last_agent_call, _warmup_thread
+    _last_agent_call = time.monotonic()
+    _warmup_thread = threading.Thread(target=_agent_warmup, args=(msg_id,), name="riscaldamento-agente", daemon=True)
+    _warmup_thread.start()
+
+
+def handle_media_without_text(event, sender_id) -> None:
+    """
+    Foto, GIF o sticker senza testo: non c'è niente da classificare, ma il diario
+    registra il tipo di media e il prezzo di quel momento.
+
+    Prima di quasi ogni segnale il trader pubblica una GIF, sempre la stessa, che
+    non dice la direzione: dal 23/09 al 20/10 188 segnali rapidi su 196, da pochi
+    secondi a 5 minuti prima del testo. Il prezzo alla GIF dice se il prezzo del
+    segnale è quello di quando il trader ha deciso (segnali mai entrati perché il
+    prezzo era già oltre il bordo). Alla GIF il bot si prepara: controlla MT5 e
+    riscalda l'agente, così il segnale non parte da freddo. Nessun ordine.
+    """
+    kind, media_id = media_info(event)
+    fields = {"media": kind, "media_id": media_id}
+    market_open, reason = is_market_time_open()
+    if market_open:
+        ok, reason = mt5_agent.check_health()
+        quote = None
+        if ok:
+            try:
+                quote = mt5_agent.quote(TRADED_SYMBOL)
+                reason = "nessun prezzo da MT5"
+            except MT5UnavailableError as e:
+                reason = f"MT5 non ha risposto ({e})"
+        fields.update(quote or {"no_price_reason": reason})
+        if kind == "gif":
+            fields["warmup"] = agent_idle()
+    else:
+        fields["no_price_reason"] = reason
+    journal.record("MESSAGE_SKIPPED", reason="messaggio senza testo", sender_id=sender_id, **fields)
+    if fields.get("warmup"):
+        start_agent_warmup(event.id)
+
+
 async def process_message(event, is_edit: bool):
     # Tutti gli eventi del diario registrati durante l'elaborazione (compresi
     # gli ordini inviati da MT5Executor) portano il msg_id di questo messaggio.
@@ -668,9 +744,13 @@ def handle_message(event, is_edit: bool):
         journal.record("MESSAGE_SKIPPED", reason="mittente non autorizzato", sender_id=sender_id, text=text)
         return
 
-    # Ignoriamo i messaggi vuoti (es. solo foto senza didascalia o sticker)
+    # Ignoriamo i messaggi vuoti (es. solo foto senza didascalia o sticker): non
+    # si classificano, ma la GIF che precede i segnali prepara il bot
     if not text or not text.strip():
-        journal.record("MESSAGE_SKIPPED", reason="messaggio senza testo", sender_id=sender_id)
+        if is_edit:
+            journal.record("MESSAGE_SKIPPED", reason="messaggio senza testo", sender_id=sender_id)
+        else:
+            handle_media_without_text(event, sender_id)
         return
 
     msg_id = event.id
@@ -729,6 +809,8 @@ def handle_message(event, is_edit: bool):
         return
 
     # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
+    global _last_agent_call
+    _last_agent_call = time.monotonic()
     ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
 
     logger.debug(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")

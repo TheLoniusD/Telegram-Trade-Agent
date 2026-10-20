@@ -212,6 +212,11 @@ class Narrator:
     def on_message_skipped(self, e):
         self.messages.pop(e.get("msg_id"), None)
         self.skipped += 1
+        if e.get("media") == "gif":
+            # Il trader la pubblica prima di quasi ogni segnale: il prezzo serve per confrontarlo con il segnale
+            price = f"prezzo {num(e['bid'])}" if e.get("bid") is not None else \
+                f"prezzo non letto: {e.get('no_price_reason') or 'motivo sconosciuto'}"
+            self.say(f"🎞️ GIF del trader (di solito annuncia un segnale) · {price}")
 
     def on_classified(self, e):
         msg_id = e.get("msg_id")
