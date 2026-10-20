@@ -1,0 +1,269 @@
+Rigioco dal 2026-09-24 al 2026-10-20 · rischio 140 $ per segnale · vita massima 8 ore · orologio del broker UTC+3.0 h
+Regole attuali: 2 ticket (1% ciascuno), ingresso al bordo della zona, TP provvisori 10/20 $, Trade Active incassa 1 ticket, pareggio +1 $ (se rifiutato +0,5 $), protezione 1/4-1/2-3/4
+
+── 2026-09-24 · 12 segnali · tick in 23 finestre su 24
+   04:20 SELL Gold sell 4285              -35.0    -35.0
+   04:25 SELL Gold sell 4285             -140.0   -140.0
+   04:44 SELL Gold sell 4295               48.9     48.4
+   07:00 SELL Gold sell 4289               39.2     41.0
+   07:39 SELL Gold sell 4286               20.0     20.0
+   07:49 SELL Gold sell 4284               36.2     36.2
+   08:02 SELL Gold sell 4282              -35.0    -35.0
+   08:20 SELL Gold sell 4284               10.4     10.4
+   09:07 SELL Gold sell 4283                9.7      9.7
+   13:36 BUY  Gold buy 4262                 7.0      7.0
+   14:02 BUY  Gold buy 4362               203.5    203.5
+   14:33 BUY  Gold buy 4270                77.0     77.0
+                                       attuale   rapido
+
+── 2026-09-25 · 12 segnali · tick in 24 finestre su 24
+   04:05 BUY  Gold buy 4291                 0.0      0.0
+   05:38 BUY  Gold buy 4274               -35.0    -35.0
+   07:33 SELL Gold sell 4269               24.3     17.1
+   07:42 SELL Gold sell 4274               27.7     27.1
+   08:03 SELL Gold sell 4271              -14.6    -14.6
+   08:36 BUY  Gold buy 4276                19.6     19.6
+   09:07 BUY  Gold buy 4277               -70.0    -70.0
+   13:19 BUY  Gold buy 4312              -140.0   -140.0
+   13:42 BUY  Gold buy 4301                29.2     29.2
+   14:15 BUY  Gold buy ,4300               34.1     34.1
+   14:33 BUY  Gold buy 4300                 4.8      4.8
+   14:48 BUY  Gold buy 4304               -35.0    -35.0
+                                       attuale   rapido
+
+── 2026-09-28 · 11 segnali · tick in 28 finestre su 28
+   05:11 SELL Gold sell 4202              177.9    177.9
+   06:52 SELL Gold sell 4197              210.0    210.0
+   07:16 SELL Gold sell 4194              210.0    210.0
+   08:08 SELL Gold sell 4180               14.1     14.1
+   08:17 SELL Gold sell 4179              210.0    210.0
+   08:37 SELL Gold sell 4176               28.4     28.4
+   08:48 SELL Gold sell 4173              162.1    172.9
+   09:17 SELL Gold sell 4163              213.2    219.0
+   13:07 SELL Gold sell 4151                7.4      6.5
+   13:24 SELL Gold sell 4153                7.4     14.1
+   14:12 SELL Gold sell 4164              179.4    179.4
+                                       attuale   rapido
+
+── 2026-09-29 · 11 segnali · tick in 23 finestre su 23
+   04:05 BUY  Gold buy 4131                15.6     15.6
+   04:23 BUY  Gold buy 4132                 0.0      0.0
+   07:04 SELL Gold sell 4128               26.2     26.2
+   07:41 SELL Gold sell 4135              -35.0    -35.0
+   08:01 SELL Gold sell. 4140             -35.0    -35.0
+   08:24 SELL Gold sell 4144               30.2     30.9
+   13:03 SELL Gold sell 4155               37.1     31.6
+   13:50 SELL Gold sell 4157               14.0     14.0
+   14:02 SELL Gold sell 4156               21.3     20.2
+   14:17 SELL Gold sell 4156                0.0      0.0
+   14:30 SELL Gold sell 4155               15.6     15.6
+                                       attuale   rapido
+
+── 2026-09-30 · 9 segnali · tick in 24 finestre su 24
+   04:26 SELL Gold sell 4178               41.8     38.8
+   05:37 BUY  Gold buy 4175               -35.0    -35.0
+   06:08 BUY  Gold buy 4174                24.7     24.6
+   07:04 BUY  Gold buy 4180              -140.0   -140.0
+   07:19 BUY  Gold buy 4168                 0.0      0.0
+   08:27 BUY  Gold buy 4181               210.0    210.0
+   09:30 BUY  Gold buy 4195                27.0     27.0
+   12:59 BUY  Gold buy 4285               -35.0    -35.0
+   13:48 BUY  Gold buy 4185                28.6     25.9
+                                       attuale   rapido
+
+── 2026-10-01 · 11 segnali · tick in 18 finestre su 18
+   04:17 SELL Gold sell 4156                0.0      0.0
+   04:25 SELL Gold sell 4155                0.0      0.0
+   07:32 BUY  Gold buy 4186                 0.0      0.0
+   07:41 BUY  Gold buy 4189                 7.8      8.7
+   08:17 BUY  Gold buy 4190              -140.0   -140.0
+   09:08 BUY  Gold buy 4180              -140.0   -140.0
+   09:32 BUY  Gold buy 4157                 0.0      0.0
+   09:38 BUY  Gold buy 4161                 7.8      7.8
+   13:11 BUY  Gold buy 4171                11.0     11.0
+   14:10 BUY  Gold buy 4177                14.0     14.0
+   14:21 BUY  Gold buy 4177                55.2     55.2
+                                       attuale   rapido
+
+── 2026-10-02 · 9 segnali · tick in 18 finestre su 18
+   05:27 SELL Gold sell 4174               14.0     14.0
+   05:36 SELL Gold sell 4175               27.1     27.1
+   05:58 SELL Gold sell 4177             -140.0   -140.0
+   06:27 SELL Gold sell 4187               35.8     35.8
+   07:03 SELL Gold sell 4185              -35.0    -35.0
+   08:18 BUY  Gold buy 4188                27.9     26.8
+   08:32 BUY  Gold buy 4188              -140.0   -140.0
+   13:11 SELL Gold sell 4186              -35.0    -35.0
+   13:16 SELL Gold sell 4187                0.0      0.0
+                                       attuale   rapido
+
+── 2026-10-05 · 11 segnali · tick in 16 finestre su 16
+   04:31 BUY  Gold buy 4159              -140.0   -140.0
+   04:58 BUY  Gold buy 4142                 8.1      8.1
+   07:01 SELL Gold sell 4132              -35.0    -35.0
+   07:40 SELL Gold sell 4137               27.6     27.6
+   08:02 SELL Gold sell 4142             -140.0   -140.0
+   08:20 SELL Gold sell 4151              -35.0    -35.0
+   08:51 SELL Gold sell 4148             -140.0   -140.0
+   13:04 BUY  Gold buy 4160                19.0     19.0
+   13:35 BUY  Gold buy 4160               -35.0    -35.0
+   14:52 BUY  Gold buy 4157              -140.0   -140.0
+   15:50 BUY  Gold buy 4138                 0.0      0.0
+                                       attuale   rapido
+
+── 2026-10-06 · 15 segnali · tick in 23 finestre su 23
+   04:00 BUY  Gold buy 4130              -140.0   -140.0
+   04:41 BUY  Gold buy 4122                78.9     77.0
+   07:06 SELL Gold sell 4124                0.0      0.0
+   07:18 SELL Gold sell 4124               22.7     22.7
+   07:48 SELL Sell 4123                     0.0      0.0
+   08:06 SELL Gold sell 4118             -140.0   -140.0
+   08:33 SELL Gold sell 4133                0.0      0.0
+   08:45 SELL Gold sell 4331               12.8     12.8
+   09:21 SELL Gold sell 4139               39.6     39.6
+   13:01 SELL Gold sell 4159             -140.0   -140.0
+   14:26 BUY  Gold buy 4179              -140.0   -140.0
+   14:51 BUY  Gold buy 4168                 0.0      0.0
+   15:09 BUY  Gold buy 4170                 0.0      0.0
+   15:21 BUY  Gold buy 4165               -70.0    -70.0
+   15:45 BUY  Gold buy 4158              -140.0   -140.0
+                                       attuale   rapido
+
+── 2026-10-07 · 9 segnali · tick in 19 finestre su 19
+   04:35 SELL Gold sell 4147               47.4     46.4
+   07:06 SELL Gold sell 4136               34.3     33.6
+   07:34 SELL Gold sell 4134               16.4     16.4
+   08:07 SELL Gold sell 4132               18.2     17.8
+   08:35 SELL Gold sell 4133               15.7     13.3
+   09:02 SELL Gold sell 4132               28.9     30.2
+   09:32 SELL Gold sell 4133              357.9    356.5
+   13:17 SELL Gold sell 4119               18.2     17.9
+   13:49 SELL Gold sell 4117              -35.0    -35.0
+                                       attuale   rapido
+
+── 2026-10-08 · 15 segnali · tick in 28 finestre su 28
+   04:54 BUY  Gold buy 4134               -16.9    -16.9
+   06:53 SELL Gold sell 4134               16.0     16.0
+   07:07 SELL Gold sell 4133               21.8     23.2
+   07:34 SELL Gold sell 4129               29.6     30.7
+   07:44 SELL Gold sell 4130                0.0      0.0
+   08:20 SELL Gold sell 4119                0.0     14.0
+   08:46 SELL Gold sell 4126               15.2     15.2
+   08:52 SELL Gold sell 4125               34.4     34.4
+   09:15 SELL Gold sell 4125                7.3     37.0
+   13:02 SELL Gold sell 4120                0.0      0.0
+   13:17 SELL Gold sell 4121              -35.0    -35.0
+   13:47 SELL Gold sell 4125               11.6     11.6
+   14:11 SELL Gold sell 4124                7.6      7.6
+   14:21 SELL Gold sell 4127                0.0      0.0
+   14:27 SELL Gold sell 4129               43.1     42.3
+                                       attuale   rapido
+
+── 2026-10-09 · 9 segnali · tick in 18 finestre su 18
+   04:05 SELL Gold sell 4172                7.0      7.0
+   06:45 SELL Gold sell 4181                0.0      0.0
+   07:33 BUY  Gold buy 4196                 0.0      0.0
+   07:42 BUY  Gold buy 4201              -140.0   -140.0
+   08:19 BUY  Gold buy 4194               -35.0    -35.0
+   09:09 BUY  Gold buy 4194                14.7     14.7
+   13:03 BUY  Gold buy 4180                14.7     17.3
+   13:45 BUY  Gold buy 4182                20.0     20.0
+   14:19 BUY  Gold buy 4181                28.2     26.4
+                                       attuale   rapido
+
+── 2026-10-12 · 11 segnali · tick in 19 finestre su 19
+   04:07 BUY  Gold buy 4209                38.2     36.6
+   04:33 BUY  Gold buy 4209                21.9     24.0
+   06:55 BUY  Gold buy 4195              -140.0   -140.0
+   07:37 SELL Gold sell 4185               15.6      8.0
+   08:33 SELL Gold sell 4185               12.1     12.1
+   09:33 SELL Gold sell 4185               20.7     21.7
+   13:04 BUY  Gold buy 4175              -140.0   -140.0
+   14:27 BUY  Gold buy 4165              -140.0   -140.0
+   14:38 SELL Gold sell 4157             -105.0   -105.0
+   14:46 SELL Gold sell 4166                0.0      0.0
+   15:08 SELL Gold sell 4170              -70.0    -70.0
+                                       attuale   rapido
+
+── 2026-10-13 · 12 segnali · tick in 23 finestre su 23
+   03:59 SELL Gold sell  4166             -35.0    -35.0
+   04:10 SELL Gold sell 4167              -17.7    -17.7
+   04:40 SELL Gold sell 4174               10.6     10.6
+   07:25 SELL Gold sell 4197              151.8    151.8
+   07:34 SELL Gold sell 4195               31.9     31.9
+   07:55 SELL Gold sell 4192               35.5     35.0
+   08:46 SELL Gold sell 4187              -35.0    -35.0
+   09:17 SELL Gold sell 4191                9.2      8.8
+   13:06 SELL Gold sell 4184              -35.0    -35.0
+   13:24 SELL Gold sell 4185                7.2      7.3
+   13:58 SELL Gold sell 4186                8.0      8.0
+   14:23 SELL Gold sell 4185              -14.1    -14.1
+                                       attuale   rapido
+
+── 2026-10-14 · 10 segnali · tick in 18 finestre su 18
+   04:01 SELL Gold sell 4155              -35.0    -35.0
+   04:08 SELL Gold sell 4160              -35.0    -35.0
+   07:10 BUY  Gold buy 4159                 0.0      0.0
+   07:17 BUY  Gold buy 4161                 5.9      5.9
+   07:40 BUY  Gold buy 4158              -140.0   -140.0
+   08:19 SELL Gold sell 4159              168.5    168.5
+   09:40 SELL Gold sell 4147             -140.0   -140.0
+   13:15 SELL Gold sell 4139                7.0      7.0
+   13:44 SELL Sell 4139                  -140.0   -140.0
+   14:07 SELL Gold sell 4148                0.0      0.0
+                                       attuale   rapido
+
+── 2026-10-15 · 1 segnali · tick in 3 finestre su 3
+   04:06 SELL Gold sell 4140               14.0     14.0
+                                       attuale   rapido
+
+── 2026-10-16 · 10 segnali · tick in 22 finestre su 22
+   04:10 BUY  Gold buy 4155               161.0    161.6
+   06:45 BUY  Gold buy 4175               -35.0    -35.0
+   07:33 BUY  Gold buy 4172                 0.0      0.0
+   07:41 BUY  Gold buy 4172                14.0     14.0
+   07:50 BUY  Gold buy 4171                 0.0      0.0
+   08:10 BUY  Gold buy 4173                 9.0      9.0
+   10:08 BUY  Gold buy 4182                22.5     22.5
+   13:01 BUY  Gold buy 4174                16.7     17.6
+   13:09 BUY  Gold buy 4175                41.6     40.8
+   13:49 BUY  Gold buy 4177                 8.3      8.3
+                                       attuale   rapido
+
+── 2026-10-19 · 11 segnali · tick in 26 finestre su 26
+   04:03 BUY  Gold buy 4176                 0.0      0.0
+   04:19 BUY  Gold buy 4176                 7.0      7.0
+   07:05 BUY  Gold buy 4180                 0.0      0.0
+   07:17 BUY  Gold buy 4179               -11.4    -11.4
+   08:04 BUY  Gold buy 4184              -140.0   -140.0
+   08:33 BUY  Gold buy 4173                 0.0      0.0
+   09:46 SELL Gold sell 4184              180.0    187.2
+   13:01 SELL Gold sell 4171               15.4     15.5
+   13:48 SELL Gold sell 4169               77.0     77.0
+   14:06 SELL Gold sell 4166               14.0     14.0
+   14:22 SELL Gold sell 4167               16.7     16.7
+                                       attuale   rapido
+
+── 2026-10-20 · 11 segnali · tick in 20 finestre su 20
+   03:34 SELL Gold sell 4121              -35.0    -35.0
+   03:42 SELL Gold sell 4126              -35.0    -35.0
+   03:58 SELL Gold sell 4130              -35.0    -35.0
+   06:49 SELL Gold sell 4144              170.9    177.9
+   08:19 SELL Gold sell 4129                9.0      9.0
+   08:32 SELL Gold sell 4128              -38.6    -38.6
+   09:20 SELL Gold sell 4132              164.3    164.3
+   12:59 SELL Gold sell 4120              -35.0    -35.0
+   13:55 SELL Gold sell 4123               31.5     42.9
+   14:20 SELL Gold sell 4121                0.0      0.0
+   14:24 SELL Gold sell 4122               17.2     17.2
+                                       attuale   rapido
+
+strategia                      24/09   25/09   28/09   29/09   30/09   01/10   02/10   05/10   06/10   07/10   08/10   09/10   12/10   13/10   14/10   15/10   16/10   19/10   20/10   totale  vinti  persi  stop  media +  media −
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+reale (registrato)               -29    -638     728     -32      45    -231    -258    -535    -449     770     133    -250    -439     119    -261      12     214     152     213     -736
+attuale                          242    -155    1420      90     122    -184    -245    -610    -616     502     135     -90    -486     118    -309      14     238     159     214      557    110     90    24     47.8    -52.2
+segnale rapido senza agente      243    -163    1442      84     116    -183    -246    -610    -618     497     180     -90    -493     117    -309      14     239     166     233      620    111     89    24     47.9    -52.8
+
+stop = segnali chiusi allo SL pieno; media + / media − = risultato medio dei segnali vinti / persi.
+'reale' è la somma delle chiusure registrate dal bot (con le regole di quel giorno e i lotti veri).
+Tick reali disponibili in 393 finestre su 394 (segnali e comandi del trader); altrove candele M1.

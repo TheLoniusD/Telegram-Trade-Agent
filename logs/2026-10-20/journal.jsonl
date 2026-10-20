@@ -673,3 +673,5 @@
 {"ts": "2026-10-20T17:04:24+02:00", "event": "MESSAGE_SKIPPED", "msg_id": 59554, "reason": "messaggio senza testo", "sender_id": -1001222394814}
 {"ts": "2026-10-20T17:08:42+02:00", "event": "MESSAGE", "msg_id": 59552, "is_edit": true, "reply_to": null, "sender_id": -1001222394814, "post_author": null, "has_media": true, "is_forwarded": true, "text": "Again..👍👍👍"}
 {"ts": "2026-10-20T17:08:42+02:00", "event": "MESSAGE_SKIPPED", "msg_id": 59552, "reason": "messaggio inoltrato"}
+{"ts": "2026-10-20T18:18:50+02:00", "event": "BOT_START", "test_mode": false, "channel": "https://t.me/Maestrofxofficial", "allowed_senders": [], "login": 5054046872, "server": "MetaQuotes-Demo", "demo": true, "balance": 7324.91, "equity": 7324.91, "margin_free": 7324.91, "open_positions": 0}
+{"ts": "2026-10-20T18:19:20+02:00", "event": "HEARTBEAT", "mt5_ok": true, "mt5_reason": "MT5 operativo", "live_trades": 0, "login": 5054046872, "server": "MetaQuotes-Demo", "demo": true, "balance": 7324.91, "equity": 7324.91, "margin_free": 7324.91, "open_positions": 0}
