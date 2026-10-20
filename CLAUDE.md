@@ -31,6 +31,7 @@ Il bot **non gira qui**: gira da solo sul server Linux (branch `server`). Lì la
 | `prezzi.py` | analisi dei prezzi di un giorno e `rigioco` delle strategie (servono i prezzi di MT5: si lancia sul server) |
 | `verifica_be.py` | rigioco delle posizioni di un giorno sulle candele M1 di MT5 (anche questo sul server) |
 | `tests/` | banco di prova con broker finto (vedi *Verifica*) |
+| `infrastruttura/caricamento-log/` | caricamento automatico dei log dal server (cron, ogni ora) in un repository privato di soli log, con `STATO.md`; script bash per Linux, installabile anche sul server di un cliente (vedi il suo README) |
 
 I parametri si leggono da `.env` con `os.getenv(NOME, default)`. **Il default nel codice è la regola in vigore**: una regola nuova si mette cambiando il default, mai chiedendo di modificare il `.env`.
 
