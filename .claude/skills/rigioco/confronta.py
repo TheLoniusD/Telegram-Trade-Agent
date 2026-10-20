@@ -3,8 +3,8 @@ Confronto segnale per segnale tra due strategie del rigioco.
 
     python3 .claude/skills/rigioco/confronta.py FILE_DETTAGLIO "attuale" "BE +1.5$" [--quanti 10]
 
-FILE_DETTAGLIO è l'uscita di `prezzi.py rigioco ... --dettaglio` (sul branch server:
-`git show origin/server:logs/rigioco_tick_dettaglio.txt > /tmp/det.txt`). Le due
+FILE_DETTAGLIO è l'uscita di `prezzi.py rigioco ... --dettaglio`, nel repository dei log:
+`Telegram-Trade-Agent-log/logs/rigioco_tick_dettaglio.txt` (CLAUDE.md, "Branch e log"). Le due
 strategie si indicano con la sigla della riga di intestazione del dettaglio
 (es. "attuale", "4 ticket", "no prot", "BE +1.5$"). Stampa in quanti segnali la
 seconda è meglio o peggio della prima, di quanto, i casi più grandi e i giorni.

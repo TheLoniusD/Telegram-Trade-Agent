@@ -9,13 +9,13 @@ Sei una **sessione sul PC del proprietario** (Windows, cartella del progetto sul
 - **correggere la logica del bot e i bug**, con test e verifica;
 - **preparare i rilasci**: unire `main` in `server` e scrivere il prompt per la sessione sul server.
 
-Il bot **non gira qui**: gira da solo sul server Linux (branch `server`). Lì lavora un'altra sessione Claude, con un **CLAUDE.md suo** (`git show origin/server:CLAUDE.md`), che rilascia il codice preparato qui, riavvia il bot e carica i log. Le due sessioni non si parlano: si passano il lavoro con git e con il prompt che scrivi tu (skill `prompt-server`).
+Il bot **non gira qui**: gira da solo sul server Linux (branch `server`). Lì lavora un'altra sessione Claude, con un **CLAUDE.md suo** (`git show origin/server:CLAUDE.md`), che rilascia il codice preparato qui e riavvia il bot. I log il server li pubblica da solo, ogni ora, in un repository a parte (vedi *Branch e log*). Le due sessioni non si parlano: si passano il lavoro con git e con il prompt che scrivi tu (skill `prompt-server`).
 
 ## Prima di tutto
 
 - **`doc/DECISIONI.md`** è la fonte delle regole di trading in vigore e del perché sono state scelte (Regole in vigore, Risultati per giornata, Registro, Questioni aperte). Leggilo prima di proporre o cambiare qualsiasi regola: una proposta non deve contraddire una scelta già fatta, o deve farlo consapevolmente, dicendolo.
 - Le regole non vanno ricopiate altrove: se servono, si leggono lì.
-- A inizio sessione: `git status` e `git pull --no-rebase origin main` (il `main` locale può essere rimasto indietro), poi `git fetch origin server` per avere gli ultimi log.
+- A inizio sessione: `git status` e `git pull --no-rebase origin main` (il `main` locale può essere rimasto indietro), poi aggiorna i log con `git -C Telegram-Trade-Agent-log pull` (vedi *Branch e log*).
 
 ## Architettura
 
@@ -38,17 +38,19 @@ I parametri si leggono da `.env` con `os.getenv(NOME, default)`. **Il default ne
 ## Branch e log
 
 - **`main`**: sviluppo, codice per Windows (`import MetaTrader5`). Si lavora qui.
-- **`server`**: `main` + `mt5_connection.py` (RPyC verso MT5 sotto Wine) + `order_send(**request)` + `requirements.txt` con `rpyc` + i **log** in `logs/` + il **CLAUDE.md del server**. Non si sviluppa su `server`: ci si porta `main` con un merge (vedi *Rilascio*).
-- I log esistono solo sul branch `server` (su `main` `logs/`, `storico/` e `active_trades.json` sono ignorati). Si leggono senza cambiare branch:
-  `git fetch origin server` poi `git show origin/server:logs/AAAA-MM-GG/bot.log` (in Git Bash vedi *Ambiente del PC*).
+- **`server`**: `main` + `mt5_connection.py` (RPyC verso MT5 sotto Wine) + `order_send(**request)` + `requirements.txt` con `rpyc` + il **CLAUDE.md del server**. Non si sviluppa su `server`: ci si porta `main` con un merge (vedi *Rilascio*). Fino al 20/10 conteneva anche i log.
+- **Log**: sono nel repository privato **`TheLoniusD/Telegram-Trade-Agent-log`**, che il server aggiorna da solo ogni ora, al minuto 05 (`infrastruttura/caricamento-log/`). Contiene tutti i giorni dal 23/09.
+  - Sul PC se ne tiene una copia **dentro il progetto**, nella cartella `Telegram-Trade-Agent-log/` (ignorata da git). La prima volta: `git clone https://github.com/TheLoniusD/Telegram-Trade-Agent-log.git Telegram-Trade-Agent-log`; a ogni sessione: `git -C Telegram-Trade-Agent-log pull`. I log si leggono come file normali, ad esempio `Telegram-Trade-Agent-log/logs/AAAA-MM-GG/bot.log`.
+  - In una sessione nel cloud (anche dal cellulare) si selezionano tutti e due i repository: la copia dei log c'è già, di solito accanto al progetto (`../Telegram-Trade-Agent-log`).
+  - `STATO.md`, in cima al repository dei log: stato del bot all'ultimo caricamento (servizi, processi, ultimo avvio e battito, disco, errori di oggi). Se l'ora scritta lì è vecchia di più di un'ora, il caricamento si è fermato: serve un prompt per il server (skill `prompt-server`, controllo dello stato).
 - Per giorno, in `logs/AAAA-MM-GG/`: `bot.log` (racconto, ora italiana), `operazioni.txt` (schede), `errors.log`, `dettagli.log`, `journal.jsonl`. L'orologio del broker è UTC+3 (campi `broker_time` nel diario). I log fino al 05/10 hanno un formato più vecchio. In `logs/` ci sono anche i risultati del rigioco (`rigioco_tick.txt`, `rigioco_tick_dettaglio.txt`).
-- I log arrivano su `server` quando la sessione sul server li carica. Se la giornata richiesta non c'è (`git ls-tree --name-only origin/server logs/`), dillo e prepara il prompt per caricarli (skill `prompt-server`).
+- I log del giorno in corso sono parziali: arrivano fino all'ultimo caricamento. Se servono subito, ad esempio dopo un rilascio o un rigioco, il prompt per il server chiede il *Caricamento dei log*, cioè un caricamento immediato (skill `prompt-server`).
 
 ## Ambiente del PC (Windows)
 
 - Python si lancia con **`python`**: `python3` qui è il collegamento del Microsoft Store e non funziona. Nelle skill i comandi sono scritti con `python3` (vale sul server): sul PC usa `python`.
 - `.claude/settings.json` imposta `PYTHONUTF8=1`: senza, gli script che stampano simboli (→, −, emoji) si fermano con `UnicodeEncodeError` sulla console di Windows. Se lanci Python fuori da una sessione: `python -X utf8 ...`.
-- **Git Bash** trasforma `origin/server:logs/...` in un percorso di Windows e `git show` fallisce: metti `MSYS_NO_PATHCONV=1` davanti (`MSYS_NO_PATHCONV=1 git show origin/server:logs/2026-10-13/bot.log`) oppure usa PowerShell. Gli script delle skill (`riepilogo.py`, `confronta.py`) non hanno il problema.
+- **Git Bash** trasforma `origin/server:CLAUDE.md` (e ogni `ref:percorso`) in un percorso di Windows e `git show` fallisce: metti `MSYS_NO_PATHCONV=1` davanti (`MSYS_NO_PATHCONV=1 git show origin/server:CLAUDE.md`) oppure usa PowerShell. I log non ne hanno bisogno: sono file nella cartella `Telegram-Trade-Agent-log/`.
 - File temporanei (estratti dei log, dettaglio del rigioco…) nella cartella scratchpad della sessione, non in `/tmp`.
 - Nella cartella ci sono il `.env` e la sessione Telegram (`*.session`): **mai avviare il bot** (`telegram_listener.py`) né altro che si colleghi a Telegram. Il server usa la stessa sessione Telegram e i due non devono mai girare insieme.
 - Il pacchetto `MetaTrader5` è installato, ma i test non lo usano (broker finto) e gli script che leggono i prezzi veri (`prezzi.py`, `verifica_be.py`) si lanciano sul server.
@@ -85,9 +87,9 @@ I parametri si leggono da `.env` con `os.getenv(NOME, default)`. **Il default ne
    ```
    - `git checkout HEAD -- CLAUDE.md` tiene il **CLAUDE.md del server** com'è, anche se il merge l'avrebbe sovrascritto con questo o è andato in conflitto. Se il CLAUDE.md del server va cambiato, si fa con un commit a parte sul branch `server`, mai portandoci questo.
    - In caso di conflitti sul codice restano le differenze del server: `from mt5_connection import mt5`, `mt5.order_send(**request)`, `rpyc` in `requirements.txt` al posto di `MetaTrader5`.
-   - Su `server` compare la cartella `logs/` (è tracciata lì) e sparisce tornando su `main`: è normale. Non modificare né committare log da qui.
+   - I log non si committano mai da qui: dal 20/10 non sono più nel branch `server`.
    - Se `main` cambia `requirements.txt`, il prompt per il server deve far installare il nuovo pacchetto (sul server non c'è `MetaTrader5`, c'è `rpyc`).
-3. Prompt per la sessione sul server (skill `prompt-server`): rilascio con riavvio se cambia il codice del bot; se cambiano solo documenti, skill o test basta che il server faccia pull (lo fa anche caricando i log).
+3. Prompt per la sessione sul server (skill `prompt-server`): rilascio con riavvio se cambia il codice del bot. Se cambiano solo il CLAUDE.md del server o `infrastruttura/`, basta l'aggiornamento: pull, più la reinstallazione del caricamento automatico se cambia `infrastruttura/caricamento-log/`. Se cambiano solo documenti, skill o test, al server non serve niente.
 4. Alla prima analisi successiva controlla nel `bot.log` la riga "▶️ Bot avviato · conto DEMO" della nuova versione e le *Questioni aperte* "da verificare".
 
 ## Regole fisse di sicurezza

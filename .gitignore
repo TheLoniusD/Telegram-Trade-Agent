@@ -12,6 +12,9 @@ active_trades.json
 logs/
 storico/
 
+# Copia del repository dei log (TheLoniusD/Telegram-Trade-Agent-log): repository a parte
+/Telegram-Trade-Agent-log/
+
 # Cache e file temporanei di Python
 __pycache__/
 *.pyc
