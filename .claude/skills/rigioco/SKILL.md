@@ -16,7 +16,7 @@ python prezzi.py rigioco 2026-09-24 AAAA-MM-GG > logs/rigioco_tick.txt
 python prezzi.py rigioco 2026-09-24 AAAA-MM-GG --dettaglio > logs/rigioco_tick_dettaglio.txt
 ```
 
-Poi i log si caricano sul branch `server`. Opzioni utili:
+Poi il server carica subito i log (procedura *Caricamento dei log* del suo CLAUDE.md): i risultati arrivano nel repository dei log, in `logs/`. Opzioni utili:
 - `--strategie "attuale,BE +1,5 $"` limita le varianti;
 - `--offset-broker 3` forza l'orologio del broker, solo se il diario non basta;
 - `--senza-tick` usa solo le candele M1, più veloce ma indulgente con gli stop di protezione.
@@ -27,8 +27,8 @@ Poi i log si caricano sul branch `server`. Opzioni utili:
 2. **Calibrazione**: le operazioni recenti fatte con le stesse regole di "attuale" devono coincidere con il reale a pochi dollari (confronta con `operazioni.txt` di quei giorni). Se non coincidono, il simulatore ha un problema: va corretto prima di trarre conclusioni.
 3. **Confronto segnale per segnale**, mai solo i totali:
    ```
-   git show origin/server:logs/rigioco_tick_dettaglio.txt > /tmp/det.txt
-   python3 .claude/skills/rigioco/confronta.py /tmp/det.txt "attuale" "SIGLA"
+   git -C Telegram-Trade-Agent-log pull
+   python3 .claude/skills/rigioco/confronta.py Telegram-Trade-Agent-log/logs/rigioco_tick_dettaglio.txt "attuale" "SIGLA"
    ```
    Le sigle sono quelle della riga sotto ogni giorno del dettaglio. Lo script dice in quanti segnali e giorni la variante è meglio o peggio, di quanto, e quali sono i casi più grandi.
 4. **Trappole già incontrate**:

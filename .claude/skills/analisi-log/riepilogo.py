@@ -1,10 +1,14 @@
 """
-Riepilogo numerico di una giornata dal diario (journal.jsonl) del branch server.
+Riepilogo numerico di una giornata dal diario (journal.jsonl) del repository dei log.
 
-    python3 .claude/skills/analisi-log/riepilogo.py 2026-10-09 [--ref origin/server]
+    python3 .claude/skills/analisi-log/riepilogo.py 2026-10-09 [--log CARTELLA | --ref REF]
 
-Legge il file con `git show` (non serve cambiare branch; prima `git fetch origin server`)
-e stampa: saldo e chiusure registrate (con la differenza da spiegare), segnali e
+Legge `logs/AAAA-MM-GG/journal.jsonl` dalla copia del repository dei log
+(TheLoniusD/Telegram-Trade-Agent-log): di default `Telegram-Trade-Agent-log/` dentro il
+progetto (PC) o accanto al progetto (sessione nel cloud); `--log` per un'altra cartella.
+Prima aggiornala con `git -C Telegram-Trade-Agent-log pull`. Con `--ref` legge invece con
+`git show` da un ref del progetto (es. `origin/server`, dove sono i log fino al 20/10).
+Stampa: saldo e chiusure registrate (con la differenza da spiegare), segnali e
 decisioni, ingressi, pareggi e protezioni, MT5, riavvii, reti di sicurezza, errori.
 È un punto di partenza: il dettaglio di ogni operazione è in operazioni.txt e bot.log.
 """
@@ -12,23 +16,43 @@ import argparse
 import json
 import subprocess
 from collections import Counter
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+LOG_REPO = "Telegram-Trade-Agent-log"
 
 
 def hm(event):
     return event["ts"][11:16]
 
 
+def read_journal(giorno, log_dir, ref):
+    if ref:
+        raw = subprocess.run(["git", "show", f"{ref}:logs/{giorno}/journal.jsonl"],
+                             capture_output=True, text=True, encoding="utf-8")
+        if raw.returncode != 0:
+            raise SystemExit(f"Diario non trovato: {raw.stderr.strip()} (hai fatto git fetch?)")
+        return raw.stdout
+    candidates = [Path(log_dir)] if log_dir else [ROOT / LOG_REPO, ROOT.parent / LOG_REPO]
+    for folder in candidates:
+        if (folder / "logs").is_dir():
+            path = folder / "logs" / giorno / "journal.jsonl"
+            if not path.is_file():
+                raise SystemExit(f"Diario non trovato: {path} (hai aggiornato i log con git -C {folder} pull?)")
+            return path.read_text(encoding="utf-8")
+    raise SystemExit(f"Repository dei log non trovato in {', '.join(map(str, candidates))}: clonalo in "
+                     f"{ROOT / LOG_REPO} (CLAUDE.md, \"Branch e log\") o indica --log")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("giorno", help="AAAA-MM-GG")
-    parser.add_argument("--ref", default="origin/server")
+    parser.add_argument("--log", help="cartella del repository dei log (default: Telegram-Trade-Agent-log dentro o accanto al progetto)")
+    parser.add_argument("--ref", help="leggi con git show da questo ref del progetto invece che dalla cartella dei log")
     args = parser.parse_args()
 
-    raw = subprocess.run(["git", "show", f"{args.ref}:logs/{args.giorno}/journal.jsonl"],
-                         capture_output=True, text=True, encoding="utf-8")
-    if raw.returncode != 0:
-        raise SystemExit(f"Diario non trovato: {raw.stderr.strip()} (hai fatto git fetch origin server?)")
-    events = [json.loads(line) for line in raw.stdout.splitlines() if line.strip()]
+    raw = read_journal(args.giorno, args.log, args.ref)
+    events = [json.loads(line) for line in raw.splitlines() if line.strip()]
     by = lambda name: [e for e in events if e.get("event") == name]
 
     print(f"== {args.giorno} · {len(events)} eventi")

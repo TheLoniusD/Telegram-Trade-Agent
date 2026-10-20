@@ -33,7 +33,7 @@ Le regole di trading in vigore e il perché di ogni scelta sono in **[doc/DECISI
 ## Branch
 
 - **`main`**: versione per **Windows**, con il pacchetto `MetaTrader5` collegato direttamente al terminale. Si sviluppa qui.
-- **`server`**: `main` più il collegamento **RPyC** a `mt5server.exe` sotto Wine (`mt5_connection.py`) e i **log** caricati dal server. Gli aggiornamenti si portano unendo `main` in `server`.
+- **`server`**: `main` più il collegamento **RPyC** a `mt5server.exe` sotto Wine (`mt5_connection.py`). Gli aggiornamenti si portano unendo `main` in `server`.
 
 ## Avvio (Windows)
 
@@ -57,7 +57,7 @@ Tutti gli altri parametri hanno un valore predefinito; l'elenco è in `doc/DECIS
 
 ## Log
 
-Ogni giorno in `logs/AAAA-MM-GG/`:
+Il server li pubblica ogni ora nel repository privato `TheLoniusD/Telegram-Trade-Agent-log`, con un `STATO.md` sullo stato del bot (`infrastruttura/caricamento-log/`). Ogni giorno in `logs/AAAA-MM-GG/`:
 - `bot.log`: il racconto della giornata;
 - `operazioni.txt`: una scheda per segnale, con esiti e risultato;
 - `errors.log`, `dettagli.log`: errori e dettagli tecnici;

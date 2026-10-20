@@ -58,8 +58,8 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ### Log e repository
 - Per giorno: `bot.log` (racconto), `operazioni.txt` (schede), `dettagli.log`, `errors.log`, `journal.jsonl` (dati). Heartbeat ogni 4 ore.
-- Sul server i log si caricano con **pull e poi push, mai push forzati**.
-- Branch: si sviluppa su **`main`** (Windows); **`server`** = `main` + collegamento RPyC + log, aggiornato unendo `main`. (`claude-branch` eliminato il 01/10.)
+- I log stanno nel repository privato **`Telegram-Trade-Agent-log`**: il server li pubblica da solo ogni ora (cron, `infrastruttura/caricamento-log/`), con `STATO.md` sullo stato del bot. Mai push forzati.
+- Branch: si sviluppa su **`main`** (Windows); **`server`** = `main` + collegamento RPyC, aggiornato unendo `main` (fino al 20/10 conteneva anche i log). (`claude-branch` eliminato il 01/10.)
 
 ### Parametri `.env` (valore di default)
 | Parametro | Default | Note |
@@ -110,6 +110,15 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 20/10 (sera) — Log in un repository a parte, caricati ogni ora
+- **Decisione** (metodo di lavoro, nessuna regola di trading cambiata):
+  - I log vanno nel repository privato `TheLoniusD/Telegram-Trade-Agent-log`. Li pubblica ogni ora, al minuto 05, uno script lanciato da cron sul server (`infrastruttura/caricamento-log/`, senza root), con `STATO.md`: servizi, processi, ultimo avvio e battito, disco, errori di oggi. Il branch `server` non li contiene più.
+  - Le sessioni sul PC leggono i log da una copia del repository dei log dentro il progetto (`Telegram-Trade-Agent-log/`, ignorata da git). Dal cellulare si usa una sessione nel cloud con i due repository: provata il 20/10, legge `STATO.md`.
+  - Remote Control attivo per le nuove sessioni del PC.
+- **Perché**: il caricamento a mano faceva `git pull` nella cartella del bot, portando sul disco codice non ancora rilasciato, che sarebbe partito al primo riavvio automatico (codice del 17/10 rimasto così fino al 20/10). Un repository a parte permette di mostrare i log a un cliente senza mostrare il codice, e dà al server una chiave che scrive solo lì. L'infrastruttura è pensata per essere installata anche sul server di un cliente.
+- **Scartati**: report giornaliero scritto in automatico da un'attività pianificata nel cloud (l'analisi resta interattiva, dal PC o dal cellulare); branch `logs` nello stesso repository (i permessi di GitHub valgono per tutto il repository).
+- **Da verificare**: che `STATO.md` si aggiorni ogni ora; dopo il passaggio, valutare di rendere di sola lettura la chiave di deploy del codice sul server.
 
 ### 20/10 — GIF prima del segnale: prezzo nel diario e agente riscaldato; le foto non si leggono
 - **Decisioni** (nessuna regola di trading cambiata)

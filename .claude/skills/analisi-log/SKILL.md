@@ -1,6 +1,6 @@
 ---
 name: analisi-log
-description: Analisi di una giornata di log del bot (bot.log, operazioni.txt, journal.jsonl sul branch server) - risultato, operazione per operazione, confronto con il trader, anomalie, bug e proposte. Da usare quando il proprietario dice di aver caricato i log o chiede di analizzare una giornata.
+description: Analisi di una giornata di log del bot (bot.log, operazioni.txt, journal.jsonl nel repository dei log Telegram-Trade-Agent-log) - risultato, operazione per operazione, confronto con il trader, anomalie, bug e proposte. Da usare quando il proprietario chiede di analizzare una giornata o com'è andato il bot.
 ---
 
 # Analisi di una giornata di log
@@ -10,12 +10,12 @@ Obiettivo: capire **cosa ha fatto il bot, se ha fatto quello che le regole preve
 ## 1. Prepararsi
 
 1. Leggi `doc/DECISIONI.md`: *Regole in vigore*, la prima voce del *Registro*, la tabella *Risultati per giornata* e le *Questioni aperte* (soprattutto quelle "da verificare").
-2. `git fetch origin server` e guarda cosa c'è: `git ls-tree --name-only origin/server logs/AAAA-MM-GG/`.
-3. Numeri della giornata: `python3 .claude/skills/analisi-log/riepilogo.py AAAA-MM-GG`. La riga "differenza saldo − chiusure" deve essere circa 0. Se non lo è, c'è qualcosa da spiegare **prima di tutto il resto**: chiusure mai registrate (bug del 05/10), posizioni orfane (08/10), operazioni aperte il giorno prima, saldo letto prima dell'ultima chiusura.
+2. Aggiorna i log: `git -C Telegram-Trade-Agent-log pull`. La prima volta serve il clone (CLAUDE.md, *Branch e log*); in una sessione nel cloud la cartella è di solito `../Telegram-Trade-Agent-log`. Poi guarda `STATO.md`: per un giorno finito, l'ultimo caricamento deve essere del giorno dopo; in cima c'è ✅ oppure cosa controllare. Infine guarda cosa c'è in `logs/AAAA-MM-GG/`.
+3. Numeri della giornata: `python3 .claude/skills/analisi-log/riepilogo.py AAAA-MM-GG` (con `--log CARTELLA` se la copia dei log è altrove). La riga "differenza saldo − chiusure" deve essere circa 0. Se non lo è, c'è qualcosa da spiegare **prima di tutto il resto**: chiusure mai registrate (bug del 05/10), posizioni orfane (08/10), operazioni aperte il giorno prima, saldo letto prima dell'ultima chiusura.
 
 ## 2. Leggere
 
-- `bot.log` per intero (`git show origin/server:logs/AAAA-MM-GG/bot.log`). È il racconto in ora italiana: 📩 messaggi del trader, 🧠 classificazione dell'agente, 📥 ordini, 🏁 chiusure, 🛡️ pareggi, 🛟 protezioni, ❌ errori e rifiuti, 🔌 MT5, ▶️ avvii, 💓 battito.
+- `bot.log` per intero (`Telegram-Trade-Agent-log/logs/AAAA-MM-GG/bot.log`). È il racconto in ora italiana: 📩 messaggi del trader, 🧠 classificazione dell'agente, 📥 ordini, 🏁 chiusure, 🛡️ pareggi, 🛟 protezioni, ❌ errori e rifiuti, 🔌 MT5, ▶️ avvii, 💓 battito.
 - `operazioni.txt`: una scheda per operazione, con i messaggi del trader collegati, l'esito di ogni ticket (e1 = TP1, e2 = TP2) e gli spostamenti di SL.
 - `errors.log` e `dettagli.log` solo se serve capire un errore.
 - `journal.jsonl` per i fatti esatti (prezzi, ticket, orari del broker UTC+3, richieste a MT5). In caso di dubbio vale il diario, non il racconto.
