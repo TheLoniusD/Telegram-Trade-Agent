@@ -126,4 +126,22 @@ signal = prezzi.extract_signals(COMPLETO)[0]
 check(not signal["quick"], "non è un segnale rapido")
 check(rigioca("segnale rapido senza agente") == rigioca("attuale"), "stesso esito delle regole attuali")
 
+# SL scritto male dal trader (22/10 SELL 4065, "SL 4175" invece di 4075): come il bot,
+# il rigioco tiene lo SL provvisorio 4075. Il prezzo sale a 4.085 e poi scende fino ai TP.
+SELL_4065 = (11, 0, "Gold sell 4065", "NEW_SIGNAL", None, dati(entry_min=4065.0))
+SL_SBAGLIATO = (11, 60, "GOLD SELL NOW\n\nSell @ 4065 - 4070\n\nSL🔴4175\nTP✅4055\nTP✅4045", "UPDATE_SIGNAL",
+                None, dati(entry_min=4065.0, entry_max=4070.0, stop_loss=4175.0, take_profit=[4055.0, 4045.0]))
+prezzi_tick = [(1, 4065.1), (120, 4070.0), (1800, 4085.0), (3600, 4050.0), (5400, 4040.0)]
+points = [(T0 + s, 0, p, p, p, p, SPREAD) for s, p in prezzi_tick]
+signal = prezzi.extract_signals(diario(SELL_4065, SL_SBAGLIATO))[0]
+
+scenario("SL scritto male nel completamento (22/10 \"SL 4175\"): non vale, resta lo SL provvisorio")
+livelli = prezzi.levels_at(signal, T0 + 60)
+check(livelli["sl"] is None and livelli["entry_max"] == 4070.0 and livelli["tps"] == [4055.0, 4045.0],
+      "zona e TP del trader applicati, SL 4175 scartato", livelli)
+esito = prezzi.simulate_signal(signal, points, dict(prezzi.BASE_RULES), risk=140.0, hours=8)
+reasons = sorted(x["reason"] for x in esito["tickets"].values())
+check(reasons == ["SL", "SL"] and vicino(esito["result"], -140.0, 0.5),
+      "e1 ed e2 allo SL provvisorio 4075 (−140 $), non tenuti fino ai TP", (reasons, round(esito["result"], 2)))
+
 fine()

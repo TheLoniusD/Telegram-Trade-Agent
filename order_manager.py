@@ -48,6 +48,30 @@ ENTRY_TICKETS = max(1, int(os.getenv("ENTRY_TICKETS", "2")))
 # 6 ore, chiuso a mano). "0" = nessun TP provvisorio.
 PROVISIONAL_TP_DISTANCES = [float(x) for x in os.getenv("PROVISIONAL_TP", "10,20").split(",") if float(x) > 0]
 
+# SL scritto male dal trader: oltre questa distanza dal prezzo del segnale è un
+# errore di battitura e non si applica (resta lo SL che c'è). Il 22/10 "SL 4176"
+# su "Sell @ 4066 - 4071" (invece di 4076) è andato così a MT5 su tre segnali: i
+# lotti erano calcolati con lo SL a 10 $, quindi a 110 $ il rischio era 11 volte
+# il 2% (1.540 $, il 22% del conto, sul SELL 4065). In tutti gli altri segnali
+# completi dal 23/09 lo SL è a 10 $ dal prezzo del segnale.
+MAX_SL_DISTANCE = float(os.getenv("MAX_SL_DISTANCE", "20"))
+
+
+def signal_price(direction: str, entry_min, entry_max):
+    """Prezzo del segnale = bordo della zona da cui parte il trader (il più alto per un BUY), o None."""
+    bounds = [p for p in (entry_min, entry_max) if p is not None]
+    if not bounds:
+        return None
+    return max(bounds) if direction == "BUY" else min(bounds)
+
+
+def stop_loss_typo(direction: str, stop_loss, price):
+    """Distanza dello SL dal prezzo del segnale se è oltre MAX_SL_DISTANCE (errore di battitura), altrimenti None."""
+    if stop_loss is None or price is None:
+        return None
+    distance = (price - stop_loss) if direction == "BUY" else (stop_loss - price)
+    return round(distance, 2) if distance > MAX_SL_DISTANCE else None
+
 
 def ticket_tp_index(key: str, ticket: dict) -> int:
     """Indice del TP del trader assegnato al ticket (0 = TP1, 1 = TP2)."""
@@ -468,9 +492,7 @@ class OrderManager:
                     and market_parent.get("status") in CLOSABLE_STATUSES):
                 age = time.time() - (market_parent.get("created_at") or 0)
                 if age <= REENTRY_CAPTION_SECONDS:
-                    # Prezzo del segnale = bordo della zona (il più alto per un BUY)
-                    bounds = [p for p in (market_parent.get("entry_min"), market_parent.get("entry_max")) if p is not None]
-                    price = (max(bounds) if data.get("direction") == "BUY" else min(bounds)) if bounds else None
+                    price = signal_price(data.get("direction"), market_parent.get("entry_min"), market_parent.get("entry_max"))
                     what = "\"again\"" if is_reentry else "ingresso senza prezzo"
                     return {"action": "IGNORE",
                             "reason": f"{what} {age:.0f} secondi dopo il segnale "
@@ -492,6 +514,15 @@ class OrderManager:
             # Se nel frattempo è stato superato dal prezzo, il Risk Manager lo
             # sostituisce con quello provvisorio.
             stop_loss = data.get("stop_loss") if data.get("stop_loss") is not None else (source_trade or {}).get("signal_stop_loss")
+            # SL scritto male in un segnale completo: SL provvisorio (vedi MAX_SL_DISTANCE),
+            # e non resta in memoria per i re-entry
+            sl_ignored = None
+            price = signal_price(direction, entry_min, entry_max)
+            distance = stop_loss_typo(direction, data.get("stop_loss"), price)
+            if distance is not None:
+                sl_ignored = {"ticket_id": ticket_id, "stop_loss": stop_loss, "distance": distance,
+                              "signal_price": price, "kept_stop_loss": None}
+                stop_loss = None
 
             # Take Profit del trader (dal messaggio, o ereditati dal padre del re-entry)
             tp_list = data.get("take_profit", [])
@@ -546,7 +577,7 @@ class OrderManager:
             self.latest_msg_id = msg_id
 
             self.save_state_to_file()
-            return {"action": "OPEN", "trade": trade_record}
+            return {"action": "OPEN", "trade": trade_record, "sl_ignored": sl_ignored}
 
         # 2. AGGIORNAMENTO SEGNALE (tramite Edit o Reply)
         elif intent == "UPDATE_SIGNAL":
@@ -587,6 +618,26 @@ class OrderManager:
             trades_to_update = self._get_trades_by_group(target_msg_id)
             if not trades_to_update:
                 return {"action": "IGNORE", "reason": "Nessun trade attivo trovato per l'aggiornamento."}
+
+            # SL scritto male (vedi MAX_SL_DISTANCE): non si applica; il resto del
+            # messaggio (zona, TP, pareggio) sì. Il prezzo del segnale è quello
+            # della zona scritta nel messaggio, se c'è.
+            sl_ignored = None
+            target = self.active_trades[target_msg_id]
+            direction = first_ticket(target).get("direction")
+            if new_entry_min is not None:
+                price = signal_price(direction, new_entry_min, new_entry_max)
+            else:
+                price = signal_price(direction, target.get("entry_min"), target.get("entry_max"))
+            if price is None:
+                # Re-entry senza prezzo: il prezzo d'ingresso dei suoi ticket
+                entries = [t.get("entry_price") for t in target.get("tickets", {}).values() if t.get("entry_price")]
+                price = (max(entries) if direction == "BUY" else min(entries)) if entries else None
+            distance = stop_loss_typo(direction, new_sl, price)
+            if distance is not None:
+                sl_ignored = {"ticket_id": target.get("ticket_id"), "stop_loss": new_sl, "distance": distance,
+                              "signal_price": price, "kept_stop_loss": target.get("stop_loss")}
+                new_sl = None
 
             updated_trades = []
             be_candidates = []  # ticket ancora da proteggere in Breakeven
@@ -671,8 +722,12 @@ class OrderManager:
                     "close_percentage": close_percentage if partial_close else None,
                     "trade_active_pips": running_pips[-1] if trade_active else None,
                     "layer_closes": layer_closes,
+                    "sl_ignored": sl_ignored,
                 }
 
+            if sl_ignored:
+                return {"action": "IGNORE", "sl_ignored": sl_ignored,
+                        "reason": "nel messaggio non c'è altro da applicare oltre allo SL scartato"}
             return {"action": "IGNORE", "reason": "Nessuna modifica applicabile (nessun trade idoneo)."}
 
         # 3. CHIUSURA SEGNALE (per ora sempre chiusura TOTALE della catena)

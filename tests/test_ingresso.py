@@ -66,6 +66,43 @@ broker.reset(price=4185.0)
 invia(9, "Gold buy 4285", classe("NEW_SIGNAL", direction="BUY", entry_min=4285.0))
 check(not broker.positions and not broker.orders, "nessuna posizione né ordine")
 
+scenario("SL scritto male nel completamento (22/10 \"SL 4176\" su Sell @ 4066 - 4071): non applicato")
+broker.reset(price=4064.08)
+invia(15, "Gold sell 4064", classe("NEW_SIGNAL", direction="SELL", entry_min=4064.0))
+e1, e2 = posizione(15, "e1"), posizione(15, "e2")
+check(e1 is not None and e2 is not None and e1.sl == 4074.0, "2 posizioni a mercato, SL provvisorio 4074",
+      e1 and e1.sl)
+invia(15, "GOLD SELL NOW · Sell @ 4066 - 4071 · SL 4176 · TP 4056 · TP 4046",
+      classe("UPDATE_SIGNAL", direction="SELL", entry_min=4066.0, entry_max=4071.0, stop_loss=4176.0,
+             take_profit=[4056.0, 4046.0]), edit=True)
+check(e1.sl == 4074.0 and e2.sl == 4074.0, "su MT5 resta lo SL 4074, non 4176", (e1.sl, e2.sl))
+check(ticket(15, "e1")["stop_loss"] == 4074.0 and operazione(15)["signal_stop_loss"] != 4176.0,
+      "in memoria resta lo SL 4074", (ticket(15, "e1")["stop_loss"], operazione(15)["signal_stop_loss"]))
+check(e1.tp == 4056.0 and e2.tp == 4046.0, "i TP del trader sono applicati", (e1.tp, e2.tp))
+eventi = [e for e in diario() if e["event"] == "SL_IGNORED"]
+check(len(eventi) == 1 and vicino(eventi[0].get("distance"), 110.0), "diario: SL_IGNORED a 110 $ dal segnale",
+      eventi)
+check("SL 4.176,00 non applicato" in racconto(), "racconto: SL non applicato, probabile errore di battitura")
+invia(15, "GOLD SELL NOW · Sell @ 4066 - 4071 · SL 4076 · TP 4056 · TP 4046",
+      classe("UPDATE_SIGNAL", direction="SELL", entry_min=4066.0, entry_max=4071.0, stop_loss=4076.0,
+             take_profit=[4056.0, 4046.0]), edit=True)
+check(e1.sl == 4076.0 and e2.sl == 4076.0, "la correzione del trader (SL 4076) è applicata", (e1.sl, e2.sl))
+pulisci()
+
+scenario("SL scritto male in un segnale completo: SL provvisorio, lotti sul rischio del 2%")
+broker.reset(price=4064.9)
+invia(17, "GOLD SELL NOW · Sell @ 4065 - 4070 · SL 4175 · TP 4055 · TP 4045",
+      classe("NEW_SIGNAL", direction="SELL", entry_min=4065.0, entry_max=4070.0, stop_loss=4175.0,
+             take_profit=[4055.0, 4045.0]))
+ordini = list(broker.orders.values())
+check(len(ordini) == 2 and all(o.sl == 4075.0 for o in ordini), "2 limiti a 4065 con lo SL provvisorio 4075",
+      [o.sl for o in ordini])
+check(vicino(sum(o.volume_current for o in ordini), 0.14), "lotto totale 0,14 (2% di 7000 $ con SL a 10 $)",
+      [o.volume_current for o in ordini])
+check(operazione(17) is not None and operazione(17)["signal_stop_loss"] is None,
+      "lo SL sbagliato non resta in memoria (re-entry)", operazione(17) and operazione(17)["signal_stop_loss"])
+pulisci()
+
 scenario("Conto non DEMO: nessun ordine")
 broker.reset(price=4200.61)
 broker.account_mode = broker.ACCOUNT_TRADE_MODE_REAL

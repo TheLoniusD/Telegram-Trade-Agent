@@ -18,7 +18,7 @@ Obiettivo: capire **cosa ha fatto il bot, se ha fatto quello che le regole preve
 - `bot.log` per intero (`Telegram-Trade-Agent-log/logs/AAAA-MM-GG/bot.log`). È il racconto in ora italiana: 📩 messaggi del trader, 🧠 classificazione dell'agente, 📥 ordini, 🏁 chiusure, 🛡️ pareggi, 🛟 protezioni, ❌ errori e rifiuti, 🔌 MT5, ▶️ avvii, 💓 battito.
 - `operazioni.txt`: una scheda per operazione, con i messaggi del trader collegati, l'esito di ogni ticket (e1 = TP1, e2 = TP2) e gli spostamenti di SL.
 - `errors.log` e `dettagli.log` solo se serve capire un errore.
-- `journal.jsonl` per i fatti esatti (prezzi, ticket, orari del broker UTC+3, richieste a MT5). In caso di dubbio vale il diario, non il racconto.
+- `journal.jsonl` per i fatti esatti (prezzi, ticket, orari del broker: UTC+3 d'estate, UTC+2 dal 25/10; richieste a MT5). In caso di dubbio vale il diario, non il racconto.
 
 ## 3. Controllare, operazione per operazione
 

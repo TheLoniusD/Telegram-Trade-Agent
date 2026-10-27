@@ -5,7 +5,7 @@ description: Rigioco delle strategie con prezzi.py (rigiocare i messaggi del tra
 
 # Rigioco delle strategie
 
-`prezzi.py rigioco DAL AL` rigioca i messaggi del trader registrati nei diari (eventi CLASSIFIED) con un rischio fisso di 140 $ per segnale. Usa le candele M1 di MT5 e i **tick reali** nei 180 secondi dopo ogni segnale e comando del trader. Applica le regole in vigore ("attuale" = `BASE_RULES`) e le varianti di `STRATEGIES` in `prezzi.py`. L'orologio del broker si ricava dal diario di ogni giorno (UTC+3).
+`prezzi.py rigioco DAL AL` rigioca i messaggi del trader registrati nei diari (eventi CLASSIFIED) con un rischio fisso di 140 $ per segnale. Usa le candele M1 di MT5 e i **tick reali** nei 180 secondi dopo ogni segnale e comando del trader. Applica le regole in vigore ("attuale" = `BASE_RULES`) e le varianti di `STRATEGIES` in `prezzi.py`. L'orologio del broker si ricava dal diario di ogni giorno (UTC+3 d'estate, UTC+2 dal 25/10).
 
 ## Lanciarlo (solo sul server: servono i prezzi di MT5)
 
@@ -23,7 +23,7 @@ Poi il server carica subito i log (procedura *Caricamento dei log* del suo CLAUD
 
 ## Leggerlo
 
-1. **Validità**: intestazione con "orologio del broker UTC+3" e "Tick reali disponibili in N finestre su M" (N vicino a M). Giorni saltati o senza candele vanno segnalati.
+1. **Validità**: intestazione con "orologio del broker UTC+3" (dal 25/10 "UTC+3 h fino al 24/10, UTC+2 h dal 26/10") e "Tick reali disponibili in N finestre su M" (N vicino a M). Giorni saltati o senza candele vanno segnalati.
 2. **Calibrazione**: le operazioni recenti fatte con le stesse regole di "attuale" devono coincidere con il reale a pochi dollari (confronta con `operazioni.txt` di quei giorni). Se non coincidono, il simulatore ha un problema: va corretto prima di trarre conclusioni.
 3. **Confronto segnale per segnale**, mai solo i totali:
    ```
