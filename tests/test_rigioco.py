@@ -144,4 +144,8 @@ reasons = sorted(x["reason"] for x in esito["tickets"].values())
 check(reasons == ["SL", "SL"] and vicino(esito["result"], -140.0, 0.5),
       "e1 ed e2 allo SL provvisorio 4075 (−140 $), non tenuti fino ai TP", (reasons, round(esito["result"], 2)))
 
+scenario("Variante \"SL scritto male applicato (fino al 27/10)\": come il bot del 22/10, fino ai TP")
+esito = rigioca("SL scritto male applicato (fino al 27/10)")
+check(esito["e1"] == ("TP", 4175.0) and esito["e2"] == ("TP", 4175.0), "e1 ed e2 ai TP con lo SL 4175", esito)
+
 fine()

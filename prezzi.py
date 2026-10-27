@@ -358,6 +358,7 @@ BASE_RULES = dict(
     be_min=0.0,                # pareggio solo con almeno questo guadagno (altrimenti si aspetta)
     protect=(0.25, 0.5, 0.75), # gradini dello stop di protezione se il pareggio non è possibile
     sl_margin=0.0,             # margine oltre lo SL del trader
+    max_sl=MAX_SL_DISTANCE,    # SL più lontano dal prezzo del segnale: errore di battitura, non vale (dal 27/10)
     expiry=30 * 60,            # ordini limite non eseguiti cancellati dopo
     entry_at_message=False,    # segnale rapido eseguito all'arrivo del messaggio, senza aspettare l'agente
 )
@@ -384,6 +385,8 @@ STRATEGIES = {
     # 20/10: "Gold sell 4121" letto dal codice, ordine all'arrivo del messaggio invece di ~3 s dopo
     "segnale rapido senza agente": ("rapido", dict(entry_at_message=True)),
     "pareggio a metà rischio":    ("BE 1/2R", dict(be_risk=0.5)),
+    # 22/10: "SL 4176" invece di 4076 mandato a MT5 (per calibrare quel giorno con il reale)
+    "SL scritto male applicato (fino al 27/10)": ("SL lont", dict(max_sl=None)),
     "mai BE":                     ("mai BE", dict(be="none", ta_close=0, protect=())),
 }
 
@@ -432,31 +435,30 @@ def _levels(data: dict):
     return levels
 
 
-def _without_sl_typo(levels: dict, previous, buy: bool) -> dict:
-    """
-    Come il bot: uno SL a più di MAX_SL_DISTANCE dal prezzo del segnale (la zona
-    del messaggio, o quella già scritta) è un errore di battitura e non vale.
-    """
-    if levels["entry_min"] is not None:
-        bounds = [p for p in (levels["entry_min"], levels["entry_max"]) if p is not None]
-    else:
-        bounds = [p for p in ((previous or {}).get("entry_min"), (previous or {}).get("entry_max")) if p is not None]
-    if levels["sl"] is None or not bounds:
-        return levels
+def _sl_too_far(merged: dict, sl: float, buy: bool, max_sl) -> bool:
+    """SL oltre max_sl dal prezzo del segnale (il bordo della zona, il più alto per un BUY)?"""
+    bounds = [p for p in (merged["entry_min"], merged["entry_max"]) if p is not None]
+    if max_sl is None or not bounds:
+        return False
     price = max(bounds) if buy else min(bounds)
-    distance = (price - levels["sl"]) if buy else (levels["sl"] - price)
-    return dict(levels, sl=None) if distance > MAX_SL_DISTANCE else levels
+    return ((price - sl) if buy else (sl - price)) > max_sl
 
 
-def levels_at(signal: dict, t: float) -> dict:
-    """Livelli del segnale validi al tempo t (le modifiche si sommano)."""
+def levels_at(signal: dict, t: float, max_sl=MAX_SL_DISTANCE) -> dict:
+    """
+    Livelli del segnale validi al tempo t (le modifiche si sommano). Come il bot,
+    uno SL a più di max_sl dal prezzo del segnale (zona del messaggio, o quella
+    già scritta) è un errore di battitura e non vale; None = vale sempre.
+    """
     merged = {"entry_min": None, "entry_max": None, "sl": None, "tps": []}
     for vt, levels in signal["versions"]:
         if vt > t:
             break
         for key, value in levels.items():
-            if value not in (None, []):
+            if value not in (None, []) and key != "sl":
                 merged[key] = value
+        if levels["sl"] is not None and not _sl_too_far(merged, levels["sl"], signal["buy"], max_sl):
+            merged["sl"] = levels["sl"]
     return merged
 
 
@@ -487,8 +489,7 @@ def extract_signals(events: list) -> list:
 
         if msg_id in by_id:  # modifica del messaggio del segnale (fase completa, correzioni)
             if levels:
-                signal = by_id[msg_id]
-                signal["versions"].append((t, _without_sl_typo(levels, levels_at(signal, t), signal["buy"])))
+                by_id[msg_id]["versions"].append((t, levels))
             continue
 
         if intent == "NEW_SIGNAL" and direction in ("BUY", "SELL"):
@@ -509,7 +510,7 @@ def extract_signals(events: list) -> list:
                 signal["versions"].append((t, {"entry_min": None, "entry_max": None,
                                                "sl": inherited["sl"], "tps": inherited["tps"]}))
             else:
-                signal["versions"].append((t, _without_sl_typo(levels, None, signal["buy"])))
+                signal["versions"].append((t, levels))
             signals.append(signal)
             by_id[msg_id] = signal
             continue
@@ -761,7 +762,7 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
         ask_o, ask_h, ask_l, ask_c = o + sp, h + sp, l + sp, c + sp
 
         if not started:
-            levels = levels_at(signal, max(t, signal["t"]))
+            levels = levels_at(signal, max(t, signal["t"]), rules["max_sl"])
             market = ask_o if buy else o
             zone = _zone(levels, buy)
             if zone is not None and min(abs(market - zone[0]), abs(market - zone[1])) > MAX_SIGNAL_DISTANCE:
@@ -808,7 +809,7 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
         # Modifiche del trader arrivate dopo l'ingresso (fase completa, correzioni)
         while applied < len(signal["versions"]) and signal["versions"][applied][0] <= t:
             applied += 1
-            levels = levels_at(signal, t)
+            levels = levels_at(signal, t, rules["max_sl"])
             zone = _zone(levels, buy)
             plan = _plan_levels(zone, buy, rules["deep"] if rules["tickets"] == 4 else 0) if zone else {}
             tps = take_profits(levels)
@@ -961,7 +962,8 @@ def main_rigioco(argv: list) -> None:
     print(f"Rigioco dal {days[0]} al {days[-1]} · rischio {args.rischio:g} $ per segnale · "
           f"vita massima {args.ore:g} ore · orologio del broker {describe_offsets(offsets)}")
     print("Regole attuali: 2 ticket (1% ciascuno), ingresso al bordo della zona, TP provvisori 10/20 $, "
-          "Trade Active incassa 1 ticket, pareggio +1 $ (se rifiutato +0,5 $), protezione 1/4-1/2-3/4\n")
+          "Trade Active incassa 1 ticket, pareggio +1 $ (se rifiutato +0,5 $), protezione 1/4-1/2-3/4, "
+          "SL a più di 20 $ dal segnale scartato\n")
 
     totals = {n: {"days": {}, "wins": [], "losses": [], "stops": 0, "signals": 0} for n in names}
     real, tick_stats = {}, {}
