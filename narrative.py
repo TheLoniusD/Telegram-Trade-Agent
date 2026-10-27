@@ -237,6 +237,13 @@ class Narrator:
     def on_risk_rejected(self, e):
         self.say(f"⛔ {self.label_from_message(e.get('msg_id'))}non aperto: {e.get('reason')}")
 
+    def on_sl_ignored(self, e):
+        trade = self.trades.get(e.get("ticket_id"))
+        prefix = self.tag(trade) if trade else self.label_from_message(e.get("msg_id"))
+        kept = f"resta {num(e['kept_stop_loss'])}" if e.get("kept_stop_loss") is not None else "SL provvisorio"
+        self.say(f"⚠️ {prefix}SL {num(e.get('stop_loss'))} non applicato: a {num(e.get('distance'))} $ dal prezzo "
+                 f"del segnale {num(e.get('signal_price'))}, probabile errore di battitura · {kept}")
+
     def on_trade_status(self, e):
         tid = e.get("ticket_id")
         tickets = e.get("tickets") or {}

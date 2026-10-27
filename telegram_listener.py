@@ -825,6 +825,11 @@ def handle_message(event, is_edit: bool):
 
     # 2. Passaggio all'Order Manager (il tuo file separato)
     manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output, is_edit=is_edit)
+    if manager_result and manager_result.get("sl_ignored"):
+        # SL scritto male dal trader (vedi MAX_SL_DISTANCE in order_manager.py)
+        logger.warning(f"⚠️ SL {manager_result['sl_ignored']['stop_loss']} a {manager_result['sl_ignored']['distance']} $ "
+                       f"dal prezzo del segnale: probabile errore di battitura, non applicato.")
+        journal.record("SL_IGNORED", **manager_result["sl_ignored"])
     if manager_result:
         journal.record("DECISION", action=manager_result.get("action"), reason=manager_result.get("reason"))
     else:
