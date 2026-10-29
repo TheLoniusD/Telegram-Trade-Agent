@@ -478,7 +478,10 @@ def extract_signals(events: list) -> list:
                 arrivals.setdefault(e.get("msg_id"), e["_t"])
 
     signals, by_id, done = [], {}, set()
+    edited = {}  # il messaggio classificato è una modifica?
     for e in events:
+        if e["event"] == "MESSAGE":
+            edited[e.get("msg_id")] = bool(e.get("is_edit"))
         if e["event"] != "CLASSIFIED":
             continue
         intent, data, msg_id, t = e.get("intent"), e.get("data") or {}, e.get("msg_id"), e["_t"]
@@ -491,6 +494,13 @@ def extract_signals(events: list) -> list:
             if levels:
                 by_id[msg_id]["versions"].append((t, levels))
             continue
+
+        # Recupero, come il bot (order_manager): la modifica di un messaggio mai aperto,
+        # con direzione e prezzo e non in risposta a un segnale, è un segnale nuovo. Il
+        # 28/10 del BUY 4048 è arrivata solo la modifica e il rigioco lo perdeva.
+        if (intent == "UPDATE_SIGNAL" and edited.get(msg_id) and direction in ("BUY", "SELL")
+                and data.get("entry_min") is not None and replies.get(msg_id) not in by_id):
+            intent = "NEW_SIGNAL"
 
         if intent == "NEW_SIGNAL" and direction in ("BUY", "SELL"):
             # t = classificazione (quando il bot ha agito), t_msg = arrivo del messaggio
@@ -968,10 +978,15 @@ def main_rigioco(argv: list) -> None:
     totals = {n: {"days": {}, "wins": [], "losses": [], "stops": 0, "signals": 0} for n in names}
     real, tick_stats = {}, {}
     skipped = []
+    # Giorni senza segnali: il weekend, ma anche un diario mancante sul server (28/09 nel
+    # rigioco del 29/10, sparito senza nessun avviso)
+    no_signals = []
     for day in days:
         events = events_by_day[day]
         signals = extract_signals(events)
         if not signals:
+            no_signals.append(f"{day[8:10]}/{day[5:7]} ({len(events)} eventi)" if events else
+                              f"{day[8:10]}/{day[5:7]} (nessun diario)")
             continue
         offset = offsets[day]
         start = min(s["t"] for s in signals) - 120
@@ -1020,6 +1035,8 @@ def main_rigioco(argv: list) -> None:
     print("'reale' è la somma delle chiusure registrate dal bot (con le regole di quel giorno e i lotti veri).")
     for day, reason in skipped:
         print(f"   {day}: saltato ({reason})")
+    if no_signals:
+        print(f"Giorni senza segnali nei diari (di solito il weekend): {', '.join(no_signals)}")
     with_ticks = sum(a for a, _ in tick_stats.values())
     all_windows = sum(b for _, b in tick_stats.values())
     print(f"Tick reali disponibili in {with_ticks} finestre su {all_windows} (segnali e comandi del trader); "

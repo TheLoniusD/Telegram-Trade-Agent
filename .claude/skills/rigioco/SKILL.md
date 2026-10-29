@@ -23,7 +23,7 @@ Poi il server carica subito i log (procedura *Caricamento dei log* del suo CLAUD
 
 ## Leggerlo
 
-1. **Validità**: intestazione con "orologio del broker UTC+3" (dal 25/10 "UTC+3 h fino al 24/10, UTC+2 h dal 26/10") e "Tick reali disponibili in N finestre su M" (N vicino a M). Giorni saltati o senza candele vanno segnalati.
+1. **Validità**: intestazione con "orologio del broker UTC+3" (dal 25/10 "UTC+3 h fino al 24/10, UTC+2 h dal 26/10") e "Tick reali disponibili in N finestre su M" (N vicino a M). Giorni saltati o senza candele vanno segnalati. La riga "Giorni senza segnali nei diari" deve contenere solo weekend e festivi: un giorno feriale lì è un diario mancante sul server (28/09 nel rigioco del 29/10, 24–25/09 in quello del 27/10).
 2. **Calibrazione**: le operazioni recenti fatte con le stesse regole di "attuale" devono coincidere con il reale a pochi dollari (confronta con `operazioni.txt` di quei giorni). Se non coincidono, il simulatore ha un problema: va corretto prima di trarre conclusioni.
 3. **Confronto segnale per segnale**, mai solo i totali:
    ```
