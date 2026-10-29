@@ -455,6 +455,17 @@ class OrderManager:
                 and not self._was_closed(msg_id)):
             logger.warning(f"🆕 [RECUPERO] Modifica del messaggio {msg_id} mai aperto come segnale: trattata come nuovo segnale.")
             intent = "NEW_SIGNAL"
+
+        # Chiusura del 100% letta come aggiornamento: è una chiusura totale. Il 29/10
+        # "lets close all first" è arrivato così e veniva ignorato (le chiusure
+        # parziali valgono solo sotto il 100%): il SELL 4030 è rimasto aperto.
+        # Non con il pareggio: HIT TP / HIT TP MAX ("Collect all or half & BE+")
+        # chiedono sempre il pareggio e non chiudono mai.
+        details = data.get("update_details") or {}
+        close_percentage = details.get("close_percentage")
+        if (intent == "UPDATE_SIGNAL" and close_percentage is not None and close_percentage >= 100
+                and not details.get("move_sl_to_be")):
+            intent = "CLOSE_SIGNAL"
     
         # 1. NUOVO SEGNALE (Lo salviamo SEMPRE per tracciare futuri edit o reply)
         if intent == "NEW_SIGNAL":
