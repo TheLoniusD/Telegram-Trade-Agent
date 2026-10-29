@@ -148,4 +148,29 @@ scenario("Variante \"SL scritto male applicato (fino al 27/10)\": come il bot de
 esito = rigioca("SL scritto male applicato (fino al 27/10)")
 check(esito["e1"] == ("TP", 4175.0) and esito["e2"] == ("TP", 4175.0), "e1 ed e2 ai TP con lo SL 4175", esito)
 
+# 28/10 BUY 4048: il messaggio nuovo non è mai arrivato, solo le sue modifiche. L'agente le
+# classifica come aggiornamento; il bot le apre con il recupero (order_manager), il rigioco
+# fino al 29/10 le ignorava (−126 $ reali, stop pieno, mancanti).
+RECUPERO = [
+    {"event": "MESSAGE", "msg_id": 21, "is_edit": True, "text": "Gold buy 4048", "reply_to": None, "_t": T0},
+    {"event": "CLASSIFIED", "msg_id": 21, "intent": "UPDATE_SIGNAL", "_t": T0 + 4,
+     "data": dati(direction="BUY", entry_min=4048.0)},
+    {"event": "MESSAGE", "msg_id": 21, "is_edit": True, "reply_to": None, "_t": T0 + 60,
+     "text": "GOLD BUY NOW\n\nBuy @ 4048 - 4043\n\nSL🔴4038\nTP✅4058\nTP✅4068"},
+    {"event": "CLASSIFIED", "msg_id": 21, "intent": "UPDATE_SIGNAL", "_t": T0 + 64,
+     "data": dati(direction="BUY", entry_min=4048.0, entry_max=4043.0, stop_loss=4038.0, take_profit=[4058.0, 4068.0])},
+]
+
+scenario("Segnale arrivato solo come modifica (28/10 BUY 4048): il rigioco lo apre come il recupero del bot")
+signals = prezzi.extract_signals(RECUPERO)
+check(len(signals) == 1 and signals[0]["buy"] and signals[0]["t"] == T0 + 4, "un segnale BUY dalla classificazione delle 04:09",
+      [(s["label"], s["t"] - T0) for s in signals])
+livelli = prezzi.levels_at(signals[0], T0 + 64) if signals else {}
+check(livelli.get("sl") == 4038.0 and livelli.get("tps") == [4058.0, 4068.0], "la modifica completa dà SL e TP", livelli)
+
+scenario("Un aggiornamento con prezzo in risposta a un segnale noto resta un comando, non un segnale nuovo")
+RISPOSTA = [dict(RECUPERO[0], msg_id=22, reply_to=1), dict(RECUPERO[1], msg_id=22)]
+signals = prezzi.extract_signals(diario(SEGNALE) + RISPOSTA)
+check(len(signals) == 1 and signals[0]["id"] == 1, "solo il segnale SELL 4128", [s["id"] for s in signals])
+
 fine()
