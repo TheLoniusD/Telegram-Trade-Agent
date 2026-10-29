@@ -529,8 +529,9 @@ def extract_signals(events: list) -> list:
         # cosa abbia deciso l'agente nei giorni prima).
         if RE_HIT_TP.search(text):
             kinds = ["BE"]
-        elif intent == "CLOSE_SIGNAL":
-            kinds = ["CLOSE"]
+        elif intent == "CLOSE_SIGNAL" or ((details.get("close_percentage") or 0) >= 100
+                                          and not details.get("move_sl_to_be")):
+            kinds = ["CLOSE"]  # come il bot: una chiusura del 100% senza pareggio è una chiusura totale (29/10)
         elif details.get("close_percentage"):
             # "Close half and BE your entry": chiusura parziale e poi pareggio, come
             # il bot (mai Trade Active insieme a una chiusura parziale). Fino al 20/10

@@ -45,6 +45,13 @@ signals = prezzi.extract_signals(diario(SEGNALE, META_E_PAREGGIO))
 kinds = [kind for _, kind, _ in signals[0]["events"]]
 check(kinds == ["HALF", "BE"], "comandi: chiusura parziale, poi pareggio (non Trade Active)", kinds)
 
+scenario("\"Lets close all first\" letto come aggiornamento al 100% (29/10): chiusura, non chiusura parziale")
+CHIUDI_TUTTO = (5, 2400, "Gold is running 60pips from last entry now, lets close all first", "UPDATE_SIGNAL", None,
+                dati(close_percentage=100.0))
+signals = prezzi.extract_signals(diario(SEGNALE, CHIUDI_TUTTO))
+kinds = [kind for _, kind, _ in signals[0]["events"]]
+check(kinds == ["CLOSE"], "comando: chiusura di tutto", kinds)
+
 scenario("\"Lets close half now\" e un minuto dopo \"close half and BE\" (20/10 SELL 4128): resta il pareggio")
 SOLO_META = (2, 2340, "Lets close half now", "UPDATE_SIGNAL", 1, dati(close_percentage=50.0))
 signals = prezzi.extract_signals(diario(SEGNALE, SOLO_META, META_E_PAREGGIO))

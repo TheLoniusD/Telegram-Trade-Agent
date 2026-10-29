@@ -76,6 +76,31 @@ check(closes and closes[0].get("close_reason") == "TAKE_PROFIT" and vicino(close
       "diario: chiusura al TP con +75,60 $", closes and (closes[0].get("close_reason"), closes[0].get("profit")))
 pulisci()
 
+scenario("\"Lets close all first\" letto come aggiornamento al 100% (29/10): chiusura di tutto")
+broker.reset(price=4030.17)
+segnale(8, "SELL", 4030, 4030, 4035, 4040, [4020, 4010])
+check(len(broker.positions) == 2, "SELL 4030: e1 ed e2 aperti")
+broker.move_price(4029.0)
+mt5_tickets = {ticket(8, "e1")["mt5_ticket"], ticket(8, "e2")["mt5_ticket"]}
+invia(9, "Gold is running 60pips from last entry now, lets close all first",
+      classe("UPDATE_SIGNAL", close_percentage=100.0))
+check(not broker.positions, "nessuna posizione rimasta su MT5", list(broker.positions))
+chiusure = [e for e in diario() if e["event"] == "POSITION_CLOSED" and e.get("mt5_ticket") in mt5_tickets]
+check(operazione(8) is None and len(chiusure) == 2, "operazione chiusa e archiviata, 2 chiusure nel diario",
+      (operazione(8) and operazione(8).get("status"), len(chiusure)))
+pulisci()
+
+scenario("HIT TP MAX letto per errore con chiusura al 100%: resta pareggio, nessuna chiusura")
+broker.reset(price=4030.17)
+segnale(10, "SELL", 4030, 4030, 4035, 4040, [4020, 4010])
+broker.move_price(4022.0)
+invia(11, "HIT TP MAX⚡️⚡️ · Gold Sell 150+ Pips ✔️ · Collect all or half & BE+ ur entries",
+      classe("UPDATE_SIGNAL", be=True, close_percentage=100.0), reply_to=10)
+check(len(broker.positions) == 2, "e1 ed e2 ancora aperti", list(broker.positions))
+check(all(vicino(p.sl, 4029.17) for p in broker.positions.values()), "tutte e due a pareggio (ingresso −1 $)",
+      [p.sl for p in broker.positions.values()])
+pulisci()
+
 scenario("Racconto all'avvio: conto DEMO o non leggibile, mai \"REALE\" per errore")
 n = narrative.Narrator()
 said = []
