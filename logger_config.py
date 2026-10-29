@@ -34,7 +34,11 @@ LOG_DIR = "logs"
 LOG_FILE = "bot.log"
 DETAILS_LOG_FILE = "dettagli.log"
 ERROR_LOG_FILE = "errors.log"
-LOG_RETENTION_DAYS = 30
+# Giorni di log tenuti nella cartella del bot. Il rigioco (prezzi.py) li legge
+# da qui: con 30 giorni il 24, 25 e 28/09 sono spariti dai rigiochi del 27 e
+# 29/10. Pesano 1–2 MB a settimana; l'archivio completo è comunque nel
+# repository dei log, dove il caricamento copia senza mai cancellare.
+LOG_RETENTION_DAYS = int(os.getenv("LOG_RETENTION_DAYS", "365"))
 
 # Logger padre condiviso: i moduli ne ottengono un figlio (trade_bot.<modulo>)
 # che propaga qui. Gli handler su file esistono così una volta sola.
