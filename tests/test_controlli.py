@@ -85,4 +85,22 @@ n.on_bot_start({"demo": True, "balance": 7000.0, "equity": 7000.0})
 check("non leggibile" in said[0] and "REALE" not in said[0], "conto non letto → \"non leggibile\"", said[0])
 check("DEMO" in said[1], "conto demo → \"conto DEMO\"", said[1])
 
+scenario("Cartelle dei log: tenute un anno sul server, non 30 giorni (il rigioco ci legge, 29/10)")
+import logger_config  # noqa: E402
+from datetime import timedelta  # noqa: E402
+
+
+def cartella(giorni_fa):
+    day = (logger_config.now_local() - timedelta(days=giorni_fa)).strftime("%Y-%m-%d")
+    path = os.path.join(logger_config.LOG_DIR, day)
+    os.makedirs(path, exist_ok=True)
+    open(os.path.join(path, "journal.jsonl"), "w").close()
+    return path
+
+
+mese, anno = cartella(40), cartella(400)
+logger_config.remove_old_log_folders()
+check(os.path.isdir(mese), "la cartella di 40 giorni fa resta (il 28/09 cancellato il 29/10)")
+check(not os.path.isdir(anno), "quella di 400 giorni fa viene cancellata")
+
 fine()

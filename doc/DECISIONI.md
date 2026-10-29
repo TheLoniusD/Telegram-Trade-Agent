@@ -59,6 +59,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 
 ### Log e repository
 - Per giorno: `bot.log` (racconto), `operazioni.txt` (schede), `dettagli.log`, `errors.log`, `journal.jsonl` (dati). Heartbeat ogni 4 ore.
+- Sul server le cartelle dei log si tengono **365 giorni** (`LOG_RETENTION_DAYS`; fino al 29/10 erano 30): il rigioco le legge da lì.
 - I log stanno nel repository privato **`Telegram-Trade-Agent-log`**: il server li pubblica da solo ogni ora (cron, `infrastruttura/caricamento-log/`), con `STATO.md` sullo stato del bot. Mai push forzati.
 - Branch: si sviluppa su **`main`** (Windows); **`server`** = `main` + collegamento RPyC, aggiornato unendo `main` (fino al 20/10 conteneva anche i log). (`claude-branch` eliminato il 01/10.)
 
@@ -82,6 +83,7 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 | `MAX_SIGNAL_DISTANCE` | 20 | |
 | `MAX_SL_DISTANCE` | 20 | SL più lontano dal prezzo del segnale = errore di battitura, non applicato (22/10) |
 | `LOG_TIMEZONE` / `LOG_DETAILS_LEVEL` | Europe/Rome / INFO | |
+| `LOG_RETENTION_DAYS` | 365 | giorni di log tenuti nella cartella del bot (30 fino al 29/10) |
 
 ---
 
@@ -117,6 +119,12 @@ Prima di proporre una modifica si controlla qui che non contraddica una scelta g
 ---
 
 ## Registro delle decisioni (dal più recente)
+
+### 29/10 — Log tenuti un anno sul server; rigioco con i segnali del recupero
+- **Decisione** (metodo di lavoro, nessuna regola di trading cambiata): la cartella dei log del bot tiene le giornate per **365 giorni** invece di 30 (`LOG_RETENTION_DAYS`). Il rigioco legge anche i segnali aperti dal recupero (arrivati solo come modifica) e stampa i giorni senza segnali.
+- **Perché**: il bot cancellava da `logs/` le giornate più vecchie di 30 giorni, a ogni cambio di giorno e a ogni avvio. Il rigioco del 27/10 ha perso il 24 e il 25/09, quello del 29/10 il 28/09 (+1.420 $ con le regole attuali, il giorno che decide i totali), senza nessun avviso. I log pesano 1–2 MB a settimana (6,6 MB dal 23/09 al 29/10) e sul server ci sono 156 GB liberi. Il rigioco ignorava il 28/10 BUY 4048 (−126 $), arrivato solo come modifica e aperto dal bot con il recupero.
+- **Scartato**: far leggere al rigioco l'archivio del repository dei log (`~/tta-log`), che sul server si aggiorna solo ogni ora; il server deve restare autonomo anche se il caricamento si ferma.
+- **Da verificare**: dopo il riavvio, che il 24/09 e i giorni successivi restino in `logs/` sul server e che il rigioco abbia tutte le giornate feriali.
 
 ### 27/10 — SL scritto male dal trader: non applicato
 - **Correzione**: uno SL a più di 20 $ dal prezzo del segnale (`MAX_SL_DISTANCE`, il bordo della zona da cui parte il trader, il più alto per un BUY) è un errore di battitura e **non viene applicato**. In una modifica resta lo SL che c'è e il resto del messaggio (zona, TP, pareggio) vale; in un segnale nuovo si usa lo SL provvisorio a 10 $ e lo SL sbagliato non resta in memoria (i re-entry non lo ereditano). Evento `SL_IGNORED` nel diario, riga ⚠️ nel racconto. Stessa regola nel rigioco (`prezzi.py`); la regola di prima resta come variante "SL scritto male applicato (fino al 27/10)" (sigla `SL lont`), per calibrare il 22/10 con il reale.
