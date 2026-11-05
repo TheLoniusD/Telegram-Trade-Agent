@@ -58,7 +58,9 @@ def main():
     print(f"== {args.giorno} · {len(events)} eventi")
 
     balances = [(hm(e), e["balance"]) for e in events if e.get("event") in ("HEARTBEAT", "BOT_START") and e.get("balance") is not None]
-    closes = by("POSITION_CLOSED")
+    # Una chiusura senza esito (storico di MT5 ancora vuoto) è seguita da una
+    # seconda con l'esito (late): conta l'ultima di ogni posizione
+    closes = list({e.get("mt5_ticket"): e for e in by("POSITION_CLOSED")}.values())
     partial = by("POSITION_PARTIAL_CLOSED")
     closed_profit = sum(e.get("profit") or 0 for e in closes) + sum(e.get("profit") or 0 for e in partial)
     if balances:

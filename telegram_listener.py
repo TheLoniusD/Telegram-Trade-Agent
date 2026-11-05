@@ -52,6 +52,14 @@ TRADED_SYMBOL = "XAUUSD"
 MONITOR_INTERVAL_SECONDS = 30
 HEARTBEAT_INTERVAL_SECONDS = 4 * 3600
 
+# Chiusure registrate senza esito perché lo storico di MT5 non lo aveva ancora:
+# il 03/11 il TP2 del BUY 3905 è scattato con MT5 scollegato e alla
+# riconnessione la posizione non c'era più ma lo storico era vuoto (+126 $
+# mai registrati, operazione segnata a +1,50 $). Si riprova a ogni controllo
+# periodico per questo tempo (mt5_ticket -> chi l'ha chiusa, operazione, da quando).
+CLOSE_INFO_RETRY_SECONDS = 30 * 60
+_close_info_missing = {}
+
 # I messaggi inoltrati nel canale sono testimonianze dei follower ("Thanks sir",
 # "Got it..continue sell👍"), mai segnali del trader: il 23/09 lo erano tutti.
 # Scartarli prima dell'agente risparmia token ed evita che un "continue sell"
@@ -590,19 +598,45 @@ def trade_summary(trade: dict) -> dict:
     }
 
 
-def record_position_closed(mt5_ticket: int, closed_by: str, trade: dict = None) -> None:
-    """Registra come si è chiusa una posizione (motivo, prezzo, profitto netto)."""
+def read_close_info(mt5_ticket: int) -> dict:
+    """Esito della chiusura dallo storico di MT5 ({} se non c'è o se MT5 non risponde)."""
     # Solo informativo: un errore qui non deve mai interrompere le chiusure
     # delle altre posizioni della stessa operazione.
     try:
-        info = mt5_agent.get_close_info(mt5_ticket)
+        return mt5_agent.get_close_info(mt5_ticket)
     except Exception as e:
         logger.warning(f"⚠️ Esito della chiusura di {mt5_ticket} non disponibile: {e}")
-        info = {}
+        return {}
+
+
+def record_position_closed(mt5_ticket: int, closed_by: str, trade: dict = None) -> None:
+    """Registra come si è chiusa una posizione (motivo, prezzo, profitto netto)."""
+    info = read_close_info(mt5_ticket)
+    ticket_id = trade.get("ticket_id") if trade else None
     logger.debug(f"🏁 Posizione {mt5_ticket} chiusa ({closed_by}) | motivo: {info.get('close_reason', 'n/d')} "
                 f"| prezzo: {info.get('close_price', 'n/d')} | profitto: {info.get('profit', 'n/d')}")
-    journal.record("POSITION_CLOSED", mt5_ticket=mt5_ticket, closed_by=closed_by,
-                   ticket_id=trade.get("ticket_id") if trade else None, **info)
+    journal.record("POSITION_CLOSED", mt5_ticket=mt5_ticket, closed_by=closed_by, ticket_id=ticket_id, **info)
+    if not info and not mt5_agent.test_mode:
+        _close_info_missing.setdefault(mt5_ticket, {"closed_by": closed_by, "ticket_id": ticket_id,
+                                                    "since": time.time()})
+
+
+def retry_missing_close_info() -> None:
+    """
+    Rilegge dallo storico di MT5 l'esito delle chiusure registrate senza: quando
+    lo trova lo registra con un secondo POSITION_CLOSED (late=True), che per il
+    racconto, le schede e i conteggi prende il posto del primo.
+    """
+    for mt5_ticket, missing in list(_close_info_missing.items()):
+        info = read_close_info(mt5_ticket)
+        if info:
+            del _close_info_missing[mt5_ticket]
+            journal.record("POSITION_CLOSED", mt5_ticket=mt5_ticket, closed_by=missing["closed_by"],
+                           ticket_id=missing["ticket_id"], late=True, **info)
+        elif time.time() - missing["since"] > CLOSE_INFO_RETRY_SECONDS:
+            del _close_info_missing[mt5_ticket]
+            logger.warning(f"⚠️ Esito della chiusura di {mt5_ticket} mai arrivato nello storico di MT5 "
+                           f"in {CLOSE_INFO_RETRY_SECONDS // 60} minuti.")
 
 
 def broker_position_lookup(mt5_ticket: int):
@@ -1297,6 +1331,7 @@ async def monitor_loop():
                 sync_pending_entries()
                 adopt_orphan_positions()
                 manager.reconcile_with_broker(broker_position_lookup)
+                retry_missing_close_info()
                 restore_missing_stops()
                 retry_pending_breakeven()
 

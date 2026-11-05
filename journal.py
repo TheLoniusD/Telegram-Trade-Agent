@@ -36,7 +36,8 @@ Tipi di evento principali:
   PARTIAL_CLOSE_PLAN         chiusura parziale richiesta: percentuale e lotti da chiudere
   POSITION_PARTIAL_CLOSED    posizione chiusa solo in parte (volume chiuso e residuo)
   PARTIAL_CLOSE_REPEATED     chiusura parziale ripetuta a pochi minuti: trattata come lo stesso comando
-  POSITION_CLOSED            posizione chiusa (dal bot o dal broker: TP/SL/manuale)
+  POSITION_CLOSED            posizione chiusa (dal bot o dal broker: TP/SL/manuale); se lo storico
+                             di MT5 non ha ancora l'esito, un secondo evento con late=true quando arriva
   MT5_CONNECTION             connessione a MT5 persa / ripristinata
   HEARTBEAT                  battito periodico: bot vivo, saldo, operazioni
   ERROR                      eccezione con traceback

@@ -430,6 +430,13 @@ class Narrator:
         mt5_ticket = e.get("mt5_ticket")
         trade, key = self.trade_of(mt5_ticket)
         reason = e.get("close_reason")
+        if e.get("profit") is None and not reason:
+            # Storico di MT5 ancora vuoto: l'esito arriva con un secondo evento (late)
+            if trade:
+                trade["alive"].discard(mt5_ticket)
+            self.say(f"🏁 {self.tag(trade)}{key or '#' + str(mt5_ticket)} chiuso su MT5: esito non ancora "
+                     f"nello storico, lo rileggo")
+            return
         if e.get("closed_by") == "TRADE_ACTIVE":
             how = "incassato al Trade Active a"
         elif e.get("closed_by") == "LAYER":
@@ -445,6 +452,8 @@ class Narrator:
         else:
             how = CLOSE_REASONS.get(reason, "(motivo n/d)")
         line = f"🏁 {self.tag(trade)}{key or '#' + str(mt5_ticket)} chiuso {how} {num(e.get('close_price'))} · {money(e.get('profit'))}"
+        if e.get("late"):
+            line += " (esito letto dallo storico in ritardo)"
         if trade:
             trade["profit"] += e.get("profit") or 0
             trade["alive"].discard(mt5_ticket)
