@@ -169,6 +169,7 @@ def controllo_periodico():
         L.sync_pending_entries()
         L.adopt_orphan_positions()
         L.manager.reconcile_with_broker(L.broker_position_lookup)
+        L.retry_missing_close_info()
         L.restore_missing_stops()
         L.retry_pending_breakeven()
     except L.MT5UnavailableError:

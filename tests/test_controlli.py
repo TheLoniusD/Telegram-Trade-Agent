@@ -76,6 +76,31 @@ check(closes and closes[0].get("close_reason") == "TAKE_PROFIT" and vicino(close
       "diario: chiusura al TP con +75,60 $", closes and (closes[0].get("close_reason"), closes[0].get("profit")))
 pulisci()
 
+scenario("TP preso con MT5 scollegato (03/11): esito letto dallo storico al giro dopo")
+broker.reset(price=3904.70)
+segnale(12, "BUY", 3905, 3900, 3905, 3895, [3915, 3925])
+e1, e2 = ticket(12, "e1")["mt5_ticket"], ticket(12, "e2")["mt5_ticket"]
+broker.broker_close(e1, "TP")
+controllo_periodico()
+broker.broker_close(e2, "TP")
+broker.history_hidden.add(e2)                    # appena ricollegato, il terminale non ha ancora lo storico
+controllo_periodico()
+check(operazione(12) is None, "operazione chiusa e archiviata anche senza l'esito di e2")
+broker.history_hidden.clear()
+controllo_periodico()
+p1, p2 = broker.deals[e1][-1].profit, broker.deals[e2][-1].profit
+closes = [e for e in diario() if e["event"] == "POSITION_CLOSED" and e.get("mt5_ticket") == e2]
+check(closes and closes[-1].get("close_reason") == "TAKE_PROFIT" and vicino(closes[-1].get("profit"), p2, 0.01),
+      f"diario: esito di e2 registrato al giro dopo (TP, {narrative.money(p2)})",
+      [(e.get("close_reason"), e.get("profit")) for e in closes])
+check(racconto().count("operazione chiusa") == 1 and f"operazione chiusa: {narrative.money(p1 + p2)}" in racconto(),
+      f"racconto: operazione chiusa una volta sola, con {narrative.money(p1 + p2)}",
+      [r for r in racconto().splitlines() if "BUY 3905" in r and "chiuso" in r])
+check(f"{narrative.money(p2)}" in schede() and f"CHIUSO {narrative.money(p1 + p2)}" in schede(),
+      "schede: e2 al TP con il suo profitto e totale giusto",
+      [r for r in schede().splitlines() if "e2" in r or "BUY 3905" in r])
+pulisci()
+
 scenario("\"Lets close all first\" letto come aggiornamento al 100% (29/10): chiusura di tutto")
 broker.reset(price=4030.17)
 segnale(8, "SELL", 4030, 4030, 4035, 4040, [4020, 4010])

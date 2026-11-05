@@ -67,6 +67,7 @@ class FakeMT5:
         self.positions = {}
         self.orders = {}
         self.deals = {}
+        self.history_hidden = set()   # posizioni il cui storico il terminale non ha ancora (03/11)
         self.requests = []
 
     def move_price(self, price: float):
@@ -148,6 +149,8 @@ class FakeMT5:
         return tuple(self.orders.values())
 
     def history_deals_get(self, position=None, *args, **kwargs):
+        if position in self.history_hidden:
+            return ()
         return tuple(self.deals.get(position, ()))
 
     def order_calc_profit(self, order_type, symbol, volume, price_open, price_close):
