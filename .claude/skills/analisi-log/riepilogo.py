@@ -120,6 +120,14 @@ def main():
     for e in safety["ERROR"]:
         print(f"  {hm(e)} ERROR in {e.get('where')}: {str(e.get('error')).strip().splitlines()[-1][:160]}")
 
+    # Agente non raggiungibile (dal 24/11; prima solo ERROR in process_message, come il 09–11/11)
+    lost = [e for e in by("AGENT_DOWN") + by("AGENT_ERROR") if e.get("where") == "classificazione"]
+    if by("AGENT_DOWN") or by("AGENT_UP"):
+        print(f"\nAgente: non raggiungibile alle {[hm(e) for e in by('AGENT_DOWN')]}, "
+              f"di nuovo raggiungibile alle {[hm(e) for e in by('AGENT_UP')]}, {len(lost)} messaggi non classificati")
+        for e in by("AGENT_DOWN"):
+            print(f"  {hm(e)} {e.get('where')}: {e.get('error')}")
+
 
 if __name__ == "__main__":
     main()

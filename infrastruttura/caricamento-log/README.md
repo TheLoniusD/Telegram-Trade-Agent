@@ -7,7 +7,7 @@ Pubblica ogni ora i log del bot in un **repository GitHub privato di soli log**,
 Ogni ora cron lancia `caricamento-log.sh`, che:
 
 1. copia la cartella dei log del bot nella copia locale del repository dei log. Copia solo i log: mai `.env`, sessione Telegram, `active_trades.json` o codice;
-2. scrive `STATO.md`: in cima "✅ Tutto regolare" oppure l'elenco di cosa controllare, poi servizio del bot (e servizi collegati, es. MT5), numero di processi del bot, ultimo avvio, ultimo battito (avviso se più vecchio di 5 ore), spazio su disco e ultime righe di `errors.log`;
+2. scrive `STATO.md`: in cima "✅ Tutto regolare" oppure l'elenco di cosa controllare, poi servizio del bot (e servizi collegati, es. MT5), numero di processi del bot, ultimo avvio, ultimo battito (avviso se più vecchio di 5 ore), agente che classifica i messaggi (avviso se l'ultima riga del `bot.log` oggi o ieri dice "Agente non raggiungibile"), spazio su disco e ultime righe di `errors.log`;
 3. fa un commit e lo pubblica. Se la rete manca, i commit restano sul server e partono al giro successivo.
 
 Non scrive nella cartella del bot e non ne aggiorna il codice: il bot cambia versione solo con un rilascio.
@@ -65,3 +65,4 @@ Lo script viene **copiato** nella home: una versione nuova (o una configurazione
 | `… marked as read only` | Alla deploy key manca *Allow write access*: toglila e riaggiungila con la spunta. |
 | `pull non riuscito` | Qualcuno ha cambiato su GitHub un file dei log: va risolto a mano nella copia `~/<istanza>-log`. |
 | `STATO.md` fermo a un'ora vecchia | Server spento, cron fermo o rete assente: guarda il registro dei caricamenti. |
+| `l'agente non risponde` in `STATO.md` | L'API dell'agente rifiuta le chiamate: in `errors.log` il motivo (credito esaurito, chiave non valida…). Il bot riceve i messaggi ma non apre nulla finché non torna. |
