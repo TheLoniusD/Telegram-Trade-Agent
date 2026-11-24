@@ -19,6 +19,13 @@ CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 # stato vivo e finisce nell'archivio giornaliero.
 TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
 
+# Ingresso rifiutato con MT5 scollegato: l'operazione aspetta che MT5 torni e il
+# controllo periodico riprova (vedi retry_waiting_entries in telegram_listener.py).
+# Il 17/11 "Gold buy 3867" è arrivato alle 09:09 con MT5 scollegato dalle 09:08:
+# ordini rifiutati ("absence of network connection"), mai riprovati alla
+# riconnessione delle 09:13; il trader 40–60 pips.
+WAITING_MT5 = "WAITING_MT5"
+
 # "Cut lose … now": il trader esce adesso, in perdita. Dal 23/09 al 24/11 cinque
 # messaggi così ("Cut lose 60pips now", "Candle break, cut lose 50pips now",
 # "Cut lose at 4049 20pips now", "this setup i cut lose 30pips", "Cut lose now"):
@@ -397,6 +404,47 @@ class OrderManager:
         return first_ticket(latest_trade).get(ticket_field or key)
 
 
+    def _update_waiting(self, trade: dict, data: dict, command: bool) -> dict:
+        """
+        Messaggio del trader su un ingresso in attesa di MT5. Un comando (Trade
+        Active, pareggio, chiusura) arriva quando il trader è già in guadagno o
+        esce: l'ingresso si annulla, come gli ordini limite non eseguiti al
+        pareggio. Il completamento (zona, SL, TP) aggiorna i livelli: il 17/11
+        la modifica delle 09:11 apriva un secondo tentativo con il recupero.
+        """
+        if command:
+            trade["status"] = "OPEN_FAILED"
+            reason = "il trader ha mandato un comando (Trade Active, pareggio o chiusura) prima che MT5 tornasse"
+            trade["wait_cancelled"] = reason
+            self.save_state_to_file()
+            return {"action": "WAIT_CANCELLED", "trade": trade, "reason": reason}
+
+        direction = first_ticket(trade).get("direction")
+        new_min, new_max = data.get("entry_min"), data.get("entry_max")
+        new_sl, new_tps = data.get("stop_loss"), data.get("take_profit")
+        if new_min is not None:
+            trade["entry_min"] = new_min
+        if new_max is not None:
+            trade["entry_max"] = new_max
+        sl_ignored = None
+        price = signal_price(direction, trade.get("entry_min"), trade.get("entry_max"))
+        distance = stop_loss_typo(direction, new_sl, price)
+        if distance is not None:
+            sl_ignored = {"ticket_id": trade.get("ticket_id"), "stop_loss": new_sl, "distance": distance,
+                          "signal_price": price, "kept_stop_loss": trade.get("stop_loss")}
+        elif new_sl is not None:
+            trade["stop_loss"] = trade["signal_stop_loss"] = new_sl
+            for tp_config in trade.get("tickets", {}).values():
+                tp_config["stop_loss"] = new_sl
+        if new_tps and isinstance(new_tps, list):
+            for tp_key, tp_config in trade.get("tickets", {}).items():
+                index = ticket_tp_index(tp_key, tp_config)
+                if index < len(new_tps):
+                    tp_config["take_profit"] = new_tps[index]
+        self.save_state_to_file()
+        return {"action": "WAITING", "trade": trade, "sl_ignored": sl_ignored,
+                "reason": "ingresso in attesa di MT5: livelli aggiornati, si useranno al nuovo tentativo"}
+
     def _explicit_target(self, msg_id: int, reply_to: Optional[int]) -> Optional[int]:
         """
         Operazione a cui si riferisce esplicitamente un messaggio di update o
@@ -499,6 +547,9 @@ class OrderManager:
             # ci farebbe perdere i riferimenti ai ticket MT5 già aperti, lasciandoli
             # orfani sul broker senza che il bot sappia più chiuderli.
             existing_trade = self.active_trades.get(msg_id)
+            if existing_trade and existing_trade.get("status") == WAITING_MT5 and is_edit:
+                # Il completamento letto come segnale nuovo: aggiorna l'ingresso in attesa
+                return self._update_waiting(existing_trade, data, command=False)
             if existing_trade and existing_trade.get("status") in CLOSABLE_STATUSES:
                 logger.warning(f"⚠️ [NEW_SIGNAL] msg_id {msg_id} ha già un'operazione a mercato: segnale ignorato per non perdere i ticket esistenti.")
                 return {"action": "IGNORE", "reason": "Operazione già esistente per questo messaggio."}
@@ -642,13 +693,18 @@ class OrderManager:
 
             # La modifica di un messaggio vale solo per quel messaggio: mai
             # ricadere sull'ultima operazione aperta, che non c'entra.
+            command = bool(move_to_be or partial_close or layer_target)
             if not target_msg_id and not is_edit:
                 latest_trade = self._get_latest_trade()
-                if latest_trade and latest_trade.get("status") == "ACTIVE":
+                if latest_trade and (latest_trade.get("status") == "ACTIVE"
+                                     or (latest_trade.get("status") == WAITING_MT5 and command)):
                     target_msg_id = latest_trade["msg_id"]
 
             if not target_msg_id or target_msg_id not in self.active_trades:
                 return {"action": "IGNORE", "reason": "Nessun trade attivo trovato per l'aggiornamento."}
+
+            if self.active_trades[target_msg_id].get("status") == WAITING_MT5:
+                return self._update_waiting(self.active_trades[target_msg_id], data, command)
 
             # 2. Recuperiamo l'intera catena legata al trade trovato (originale + re-entry)
             trades_to_update = self._get_trades_by_group(target_msg_id)
@@ -776,11 +832,14 @@ class OrderManager:
 
             if not target_msg_id and not is_edit:
                 latest_trade = self._get_latest_trade()
-                if latest_trade and latest_trade.get("status") in CLOSABLE_STATUSES:
+                if latest_trade and latest_trade.get("status") in CLOSABLE_STATUSES + (WAITING_MT5,):
                     target_msg_id = latest_trade["msg_id"]
 
             if not target_msg_id or target_msg_id not in self.active_trades:
                 return {"action": "IGNORE", "reason": "Nessuna operazione a mercato da chiudere."}
+
+            if self.active_trades[target_msg_id].get("status") == WAITING_MT5:
+                return self._update_waiting(self.active_trades[target_msg_id], data, command=True)
 
             target_trade = self.active_trades[target_msg_id]
             root_id = target_trade.get("root_msg_id", target_trade.get("msg_id"))

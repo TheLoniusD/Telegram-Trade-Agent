@@ -13,7 +13,7 @@ load_dotenv()
 
 import journal
 from agent_classifier import agent_classify_telegram_message, warm_up_agent
-from order_manager import OrderManager, CLOSABLE_STATUSES, ticket_tp_index, cut_loss_now
+from order_manager import OrderManager, CLOSABLE_STATUSES, WAITING_MT5, ticket_tp_index, cut_loss_now
 from risk_manager import RiskManager, zone_bounds
 from mt5_executor import MT5Executor, MT5UnavailableError
 from market_hours import is_market_time_open
@@ -153,6 +153,11 @@ EDIT_FRESHNESS_SECONDS = 120
 # Ordini limite nella zona non ancora eseguiti dopo questo tempo vengono
 # cancellati: il prezzo è partito senza tornare nella zona del trader.
 ENTRY_ORDER_EXPIRY_SECONDS = int(os.getenv("ENTRY_ORDER_EXPIRY_MINUTES", "30")) * 60
+
+# Ingresso rifiutato con MT5 scollegato: per quanto tempo dall'arrivo del segnale
+# si riprova appena MT5 torna (vedi wait_for_mt5). Il 17/11 MT5 è tornato dopo 5
+# minuti e mezzo dallo scollegamento, 4 e mezzo dopo il segnale.
+ENTRY_MT5_WAIT_SECONDS = int(os.getenv("ENTRY_MT5_WAIT_SECONDS", "300"))
 
 # Ultimo testo visto per ogni messaggio: il canale genera molti edit che non
 # cambiano il testo (il 23/09 15 su 20). Riclassificarli costa token e rischia
@@ -389,6 +394,141 @@ def ticket_in_profit(tp_config: dict) -> bool:
     except MT5UnavailableError:
         return False
     return move is None or move > 0
+
+
+def place_entry(trade_data: dict) -> None:
+    """
+    Ingresso di un segnale: rischio, ordini su MT5 e stato in memoria. Se nessun
+    ordine parte e MT5 non è collegato, l'operazione aspetta (wait_for_mt5) e il
+    controllo periodico la riprova appena MT5 torna (retry_waiting_entries).
+    """
+    validated_orders = risk_agent.validate_and_build_order(trade_data)
+    if validated_orders.get("approved"):
+        orders_dict = validated_orders.get("orders", {})
+
+        opened_count = 0
+        errors = []
+        for target_key, order_config in orders_dict.items():
+            # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
+            exec_result = mt5_agent.execute_open(order_config)
+
+            # Scriviamo in memoria i valori REALI restituiti dal broker:
+            # prezzo di riempimento e volume effettivo possono differire da
+            # quelli pianificati (slippage, riempimento parziale), e sono loro
+            # a dover guidare il Breakeven e i controlli successivi.
+            if target_key in trade_data["tickets"]:
+                ticket_data = trade_data["tickets"][target_key]
+                ticket_data["mt5_ticket"] = exec_result.get("mt5_ticket")
+                ticket_data["success"] = exec_result.get("success", False)
+                ticket_data["volume"] = exec_result.get("volume") or order_config.get("volume")
+
+                fill_price = exec_result.get("fill_price")
+                if fill_price:
+                    ticket_data["entry_price"] = fill_price
+                elif exec_result.get("pending"):
+                    # Ordine limite in attesa: il prezzo previsto è il livello limite
+                    ticket_data["entry_price"] = order_config.get("limit_price")
+                    ticket_data["pending"] = True
+                    ticket_data["pending_since"] = time.time()
+                    ticket_data["tighten_price"] = order_config.get("tighten_price")
+                    journal.record("ENTRY_PENDING", mt5_ticket=ticket_data["mt5_ticket"], key=target_key,
+                                   limit_price=order_config.get("limit_price"), volume=ticket_data["volume"])
+
+                # Lo SL inviato a MT5 (anche quello temporaneo della fase
+                # rapida) va in memoria: altrimenti resta None e un update
+                # successivo con soli TP invierebbe sl=0, togliendolo.
+                if exec_result.get("success"):
+                    ticket_data["stop_loss"] = order_config.get("stop_loss")
+                    trade_data["stop_loss"] = order_config.get("stop_loss")
+                    # Anche il TP inviato (es. quello provvisorio di un ingresso senza prezzo)
+                    ticket_data["take_profit"] = order_config.get("take_profit")
+
+            if exec_result.get("success"):
+                opened_count += 1
+            else:
+                errors.append(str(exec_result.get("error")))
+                logger.warning(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
+
+        # Se anche un solo ticket è a mercato l'operazione resta ACTIVE,
+        # così update e chiusure continuano a gestirlo (i ticket non
+        # aperti hanno mt5_ticket a None e vengono saltati). Con uno
+        # stato diverso il CLOSE la ignorerebbe, lasciando la posizione
+        # aperta su MT5 senza più controllo.
+        if opened_count == 0 and wait_for_mt5(trade_data, errors):
+            return
+        trade_data["status"] = "ACTIVE" if opened_count > 0 else "OPEN_FAILED"
+        if 0 < opened_count < len(orders_dict):
+            logger.warning(f"⚠️ Apertura PARZIALE: {opened_count}/{len(orders_dict)} ticket a mercato, l'operazione resta gestita.")
+        journal.record("TRADE_STATUS", **trade_summary(trade_data))
+
+        # Persistiamo SUBITO: fino a questo punto il file su disco
+        # contiene ancora mt5_ticket a null. Se il bot si riavviasse
+        # ora, perderebbe il riferimento a posizioni già a mercato.
+        manager.save_state_to_file()
+        logger.debug(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
+
+    else:
+        if wait_for_mt5(trade_data, [str(validated_orders.get("reason"))]):
+            return
+        logger.warning(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
+        journal.record("RISK_REJECTED", ticket_id=trade_data.get("ticket_id"), reason=validated_orders.get("reason"))
+        trade_data["status"] = "REJECTED"
+        manager.save_state_to_file()
+
+
+def wait_for_mt5(trade_data: dict, errors: list) -> bool:
+    """
+    Nessun ordine partito: se MT5 non è collegato, l'operazione aspetta che
+    torni (WAITING_MT5) per ENTRY_MT5_WAIT_SECONDS dall'arrivo del segnale.
+    True se aspetta; False se MT5 è collegato (il rifiuto è vero) o il tempo è
+    finito: allora vale l'esito di sempre (OPEN_FAILED o REJECTED).
+    """
+    ok, reason = mt5_agent.check_health()
+    if ok:
+        return False
+    now = time.time()
+    first = "mt5_wait_until" not in trade_data
+    if first:
+        trade_data["mt5_wait_since"] = now
+        trade_data["mt5_wait_until"] = now + ENTRY_MT5_WAIT_SECONDS
+    if now > trade_data["mt5_wait_until"]:
+        return False
+    trade_data["status"] = WAITING_MT5
+    for tp_config in trade_data.get("tickets", {}).values():
+        tp_config.update(mt5_ticket=None, success=False, pending=False)
+    if first:
+        journal.record("ENTRY_WAIT", ticket_id=trade_data.get("ticket_id"), mt5_reason=reason,
+                       errors=errors[:2], wait_seconds=ENTRY_MT5_WAIT_SECONDS)
+    manager.save_state_to_file()
+    return True
+
+
+def retry_waiting_entries(mt5_ok: bool) -> None:
+    """
+    Controllo periodico: gli ingressi in attesa di MT5 si riprovano appena MT5
+    torna, con le regole di sempre sul prezzo nuovo (a mercato nella zona,
+    altrimenti limite al bordo); scaduta l'attesa, il segnale non viene aperto.
+    """
+    changed = False
+    for trade in list(manager.active_trades.values()):
+        if trade.get("status") != WAITING_MT5:
+            continue
+        token = journal.set_current_message(trade.get("msg_id"))
+        try:
+            if time.time() > trade.get("mt5_wait_until", 0):
+                trade["status"] = "OPEN_FAILED"
+                journal.record("ENTRY_WAIT_EXPIRED", ticket_id=trade.get("ticket_id"),
+                               wait_seconds=ENTRY_MT5_WAIT_SECONDS)
+                journal.record("TRADE_STATUS", **trade_summary(trade))
+                changed = True
+            elif mt5_ok:
+                journal.record("ENTRY_RETRY", ticket_id=trade.get("ticket_id"),
+                               waited_seconds=round(time.time() - trade.get("mt5_wait_since", time.time())))
+                place_entry(trade)
+        finally:
+            journal.clear_current_message(token)
+    if changed:
+        manager.save_state_to_file()
 
 
 def trade_in_loss(trade: dict) -> bool:
@@ -958,72 +1098,14 @@ def handle_message(event, is_edit: bool):
 
         # CASO 1: Apertura nuovo ordine (Fase Rapida)
         if action == "OPEN":
-            validated_orders = risk_agent.validate_and_build_order(trade_data)
-            if validated_orders.get("approved"):
-                orders_dict = validated_orders.get("orders", {})
+            place_entry(trade_data)
 
-                opened_count = 0
-                for target_key, order_config in orders_dict.items():
-                    # Eseguiamo l'apertura su MT5 con il volume calcolato dal Risk Manager
-                    exec_result = mt5_agent.execute_open(order_config)
-
-                    # Scriviamo in memoria i valori REALI restituiti dal broker:
-                    # prezzo di riempimento e volume effettivo possono differire da
-                    # quelli pianificati (slippage, riempimento parziale), e sono loro
-                    # a dover guidare il Breakeven e i controlli successivi.
-                    if target_key in trade_data["tickets"]:
-                        ticket_data = trade_data["tickets"][target_key]
-                        ticket_data["mt5_ticket"] = exec_result.get("mt5_ticket")
-                        ticket_data["success"] = exec_result.get("success", False)
-                        ticket_data["volume"] = exec_result.get("volume") or order_config.get("volume")
-
-                        fill_price = exec_result.get("fill_price")
-                        if fill_price:
-                            ticket_data["entry_price"] = fill_price
-                        elif exec_result.get("pending"):
-                            # Ordine limite in attesa: il prezzo previsto è il livello limite
-                            ticket_data["entry_price"] = order_config.get("limit_price")
-                            ticket_data["pending"] = True
-                            ticket_data["pending_since"] = time.time()
-                            ticket_data["tighten_price"] = order_config.get("tighten_price")
-                            journal.record("ENTRY_PENDING", mt5_ticket=ticket_data["mt5_ticket"], key=target_key,
-                                           limit_price=order_config.get("limit_price"), volume=ticket_data["volume"])
-
-                        # Lo SL inviato a MT5 (anche quello temporaneo della fase
-                        # rapida) va in memoria: altrimenti resta None e un update
-                        # successivo con soli TP invierebbe sl=0, togliendolo.
-                        if exec_result.get("success"):
-                            ticket_data["stop_loss"] = order_config.get("stop_loss")
-                            trade_data["stop_loss"] = order_config.get("stop_loss")
-                            # Anche il TP inviato (es. quello provvisorio di un ingresso senza prezzo)
-                            ticket_data["take_profit"] = order_config.get("take_profit")
-
-                    if exec_result.get("success"):
-                        opened_count += 1
-                    else:
-                        logger.warning(f"⚠️ Apertura {target_key} non riuscita: {exec_result.get('error')}")
-
-                # Se anche un solo ticket è a mercato l'operazione resta ACTIVE,
-                # così update e chiusure continuano a gestirlo (i ticket non
-                # aperti hanno mt5_ticket a None e vengono saltati). Con uno
-                # stato diverso il CLOSE la ignorerebbe, lasciando la posizione
-                # aperta su MT5 senza più controllo.
-                trade_data["status"] = "ACTIVE" if opened_count > 0 else "OPEN_FAILED"
-                if 0 < opened_count < len(orders_dict):
-                    logger.warning(f"⚠️ Apertura PARZIALE: {opened_count}/{len(orders_dict)} ticket a mercato, l'operazione resta gestita.")
-                journal.record("TRADE_STATUS", **trade_summary(trade_data))
-
-                # Persistiamo SUBITO: fino a questo punto il file su disco
-                # contiene ancora mt5_ticket a null. Se il bot si riavviasse
-                # ora, perderebbe il riferimento a posizioni già a mercato.
-                manager.save_state_to_file()
-                logger.debug(f"✅ Memoria aggiornata con successo. Status trade: {trade_data['status']}")
-
-            else:
-                logger.warning(f"⚠️ Risk Manager: {validated_orders.get('reason')}")
-                journal.record("RISK_REJECTED", ticket_id=trade_data.get("ticket_id"), reason=validated_orders.get("reason"))
-                trade_data["status"] = "REJECTED"
-                manager.save_state_to_file()
+        # Ingresso in attesa di MT5 annullato da un comando del trader
+        elif action == "WAIT_CANCELLED":
+            journal.record("ENTRY_WAIT_CANCELLED", ticket_id=trade_data.get("ticket_id"),
+                           reason=manager_result.get("reason"), msg_id=trade_data.get("msg_id"), by_msg_id=msg_id)
+            journal.record("TRADE_STATUS", **trade_summary(trade_data))
+            manager.save_state_to_file()
 
         # CASO 2: Aggiornamento ordine esistente (SL/TP reali e/o BE+)
         elif action == "UPDATE":
@@ -1412,6 +1494,8 @@ async def monitor_loop():
                 else:
                     logger.error(f"❌ Problema MT5: {reason}")
                 journal.record("MT5_CONNECTION", ok=ok, reason=reason)
+
+            retry_waiting_entries(ok)
 
             if ok and not mt5_agent.test_mode:
                 sync_pending_entries()

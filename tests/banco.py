@@ -163,6 +163,7 @@ def controllo_periodico():
     monitor_loop() in telegram_listener.py: se cambia lì, va cambiata qui.
     """
     ok, _reason = L.mt5_agent.check_health()
+    L.retry_waiting_entries(ok)
     if not ok:
         return
     try:
