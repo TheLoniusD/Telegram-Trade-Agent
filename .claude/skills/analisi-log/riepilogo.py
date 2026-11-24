@@ -89,6 +89,11 @@ def main():
           f"{len(by('PENDING_FILLED'))} eseguiti, {len(by('PENDING_MOVED'))} spostati")
     for reason, n in Counter(e.get("reason") for e in by("PENDING_CANCELLED")).most_common():
         print(f"  cancellati: {n} — {reason}")
+    if by("ENTRY_WAIT"):
+        # Ingressi con MT5 scollegato (dal 24/11): in attesa, riprovati, scaduti o annullati
+        print(f"  in attesa di MT5: {[hm(e) for e in by('ENTRY_WAIT')]} · riprovati {[hm(e) for e in by('ENTRY_RETRY')]}"
+              f" · scaduti {[hm(e) for e in by('ENTRY_WAIT_EXPIRED')]}"
+              f" · annullati {[hm(e) for e in by('ENTRY_WAIT_CANCELLED')]}")
 
     protective = by("PROTECTIVE_STOP")
     print(f"\nPareggio: {len(by('BE_PENDING'))} richieste in attesa, {len(by('BE_PENDING_APPLIED'))} applicati dopo, "

@@ -64,6 +64,9 @@ class FakeMT5:
         self.account_mode = ACCOUNT_TRADE_MODE_DEMO
         self.symbol_mode = SYMBOL_TRADE_MODE_FULL
         self.connected = True
+        # Terminale acceso ma scollegato dal server del broker (17/11 09:08–09:13):
+        # prezzi fermi all'ultimo tick, ordini rifiutati con retcode 10031
+        self.broker_online = True
         self.positions = {}
         self.orders = {}
         self.deals = {}
@@ -111,7 +114,7 @@ class FakeMT5:
         return (1, "Success") if self.connected else (-10004, "No IPC connection")
 
     def terminal_info(self):
-        return NS(connected=self.connected, trade_allowed=True)
+        return NS(connected=self.connected and self.broker_online, trade_allowed=True)
 
     def account_info(self):
         if not self.connected:
@@ -166,6 +169,8 @@ class FakeMT5:
         self.requests.append(req)
         if not self.connected:
             return None
+        if not self.broker_online:
+            return self._result(10031, comment="Request rejected due to absence of network connection")
         action = req.get("action")
         if action == TRADE_ACTION_DEAL:
             return self._close(req) if req.get("position") else self._open(req)

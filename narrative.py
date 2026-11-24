@@ -241,6 +241,26 @@ class Narrator:
     def on_decision(self, e):
         if e.get("action") == "IGNORE":
             self.say(f"   ↳ nessuna azione: {e.get('reason')}")
+        elif e.get("action") == "WAITING":
+            self.say(f"   ↳ ⏳ {e.get('reason')}")
+
+    # Ingresso rifiutato con MT5 scollegato (dal 24/11, vedi wait_for_mt5)
+    def on_entry_wait(self, e):
+        minutes = round((e.get("wait_seconds") or 0) / 60)
+        self.say(f"⏳ {self.label_from_message(e.get('msg_id'))}MT5 scollegato: ingresso in attesa, "
+                 f"riprovo appena torna (per {minutes} minuti)")
+
+    def on_entry_retry(self, e):
+        self.say(f"🔁 {self.label_from_message(e.get('msg_id'))}MT5 di nuovo collegato dopo "
+                 f"{e.get('waited_seconds')} secondi: nuovo tentativo d'ingresso")
+
+    def on_entry_wait_expired(self, e):
+        minutes = round((e.get("wait_seconds") or 0) / 60)
+        self.say(f"⌛ {self.label_from_message(e.get('msg_id'))}MT5 non tornato entro {minutes} minuti: "
+                 f"segnale non aperto")
+
+    def on_entry_wait_cancelled(self, e):
+        self.say(f"🗑️ {self.label_from_message(e.get('msg_id'))}ingresso in attesa annullato: {e.get('reason')}")
 
     def on_risk_calc(self, e):
         self.risk[e.get("ticket_id")] = e
