@@ -67,6 +67,14 @@ def level(value) -> str:
     return str(int(value)) if float(value).is_integer() else num(value)
 
 
+def day_time(iso) -> str:
+    """'2026-11-09T03:05:08+01:00' -> '09/11 03:05' (ora del bot, già locale)."""
+    try:
+        return datetime.fromisoformat(str(iso)).strftime("%d/%m %H:%M")
+    except ValueError:
+        return str(iso or "?")
+
+
 def compact_text(text: str, limit: int = 110) -> str:
     """Testo del trader su una riga: senza righe vuote, spazi doppi e firme."""
     lines = []
@@ -478,9 +486,36 @@ class Narrator:
 
     def on_heartbeat(self, e):
         state = "" if e.get("mt5_ok") else f" · ⚠️ MT5: {e.get('mt5_reason')}"
+        if e.get("agent_down_since"):
+            state += (f" · 🚨 Agente non raggiungibile dal {day_time(e['agent_down_since'])} "
+                      f"({e.get('agent_lost_messages', 0)} messaggi non classificati)")
         self.say(f"💓 Bot attivo · saldo {num(e.get('balance'))} $ · equity {num(e.get('equity'))} $ · "
                  f"{e.get('live_trades', 0)} operazioni aperte · {self.skipped} messaggi scartati dall'ultimo controllo{state}")
         self.skipped = 0
+
+    # Le righe con "Agente non raggiungibile" e "Agente di nuovo raggiungibile" sono
+    # lette da STATO.md (infrastruttura/caricamento-log): non cambiarne le parole.
+    def say_lost_message(self, e):
+        message = self.messages.pop(e.get("msg_id"), None) if e.get("where") == "classificazione" else None
+        if message:
+            verb = "✏️ Trader modifica" if message.get("is_edit") else "📩 Trader"
+            self.say(f"{verb}: \"{compact_text(message.get('text'))}\"")
+
+    def on_agent_down(self, e):
+        self.say_lost_message(e)
+        what = "messaggio non classificato" if e.get("where") == "classificazione" else "riscaldamento non riuscito"
+        self.say(f"🚨 Agente non raggiungibile: {what} · {compact_text(e.get('error'), 160)} · "
+                 f"nessuna operazione nuova finché non torna")
+
+    def on_agent_error(self, e):
+        self.say_lost_message(e)
+        what = (f"messaggio non classificato ({e.get('messages')}°)" if e.get("where") == "classificazione"
+                else "riscaldamento non riuscito")
+        self.say(f"🚨 Agente non raggiungibile dal {day_time(e.get('since'))}: {what}")
+
+    def on_agent_up(self, e):
+        self.say(f"✅ Agente di nuovo raggiungibile · non rispondeva dal {day_time(e.get('since'))} · "
+                 f"{e.get('messages', 0)} messaggi non classificati")
 
     def on_error(self, e):
         last = [line for line in str(e.get("error") or "").strip().splitlines() if line.strip()]

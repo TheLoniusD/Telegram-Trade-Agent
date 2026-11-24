@@ -23,6 +23,8 @@ SERVIZI_EXTRA=${SERVIZI_EXTRA:-}
 RIGA_AVVIO=${RIGA_AVVIO:-Bot avviato}
 RIGA_BATTITO=${RIGA_BATTITO:-Bot attivo}
 ORE_BATTITO=${ORE_BATTITO:-5}
+RIGA_AGENTE_KO=${RIGA_AGENTE_KO-Agente non raggiungibile}
+RIGA_AGENTE_OK=${RIGA_AGENTE_OK-Agente di nuovo raggiungibile}
 REGISTRO=${REGISTRO:-$HOME/.local/state/caricamento-log/$ISTANZA.log}
 export TZ=$FUSO
 
@@ -87,12 +89,15 @@ controlla_processi() {
     esac
 }
 
-# Ultima riga del bot.log che contiene $1, oggi o ieri: stampa "AAAA-MM-GG|riga"
+# Ultima riga del bot.log che contiene uno dei testi dati, oggi o ieri: stampa "AAAA-MM-GG|riga"
 ultima_riga() {
-    local giorno riga
+    local giorno riga testo cerca=()
+    for testo in "$@"; do
+        [ -n "$testo" ] && cerca+=(-e "$testo")
+    done
     for giorno in "$(date +%F)" "$(date -d yesterday +%F)"; do
         [ -f "$CARTELLA_LOG/$giorno/bot.log" ] || continue
-        riga=$(grep -F -- "$1" "$CARTELLA_LOG/$giorno/bot.log" | tail -n 1)
+        riga=$(grep -F "${cerca[@]}" "$CARTELLA_LOG/$giorno/bot.log" | tail -n 1)
         if [ -n "$riga" ]; then
             echo "$giorno|$riga"
             return
@@ -126,6 +131,27 @@ controlla_bot_log() {
         segno="✅"
     fi
     aggiungi "Ultimo battito" "$segno $(giorno_breve "$giorno") $riga"
+}
+
+# L'agente che classifica i messaggi. Dal 09 all'11/11 ogni chiamata è fallita (credito
+# esaurito, poi chiave non valida) per due giorni e mezzo, con servizi, processo e battito
+# a posto: STATO.md diceva "Tutto regolare". Il bot scrive "Agente non raggiungibile" a
+# ogni messaggio perso e nel battito finché il guasto dura, "Agente di nuovo raggiungibile"
+# quando finisce. Conta l'ultima riga, oggi o ieri, tra queste, l'avvio (un riavvio azzera
+# il guasto: l'11/11 il bot è ripartito con la chiave nuova) e il battito senza il guasto.
+controlla_agente() {
+    local trovata riga
+    [ -n "$RIGA_AGENTE_KO" ] || return
+    trovata=$(ultima_riga "$RIGA_AGENTE_KO" "$RIGA_AGENTE_OK" "$RIGA_AVVIO" "$RIGA_BATTITO")
+    riga=${trovata#*|}
+    if [ -n "$trovata" ] && [[ "$riga" == *"$RIGA_AGENTE_KO"* ]]; then
+        aggiungi "Agente" "❌ $(giorno_breve "${trovata%%|*}") $riga"
+        problema "l'agente non risponde: i messaggi del trader non vengono classificati e non si aprono operazioni"
+    elif [ -n "$RIGA_AGENTE_OK" ] && [[ "$riga" == *"$RIGA_AGENTE_OK"* ]]; then
+        aggiungi "Agente" "✅ $(giorno_breve "${trovata%%|*}") $riga"
+    else
+        aggiungi "Agente" "✅ nessun guasto in corso"
+    fi
 }
 
 controlla_disco() {
@@ -185,6 +211,7 @@ for servizio in $SERVIZI_EXTRA; do
 done
 [ -z "$PROCESSO_BOT" ] || controlla_processi
 controlla_bot_log
+controlla_agente
 controlla_disco
 scrivi_stato > STATO.md || errore "STATO.md non scritto"
 

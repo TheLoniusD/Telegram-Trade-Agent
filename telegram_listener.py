@@ -17,7 +17,7 @@ from order_manager import OrderManager, CLOSABLE_STATUSES, ticket_tp_index
 from risk_manager import RiskManager, zone_bounds
 from mt5_executor import MT5Executor, MT5UnavailableError
 from market_hours import is_market_time_open
-from logger_config import setup_logger
+from logger_config import now_local, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -166,6 +166,51 @@ _LAST_TEXT_MAX_ENTRIES = 1000
 AGENT_WARMUP_MIN_GAP_SECONDS = 300
 _last_agent_call = None     # time.monotonic() dell'ultima chiamata all'agente (o riscaldamento)
 _warmup_thread = None       # ultimo riscaldamento lanciato (i test lo aspettano)
+
+# Agente che non risponde. Dal 09/11 alle 03:05 all'11/11 alle 19:37 ogni chiamata
+# è fallita (credito Anthropic esaurito, poi chiave non valida): il bot scriveva un
+# errore per messaggio e andava avanti, circa 33 segnali persi, e STATO.md diceva
+# "Tutto regolare". Ora il primo errore apre lo stato "agente non raggiungibile"
+# (AGENT_DOWN), ogni messaggio perso lo dice (AGENT_ERROR), il battito lo ripete e
+# la prima chiamata riuscita lo chiude (AGENT_UP). STATO.md legge queste righe.
+_agent_down = None          # {"since": ora locale ISO, "messages": messaggi non classificati, "error": ultimo errore}
+_agent_lock = threading.Lock()  # il riscaldamento gira in un altro thread
+
+
+def _short_error(e: Exception) -> str:
+    return f"{type(e).__name__}: {e}"[:300]
+
+
+def agent_failed(e: Exception, where: str, msg_id=None) -> None:
+    """Una chiamata all'agente non è riuscita (classificazione o riscaldamento)."""
+    global _agent_down
+    error = _short_error(e)
+    with _agent_lock:
+        first = _agent_down is None
+        if first:
+            _agent_down = {"since": now_local().isoformat(timespec="seconds"), "messages": 0}
+        if where == "classificazione":
+            _agent_down["messages"] += 1
+        _agent_down["error"] = error
+        state = dict(_agent_down)
+    if first:
+        logger.error(f"🚨 Agente non raggiungibile ({where}): {error}", exc_info=e)
+        journal.record("AGENT_DOWN", where=where, error=error, since=state["since"], msg_id=msg_id)
+    else:
+        logger.warning(f"🚨 Agente ancora non raggiungibile ({where}): {error}")
+        journal.record("AGENT_ERROR", where=where, error=error, since=state["since"], messages=state["messages"],
+                       msg_id=msg_id)
+
+
+def agent_ok() -> None:
+    """Una chiamata all'agente è riuscita: se non rispondeva, il problema è finito."""
+    global _agent_down
+    with _agent_lock:
+        state, _agent_down = _agent_down, None
+    if state:
+        logger.warning(f"✅ Agente di nuovo raggiungibile (non rispondeva dal {state['since']}, "
+                       f"{state['messages']} messaggi non classificati)")
+        journal.record("AGENT_UP", since=state["since"], messages=state["messages"], last_error=state.get("error"))
 
 
 def levels_match_direction(direction: str, stop_loss, take_profit) -> bool:
@@ -703,10 +748,12 @@ def _agent_warmup(msg_id) -> None:
     try:
         result = warm_up_agent()
         journal.record("AGENT_WARMUP", msg_id=msg_id, ok=True, seconds=round(time.monotonic() - started, 2), **result)
+        agent_ok()
     except Exception as e:
         logger.warning(f"⚠️ Riscaldamento dell'agente non riuscito: {type(e).__name__}: {e}")
         journal.record("AGENT_WARMUP", msg_id=msg_id, ok=False, seconds=round(time.monotonic() - started, 2),
                        error=f"{type(e).__name__}: {e}")
+        agent_failed(e, "riscaldamento", msg_id)
 
 
 def agent_idle() -> bool:
@@ -845,7 +892,15 @@ def handle_message(event, is_edit: bool):
     # Chiamata al tuo Agente 1 passando il testo e lo stato di modifica
     global _last_agent_call
     _last_agent_call = time.monotonic()
-    ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media, is_forwarded=is_forwarded, timestamp=timestamp)
+    try:
+        ai_output = agent_classify_telegram_message(text, is_edit=is_edit, reply_to=reply_to, has_media=has_media,
+                                                    is_forwarded=is_forwarded, timestamp=timestamp)
+    except Exception as e:
+        # Messaggio perso: lo dicono il racconto, il battito e STATO.md (vedi agent_failed).
+        # Il testo non viene memorizzato: una modifica con lo stesso testo verrà riprovata.
+        agent_failed(e, "classificazione", msg_id)
+        return
+    agent_ok()
 
     logger.debug(f"🧠 OUTPUT AGENTE 1: {json.dumps(ai_output, ensure_ascii=False)}")
 
@@ -1298,7 +1353,10 @@ def write_heartbeat(mt5_ok: bool, mt5_reason: str) -> None:
     logger.debug(f"💓 Bot attivo | MT5: {mt5_reason} | operazioni vive: {len(live_trades)} "
                 f"| saldo: {account.get('balance')} | equity: {account.get('equity')} "
                 f"| posizioni aperte sul conto: {account.get('open_positions')}")
-    journal.record("HEARTBEAT", mt5_ok=mt5_ok, mt5_reason=mt5_reason, live_trades=len(live_trades), **account)
+    with _agent_lock:
+        agent = {"agent_down_since": _agent_down["since"], "agent_lost_messages": _agent_down["messages"]} \
+            if _agent_down else {}
+    journal.record("HEARTBEAT", mt5_ok=mt5_ok, mt5_reason=mt5_reason, live_trades=len(live_trades), **account, **agent)
 
 
 async def monitor_loop():
