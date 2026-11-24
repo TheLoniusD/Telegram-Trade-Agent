@@ -57,6 +57,12 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
      "Close GOLD now", "Exit all entries at market", "Out of Gold", "Setup invalidated, cut trade",
      "Abort buy setup", "Close with small loss", "Close all open trades before news".
      -> intent: 'CLOSE_SIGNAL', is_actionable: true
+     Cut loss IMMEDIATO (il trader esce adesso, in perdita), esempi reali dal canale: "Cut lose 60pips now",
+     "Candle break, cut lose 50pips now and ready next setup", "Cut lose at 4049 20pips now",
+     "this setup i cut lose 30pips", "Cut lose now, ready setup recovery!".
+     -> intent: 'CLOSE_SIGNAL', is_actionable: true, close_percentage: null, stop_loss: null.
+     I numeri seguiti da "pips" sono la perdita in pips, MAI una percentuale di chiusura.
+     Il cut loss CONDIZIONATO ("Cut lose if solid break 4188") NON è una chiusura: vedi UPDATE_SIGNAL, punto d.
 
 ── 2. UPDATE_SIGNAL (verifica su un trade GIÀ APERTO, dopo aver escluso CLOSE_SIGNAL) ──
 
@@ -87,7 +93,7 @@ da semplice commento tecnico, gergo di trading o frasi motivazionali/enigmatiche
 
   d) NON STANDARD: qualsiasi altro messaggio che fa riferimento a un'operazione attiva con un comando operativo
      concreto ma senza rientrare nei template sopra:
-     - Livelli di Invalidation / Cut Loss condizionato: "Cut loss if solid break 4426", "Invalidation at X",
+     - Livelli di Invalidation / Cut Loss condizionato (con "if"): "Cut loss if solid break 4426", "Invalidation at X",
        "Exit if X breaks" -> intent: 'UPDATE_SIGNAL', is_actionable: true; estrai il prezzo in `stop_loss`.
      - Chiusura parziale + protezione in stile libero: "Running 90pips, lets close half now and BE your entry"
        -> intent: 'UPDATE_SIGNAL', is_actionable: true; estrai close_percentage e/o move_sl_to_be.
