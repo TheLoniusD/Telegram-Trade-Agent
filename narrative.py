@@ -235,6 +235,9 @@ class Narrator:
             self.say(f"{verb}: \"{compact_text(message.get('text'))}\"")
         self.say(f"🧠 Agente: {describe_classification(e)}")
 
+    def on_cut_loss(self, e):
+        self.say("✂️ Cut loss del trader: chiusura totale dell'operazione, se in perdita")
+
     def on_decision(self, e):
         if e.get("action") == "IGNORE":
             self.say(f"   ↳ nessuna azione: {e.get('reason')}")

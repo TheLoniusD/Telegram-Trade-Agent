@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -17,6 +18,24 @@ CLOSABLE_STATUSES = ("ACTIVE", "CLOSING", "CLOSE_FAILED")
 # Stati definitivi: l'operazione non tornerà più a mercato, quindi esce dallo
 # stato vivo e finisce nell'archivio giornaliero.
 TERMINAL_STATUSES = ("CLOSED", "REJECTED", "OPEN_FAILED")
+
+# "Cut lose … now": il trader esce adesso, in perdita. Dal 23/09 al 24/11 cinque
+# messaggi così ("Cut lose 60pips now", "Candle break, cut lose 50pips now",
+# "Cut lose at 4049 20pips now", "this setup i cut lose 30pips", "Cut lose now"):
+# l'agente li leggeva come IGNORE o come "chiudi il 20/50%" (i pips presi per la
+# percentuale, nessuna chiusura con i ticket in perdita) e quattro volte siamo
+# finiti allo stop pieno, circa 290 $ in più del trader. Il condizionale ("cut
+# lose if solid break 4188", cinque volte) resta uno SL. Si riconosce dal testo,
+# non dall'agente; stessa regola nel rigioco (prezzi.py).
+RE_CUT_LOSS = re.compile(r"(?i)\bcut\s*los(?:e|s|ss)?\b")
+RE_CUT_LOSS_NOW = re.compile(r"(?i)\bnow\b|\d\s*pips?\b")
+RE_CUT_LOSS_IF = re.compile(r"(?i)\bif\b")
+
+
+def cut_loss_now(text: str) -> bool:
+    """True per "cut lose … now" / "cut lose N pips" senza condizioni ("if solid break X")."""
+    text = text or ""
+    return bool(RE_CUT_LOSS.search(text) and RE_CUT_LOSS_NOW.search(text) and not RE_CUT_LOSS_IF.search(text))
 
 # Re-entry ("Try buy again", "Lets try sell again"): non ha prezzo né livelli
 # e il trader non lo corregge mai con SL/TP, quindi eredita tutto dall'ultima
@@ -439,7 +458,13 @@ class OrderManager:
         return [key for key, cfg in open_tickets.items() if cfg["take_profit"] == target_tp]
 
 
-    def handle_agent_output(self, msg_id: int, reply_to: Optional[int], ai_output: dict, is_edit: bool = False) -> Optional[dict]:
+    def handle_agent_output(self, msg_id: int, reply_to: Optional[int], ai_output: dict, is_edit: bool = False,
+                            in_loss=None) -> Optional[dict]:
+        """
+        in_loss(trade) -> bool: True se l'operazione è in perdita (solo posizioni
+        aperte in perdita, o nessuna posizione aperta). Serve al cut loss, che
+        chiude solo un'operazione in perdita (vedi cut_loss_now).
+        """
         intent = ai_output.get("intent")
         data = ai_output.get("data", {})
 
@@ -763,14 +788,21 @@ class OrderManager:
             # Raccogliamo tutta la famiglia collegata (originale + re-entry).
             # Lo stato diventa CLOSING, non CLOSED: la chiusura è confermata solo
             # dall'esito reale restituito da MT5 (vedi telegram_listener.py).
-            closing_chain = []
-            for trade in self.active_trades.values():
-                if trade.get("root_msg_id", trade.get("msg_id")) == root_id and trade.get("status") in CLOSABLE_STATUSES:
-                    trade["status"] = "CLOSING"
-                    closing_chain.append(trade)
+            closing_chain = [trade for trade in self.active_trades.values()
+                             if trade.get("root_msg_id", trade.get("msg_id")) == root_id
+                             and trade.get("status") in CLOSABLE_STATUSES]
 
             if not closing_chain:
                 return {"action": "IGNORE", "reason": "Nessuna operazione a mercato da chiudere."}
+
+            # Cut loss: si esce in perdita. Un'operazione in guadagno non è quella
+            # di cui parla il trader (o ne siamo usciti meglio di lui): resta com'è.
+            if details.get("cut_loss") and not all(in_loss(trade) if in_loss else False for trade in closing_chain):
+                return {"action": "IGNORE",
+                        "reason": "cut loss: l'operazione non è in perdita, resta aperta con il suo SL."}
+
+            for trade in closing_chain:
+                trade["status"] = "CLOSING"
 
             self.save_state_to_file()
             logger.debug(f"🔒 [CLOSE_SIGNAL] Root ID {root_id}: {len(closing_chain)} operazioni da chiudere (Originale + Re-entry).")

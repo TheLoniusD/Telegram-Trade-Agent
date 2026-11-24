@@ -13,7 +13,7 @@ load_dotenv()
 
 import journal
 from agent_classifier import agent_classify_telegram_message, warm_up_agent
-from order_manager import OrderManager, CLOSABLE_STATUSES, ticket_tp_index
+from order_manager import OrderManager, CLOSABLE_STATUSES, ticket_tp_index, cut_loss_now
 from risk_manager import RiskManager, zone_bounds
 from mt5_executor import MT5Executor, MT5UnavailableError
 from market_hours import is_market_time_open
@@ -389,6 +389,24 @@ def ticket_in_profit(tp_config: dict) -> bool:
     except MT5UnavailableError:
         return False
     return move is None or move > 0
+
+
+def trade_in_loss(trade: dict) -> bool:
+    """
+    Per il cut loss: True se tutte le posizioni aperte dell'operazione sono in
+    perdita, o se ha solo ordini in attesa (si cancellano). False se una è in
+    guadagno o non è misurabile: meglio lasciare lo SL che chiudere a caso.
+    """
+    for tp_config in trade.get("tickets", {}).values():
+        if not tp_config.get("mt5_ticket") or tp_config.get("closed") or tp_config.get("pending"):
+            continue
+        try:
+            move = mt5_agent.favorable_move(tp_config.get("mt5_ticket"))
+        except MT5UnavailableError:
+            return False
+        if move is None or move >= 0:
+            return False
+    return True
 
 
 def execute_partial_close(trades: list, percentage: float) -> None:
@@ -912,8 +930,18 @@ def handle_message(event, is_edit: bool):
     journal.record("CLASSIFIED", intent=ai_output.get("intent"), is_actionable=ai_output.get("is_actionable"),
                    data=ai_output.get("data"), reasoning=ai_output.get("raw_reasoning"))
 
+    # "Cut lose … now": chiusura totale dell'operazione in perdita, qualunque cosa
+    # abbia letto l'agente (vedi cut_loss_now in order_manager.py)
+    if cut_loss_now(text):
+        journal.record("CUT_LOSS", agent_intent=ai_output.get("intent"))
+        data = dict(ai_output.get("data") or {})
+        data["update_details"] = {"move_sl_to_be": False, "close_percentage": None, "layer_target": None,
+                                  "cut_loss": True}
+        data["stop_loss"], data["take_profit"] = None, []
+        ai_output = dict(ai_output, intent="CLOSE_SIGNAL", is_actionable=True, data=data)
+
     # 2. Passaggio all'Order Manager (il tuo file separato)
-    manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output, is_edit=is_edit)
+    manager_result = manager.handle_agent_output(msg_id, reply_to, ai_output, is_edit=is_edit, in_loss=trade_in_loss)
     if manager_result and manager_result.get("sl_ignored"):
         # SL scritto male dal trader (vedi MAX_SL_DISTANCE in order_manager.py)
         logger.warning(f"⚠️ SL {manager_result['sl_ignored']['stop_loss']} a {manager_result['sl_ignored']['distance']} $ "

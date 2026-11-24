@@ -45,6 +45,7 @@ load_dotenv()
 
 from logger_config import LOG_DIR, to_local
 from verifica_be import POINT, SYMBOL, download_bars, load_events
+from order_manager import cut_loss_now
 
 PIPS_PER_DOLLAR = 10  # oro: 1 $ = 10 pips, come li conta il trader
 
@@ -361,6 +362,7 @@ BASE_RULES = dict(
     max_sl=MAX_SL_DISTANCE,    # SL più lontano dal prezzo del segnale: errore di battitura, non vale (dal 27/10)
     expiry=30 * 60,            # ordini limite non eseguiti cancellati dopo
     entry_at_message=False,    # segnale rapido eseguito all'arrivo del messaggio, senza aspettare l'agente
+    cut_loss=True,             # "cut lose … now" chiude l'operazione in perdita (dal 24/11)
 )
 
 # nome: (sigla per il dettaglio, regole diverse da quelle attuali)
@@ -388,6 +390,8 @@ STRATEGIES = {
     # 22/10: "SL 4176" invece di 4076 mandato a MT5 (per calibrare quel giorno con il reale)
     "SL scritto male applicato (fino al 27/10)": ("SL lont", dict(max_sl=None)),
     "mai BE":                     ("mai BE", dict(be="none", ta_close=0, protect=())),
+    # 12/10, 28/10, 05/11, 19/11: "cut lose … now" ignorato o letto come "chiudi il N%" in perdita
+    "senza cut loss (fino al 24/11)": ("no cut", dict(cut_loss=False)),
 }
 
 
@@ -525,9 +529,15 @@ def extract_signals(events: list) -> list:
             by_id[msg_id] = signal
             continue
 
-        # Comandi. HIT TP / HIT TP MAX = pareggio (regola dal 28/09, qualunque
-        # cosa abbia deciso l'agente nei giorni prima).
-        if RE_HIT_TP.search(text):
+        # Comandi. "Cut lose … now" = chiusura dell'operazione se in perdita, come il
+        # bot (24/11), qualunque cosa abbia letto l'agente; vale per l'ultimo segnale,
+        # in qualunque direzione, e una modifica senza risposta non ne cerca uno.
+        # HIT TP / HIT TP MAX = pareggio (regola dal 28/09, qualunque cosa abbia
+        # deciso l'agente nei giorni prima).
+        cut = cut_loss_now(text)
+        if cut:
+            kinds, direction = ["CUT"], None
+        elif RE_HIT_TP.search(text):
             kinds = ["BE"]
         elif intent == "CLOSE_SIGNAL" or ((details.get("close_percentage") or 0) >= 100
                                           and not details.get("move_sl_to_be")):
@@ -555,6 +565,8 @@ def extract_signals(events: list) -> list:
                 break
             ref, depth = replies.get(ref), depth + 1
         if target is None:
+            if cut and edited.get(msg_id):
+                continue
             candidates = [s for s in signals if t - s["t"] <= COMMAND_LINK_SECONDS
                           and (direction not in ("BUY", "SELL") or s["buy"] == (direction == "BUY"))]
             if not candidates:
@@ -872,6 +884,14 @@ def simulate_signal(signal: dict, points: list, rules: dict, risk: float, hours:
                         ticket["state"] = "cancelled"
                 for ticket in open_tickets:
                     close(ticket, c if buy else ask_c, "chiusura")
+            elif kind == "CUT":
+                # Cut loss: si esce solo in perdita (nessuna posizione aperta in guadagno)
+                if rules["cut_loss"] and all(gain(x, c, ask_c) < 0 for x in open_tickets):
+                    for ticket in tickets.values():
+                        if ticket["state"] == "pending":
+                            ticket["state"] = "cancelled"
+                    for ticket in open_tickets:
+                        close(ticket, c if buy else ask_c, "cut loss")
             elif kind == "HALF":
                 for ticket in tickets.values():
                     if ticket["state"] == "pending":

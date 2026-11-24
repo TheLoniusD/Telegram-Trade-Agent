@@ -180,4 +180,34 @@ RISPOSTA = [dict(RECUPERO[0], msg_id=22, reply_to=1), dict(RECUPERO[1], msg_id=2
 signals = prezzi.extract_signals(diario(SEGNALE) + RISPOSTA)
 check(len(signals) == 1 and signals[0]["id"] == 1, "solo il segnale SELL 4128", [s["id"] for s in signals])
 
+# "Cut lose 60pips now" (19/11), senza risposta, che l'agente legge come aggiornamento
+# senza modifiche: come il bot dal 24/11, chiusura dell'ultimo segnale se in perdita.
+# SELL a 4.128,20; al messaggio il prezzo è a 4.131 (in perdita), poi sale oltre lo SL 4.138.
+CUT = (8, 600, "Cut lose 60pips now", "UPDATE_SIGNAL", None, dati(direction=None))
+prezzi_tick = [(1, 4128.2), (600, 4131.0), (1200, 4140.0)]
+points = [(T0 + s, 0, p, p, p, p, SPREAD) for s, p in prezzi_tick]
+signal = prezzi.extract_signals(diario(SEGNALE, CUT))[0]
+
+scenario("\"Cut lose 60pips now\" letto dall'agente come aggiornamento: comando di cut loss sull'ultimo segnale")
+kinds = [kind for _, kind, _ in signal["events"]]
+check(kinds == ["CUT"], "comando: cut loss", kinds)
+esito = rigioca("attuale")
+check(all(r == "cut loss" for r, _ in esito.values()), "e1 ed e2 chiusi dal cut loss, non allo SL", esito)
+
+scenario("Variante \"senza cut loss (fino al 24/11)\": come il bot di prima, allo stop pieno")
+esito = rigioca("senza cut loss (fino al 24/11)")
+check(all(r == "SL" for r, _ in esito.values()), "e1 ed e2 allo SL del trader", esito)
+
+scenario("Cut loss con l'operazione in guadagno: niente chiusura")
+prezzi_tick = [(1, 4128.2), (600, 4125.0), (1200, 4140.0)]
+points = [(T0 + s, 0, p, p, p, p, SPREAD) for s, p in prezzi_tick]
+esito = rigioca("attuale")
+check(all(r == "SL" for r, _ in esito.values()), "resta lo SL del trader", esito)
+
+scenario("Cut loss condizionato (\"if solid break\"): nessun cut loss")
+CONDIZIONATO = (9, 600, "Cut lose if solid break 4136", "UPDATE_SIGNAL", 1, dati(stop_loss=4136.0))
+signal = prezzi.extract_signals(diario(SEGNALE, CONDIZIONATO))[0]
+check("CUT" not in [kind for _, kind, _ in signal["events"]], "nessun comando di cut loss",
+      [kind for _, kind, _ in signal["events"]])
+
 fine()
